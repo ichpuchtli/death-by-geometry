@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Playwright test runner for Geometry Genocide
+# Playwright test runner for Death by Geometry
 # Usage: ./tests/playwright.sh [flow-file|tag|all|screenshot] [flags]
 #
 # Examples:

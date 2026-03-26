@@ -1,4 +1,4 @@
-# Geometry Genocide Art Direction Review
+# Death by Geometry Art Direction Review
 
 ## Overall Verdict
 

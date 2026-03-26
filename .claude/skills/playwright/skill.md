@@ -1,7 +1,7 @@
 # Playwright — Browser Testing & Screenshots
 
 ## Purpose
-Run Playwright browser tests and take screenshots of the Geometry Genocide game. Handles building, starting a preview server, running declarative YAML test flows, and capturing screenshots.
+Run Playwright browser tests and take screenshots of the Death by Geometry game. Handles building, starting a preview server, running declarative YAML test flows, and capturing screenshots.
 
 ## When to Use
 - When the user says `/playwright`, `run tests`, `take a screenshot`, or asks to verify game visually

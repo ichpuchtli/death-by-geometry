@@ -1,5 +1,5 @@
 // ============================================================
-// Geometry Genocide Web — Central Configuration
+// Death by Geometry — Central Configuration
 // All tunable game constants live here. Nothing is hardcoded elsewhere.
 // ============================================================
 

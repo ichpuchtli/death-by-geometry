@@ -1,10 +1,10 @@
-# Geometry Genocide Gameplay Excitement Roadmap
+# Death by Geometry Gameplay Excitement Roadmap
 
 This document is organized for Ralph-loop execution. Each phase is meant to be independently playable and shippable before moving to the next one.
 
 ## Mission
 
-Turn Geometry Genocide into a more legible, dramatic, and rewarding arcade shooter without losing its fast, skill-first identity.
+Turn Death by Geometry into a more legible, dramatic, and rewarding arcade shooter without losing its fast, skill-first identity.
 
 ### Mission Intent
 
@@ -205,7 +205,7 @@ Add one memorable encounter that punctuates the run and creates a chapter-like m
 
 ### Intent
 
-The first miniboss should prove that Geometry Genocide can deliver authored encounter beats inside the survival loop without turning into a boss-rush game.
+The first miniboss should prove that Death by Geometry can deliver authored encounter beats inside the survival loop without turning into a boss-rush game.
 
 ### Tasks
 

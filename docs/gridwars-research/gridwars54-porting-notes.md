@@ -1,6 +1,6 @@
 # GridWars54 Porting Notes
 
-This folder is the local reference pack for using the original `docs/GridWars54` bundle to steer a rewrite, port, or Grid Wars alignment pass in Geometry Genocide.
+This folder is the local reference pack for using the original `docs/GridWars54` bundle to steer a rewrite, port, or Grid Wars alignment pass in Death by Geometry.
 
 Regenerate the machine-readable manifests with:
 
@@ -93,13 +93,13 @@ What it does not yet do:
 - render audio
 - normalize the event data into stems or note lanes for DAW import
 
-## Current Geometry Genocide alignment
+## Current Death by Geometry alignment
 
 ### Enemy roster
 
 The active web roster is defined in `web/src/spawner/spawn-patterns.ts` and instantiated in `web/src/game.ts`.
 
-| Current Geometry Genocide enemy | Closest Grid Wars counterpart | Match | Notes |
+| Current Death by Geometry enemy | Closest Grid Wars counterpart | Match | Notes |
 |---|---|---|---|
 | `rhombus` | Dimmy the Diamond | High | Same visual role: direct tracker diamond. Current score/value tuning differs. |
 | `pinwheel` | Paul the Pinwheel | High | Bounce + spin behavior remains close. |
@@ -107,7 +107,7 @@ The active web roster is defined in `web/src/spawner/spawn-patterns.ts` and inst
 | `square2` | Cubie child form | High | Small split child maps cleanly to the cube fragments. |
 | `circle` | Sammy the Seeker | Medium | Shape/behavior match is good, but the current game only spawns circles as BlackHole overload children. Original Grid Wars treats blue circles as their own enemy family. |
 | `blackhole` | Dwight the Black Hole | High | Gravity-well gameplay is aligned, but the current web version is much more elaborate and much higher value. |
-| `sierpinski` | none | No direct original counterpart | Geometry Genocide-specific addition. |
+| `sierpinski` | none | No direct original counterpart | Death by Geometry-specific addition. |
 | `shard` | none | No direct original counterpart | Child of Sierpinski only. |
 | `mandelbrot` / `minimandel` | none | No direct original counterpart | Current miniboss system, outside Grid Wars scope. |
 
@@ -123,7 +123,7 @@ The active web roster is defined in `web/src/spawner/spawn-patterns.ts` and inst
 
 ### SFX
 
-The active web build still uses the older Geometry Genocide / Geometry Wars-oriented WAV roster for base SFX:
+The active web build still uses the older Death by Geometry / Geometry Wars-oriented WAV roster for base SFX:
 
 - `start`
 - `die`
@@ -149,7 +149,7 @@ Generated audio currently exists in `sounds/generated/` for:
 
 ### Music
 
-Current Geometry Genocide music is procedural synthwave built in `web/src/core/audio.ts`, with adaptive bass/pad/rhythm/arp/lead layering. That is a deliberate aesthetic break from Grid Wars54, which shipped authored tracker modules.
+Current Death by Geometry music is procedural synthwave built in `web/src/core/audio.ts`, with adaptive bass/pad/rhythm/arp/lead layering. That is a deliberate aesthetic break from Grid Wars54, which shipped authored tracker modules.
 
 If the goal is tighter Grid Wars alignment, the biggest music decision is:
 

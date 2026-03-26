@@ -1,4 +1,4 @@
-# Geometry Genocide / Grid Wars Alignment
+# Death by Geometry / Grid Wars Alignment
 
 This document translates the generated manifests in this folder into concrete rewrite and port decisions.
 
@@ -8,7 +8,7 @@ Primary source bundle:
 - `docs/GridWars54/gridwars.bmx`
 - `docs/GridWars54/music/*.it`
 
-Current Geometry Genocide references:
+Current Death by Geometry references:
 - `web/src/game.ts`
 - `web/src/spawner/spawn-patterns.ts`
 - `web/src/config.ts`

@@ -1,7 +1,7 @@
 # Maestro — Declarative Browser Test Runner
 
 ## Purpose
-Run Maestro-style YAML test flows against the Geometry Genocide web game using Playwright as the headless browser engine.
+Run Maestro-style YAML test flows against the Death by Geometry web game using Playwright as the headless browser engine.
 
 ## When to Use
 - When the user says `/maestro`, `maestro test`, or asks to run browser/integration/e2e tests

@@ -1,6 +1,6 @@
 ---
 name: elevenlabs-game-audio
-description: Use when generating or iterating Geometry Genocide sound effects or menu music with ElevenLabs, including replacements for existing WAVs, active enemy form/destroy pairs, procedural audio.ts cues, and stitched menu themes.
+description: Use when generating or iterating Death by Geometry sound effects or menu music with ElevenLabs, including replacements for existing WAVs, active enemy form/destroy pairs, procedural audio.ts cues, and stitched menu themes.
 ---
 
 # ElevenLabs Game Audio

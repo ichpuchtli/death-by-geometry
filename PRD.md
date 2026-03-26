@@ -1,9 +1,9 @@
-# Product Requirements Document: Geometry Genocide Web
+# Product Requirements Document: Death by Geometry Web
 
 ## 1. Overview
 
 ### 1.1 Product Summary
-Geometry Genocide Web is a browser-based port of the original Python/Pygame twin-stick arcade shooter, rebuilt from scratch in TypeScript with raw WebGL rendering. The game targets retro/arcade fans and will be hosted on GitHub Pages as a free-to-play experience with full mobile support.
+Death by Geometry Web is a browser-based port of the original Python/Pygame twin-stick arcade shooter, rebuilt from scratch in TypeScript with raw WebGL rendering. The game targets retro/arcade fans and will be hosted on GitHub Pages as a free-to-play experience with full mobile support.
 
 ### 1.2 Vision
 Preserve the fast-paced, Geometry Wars-inspired gameplay of the original while elevating the visual experience with WebGL-powered neon glow effects, a reactive grid background, particle trails, and a scrolling world — all playable on desktop and mobile browsers.

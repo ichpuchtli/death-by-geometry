@@ -63,7 +63,7 @@ class System: #library
 		""" Main init, called from app module """
 		pygame.init()
 		pygame.display.init()
-		pygame.display.set_caption("Geometry Genocide")
+		pygame.display.set_caption("Death by Geometry")
 		pygame.mixer.pre_init()
 		self.load_sounds()
 		# Play Start up sound

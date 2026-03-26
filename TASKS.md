@@ -1,4 +1,4 @@
-# Geometry Genocide Web — Task List
+# Death by Geometry Web — Task List
 
 > **Instructions for AI sessions**: Each phase is designed to fit within a single context window.
 > After completing each phase, **verify the build compiles** (`npm run build`) and **run the dev server** (`npm run dev`) to confirm no regressions. Commit working state before ending the session.

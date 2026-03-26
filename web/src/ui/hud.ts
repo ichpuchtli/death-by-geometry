@@ -180,8 +180,8 @@ export class HUD {
     this.ctx.textBaseline = 'middle';
 
     // Title with strong glow
-    this.drawGlowText('GEOMETRY', w / 2, h / 2 - 80, 'bold 56px monospace', '#20ff20', '#20ff20', 25);
-    this.drawGlowText('GENOCIDE', w / 2, h / 2 - 20, 'bold 56px monospace', '#20ff20', '#20ff20', 25);
+    this.drawGlowText('DEATH BY', w / 2, h / 2 - 80, 'bold 56px monospace', '#20ff20', '#20ff20', 25);
+    this.drawGlowText('GEOMETRY', w / 2, h / 2 - 20, 'bold 56px monospace', '#20ff20', '#20ff20', 25);
 
     // Subtitle
     const playText = this.touchMode ? 'Tap to Play' : 'Click to Play';

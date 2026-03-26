@@ -1,7 +1,7 @@
 {
-  "name": "geometry-genocide",
+  "name": "death-by-geometry",
   "version": "1.0.0",
-  "description": "Geometry Genocide v1.0 ======================",
+  "description": "Death by Geometry v1.0 ======================",
   "main": "index.js",
   "directories": {
     "test": "tests"

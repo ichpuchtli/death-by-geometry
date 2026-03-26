@@ -1,6 +1,6 @@
 {
-  "name": "Geometry Genocide",
-  "short_name": "GeoGenocide",
+  "name": "Death by Geometry",
+  "short_name": "DeathByGeo",
   "description": "Geometry Wars-inspired arcade shooter",
   "start_url": "./",
   "display": "fullscreen",

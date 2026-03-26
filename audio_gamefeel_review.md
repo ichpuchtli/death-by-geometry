@@ -1,4 +1,4 @@
-# Geometry Genocide Audio and Game Feel Review
+# Death by Geometry Audio and Game Feel Review
 
 ## Method Note
 

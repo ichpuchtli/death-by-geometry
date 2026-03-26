@@ -1,6 +1,6 @@
 # New Enemy Type Designs — Fractals, Topology & Non-Euclidean Geometry
 
-10 new enemy types for Geometry Genocide. Each leverages exotic mathematical
+10 new enemy types for Death by Geometry. Each leverages exotic mathematical
 geometry as both visual identity and gameplay mechanic.
 
 ---

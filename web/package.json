@@ -1,7 +1,7 @@
 {
-  "name": "geometry-genocide-web",
+  "name": "death-by-geometry-web",
   "version": "1.0.0",
-  "description": "Geometry Genocide — a Geometry Wars-inspired browser arcade shooter",
+  "description": "Death by Geometry — a Geometry Wars-inspired browser arcade shooter",
   "type": "module",
   "scripts": {
     "dev": "vite",

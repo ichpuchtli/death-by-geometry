@@ -1,4 +1,4 @@
-# Geometry Genocide
+# Death by Geometry
 
 A fast-paced arcade shooter inspired by [Geometry Wars](https://en.wikipedia.org/wiki/Geometry_Wars). Survive endless waves of geometric enemies, rack up points, and see how long you can last.
 
@@ -6,7 +6,7 @@ A fast-paced arcade shooter inspired by [Geometry Wars](https://en.wikipedia.org
 
 ## About
 
-Geometry Genocide started as a Python/Pygame desktop game and has been reborn as a browser-based experience with WebGL rendering, bloom post-processing, and dual-stick touch controls for mobile.
+Death by Geometry started as a Python/Pygame desktop game and has been reborn as a browser-based experience with WebGL rendering, bloom post-processing, and dual-stick touch controls for mobile.
 
 The original game was written by Sam Macpherson using Python 2 and Pygame — a love letter to the frenetic neon chaos of Geometry Wars. This web port faithfully recreates the gameplay while adding modern visual effects and mobile support.
 
