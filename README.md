@@ -2,7 +2,7 @@
 
 A fast-paced arcade shooter inspired by [Geometry Wars](https://en.wikipedia.org/wiki/Geometry_Wars). Survive endless waves of geometric enemies, rack up points, and see how long you can last.
 
-**Play now:** [https://ichpuchtli.github.io/Geometry-Genocide/](https://ichpuchtli.github.io/Geometry-Genocide/)
+**Play now:** [https://ichpuchtli.github.io/death-by-geometry/](https://ichpuchtli.github.io/death-by-geometry/)
 
 ## About
 

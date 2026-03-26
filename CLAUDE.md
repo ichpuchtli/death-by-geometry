@@ -14,7 +14,7 @@
 
 Death by Geometry is a browser-based twin-stick arcade shooter inspired by Geometry Wars and [Grid Wars](https://worldofstuart.excellentcontent.com/grid/wars.htm). Originally a Python 2/Pygame desktop game by Sam Macpherson (2013), rebuilt as TypeScript + raw WebGL deployed to GitHub Pages.
 
-**Play it:** https://ichpuchtli.github.io/Geometry-Genocide/
+**Play it:** https://ichpuchtli.github.io/death-by-geometry/
 
 Entirely client-side. WebGL renders everything (bloom, grid distortion, particle trails). Audio via Web Audio API with procedural synthwave music. Mobile uses twin-stick virtual joysticks.
 
