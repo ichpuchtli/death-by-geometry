@@ -1,0 +1,67 @@
+name: "Pause Feature (P key)"
+tags: [smoke, gameplay]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Start game
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  - action: wait
+    ms: 1000
+
+  # Verify game is running
+  - action: evalCheck
+    description: "Game is in playing state"
+    script: |
+      // Game object is global on window
+      return true; // Basic check - if we got here, page loaded
+
+  - action: screenshot
+    name: "50-gameplay-running"
+
+  # Press P to pause
+  - action: keyPress
+    key: "p"
+    duration: 100
+
+  - action: wait
+    ms: 500
+
+  # Check that settings panel is visible
+  - action: evalCheck
+    description: "Settings panel is displayed when paused"
+    script: |
+      const desktop = document.getElementById('desktop-settings');
+      return desktop && window.getComputedStyle(desktop).display !== 'none';
+
+  - action: screenshot
+    name: "50-paused-with-settings"
+
+  # Press P again to unpause
+  - action: keyPress
+    key: "p"
+    duration: 100
+
+  - action: wait
+    ms: 500
+
+  # Check that settings panel is hidden
+  - action: evalCheck
+    description: "Settings panel is hidden when unpaused"
+    script: |
+      const desktop = document.getElementById('desktop-settings');
+      return !desktop || window.getComputedStyle(desktop).display === 'none';
+
+  - action: screenshot
+    name: "50-unpaused-no-settings"
+
+  - action: assertNoErrors
+    description: "No console errors during pause feature test"

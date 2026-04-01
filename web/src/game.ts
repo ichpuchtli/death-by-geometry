@@ -239,6 +239,7 @@ export class Game {
   private gameOverTime = 0;
   private totalTime = 0; // monotonic time for shader effects
   private mobile: boolean;
+  private paused = false;
 
   // Trail IDs for bullets (keyed by bullet index)
   private bulletTrailIds = new Map<Bullet, number>();
@@ -386,6 +387,15 @@ export class Game {
       }
       if (e.code === 'KeyF') {
         this.input.autoFire = !this.input.autoFire;
+      }
+      // Pause during gameplay: P to toggle pause + show/hide config panel
+      if (e.code === 'KeyP' && (this.state === 'playing' || this.state === 'death_slowmo')) {
+        this.paused = !this.paused;
+        if (this.paused && !this.mobile) {
+          showDesktopSettings();
+        } else if (!this.paused && !this.mobile) {
+          hideDesktopSettings();
+        }
       }
       // Design Lab: D to enter from menu, D/Escape to exit
       if (e.code === 'KeyD' && this.state === 'menu') {
@@ -774,6 +784,13 @@ export class Game {
 
     if (this.state !== 'playing') {
       this.grid.update(dt);
+      return;
+    }
+
+    // Paused: skip gameplay but keep rendering and allow input
+    if (this.paused) {
+      this.grid.update(dt);
+      this.audio.setMusicIntensity(this.computeIntensity());
       return;
     }
 
