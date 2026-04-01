@@ -138,7 +138,7 @@ Bloom: ping-pong FBOs, half-res on mobile. Grid: own shader with gravity well un
 
 `'menu'` | `'playing'` | `'gameover'` | `'design_lab'`
 
-Controls: WASD move, mouse aim, click/hold shoot, F auto-fire, M mute, D design lab, Space restart.
+Controls: WASD move, mouse aim, click/hold shoot, F auto-fire, M mute, P pause (shows config), D design lab, Space restart.
 
 ---
 
@@ -184,6 +184,7 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 - Bullet gravity bending: **Complete** (Bullets curve near BlackHoles. Config: `BULLET_GRAVITY_STRENGTH = 0.15`. Modifies velocity + updates angle for diamond rotation.)
 - Spawn overlap fix: **Complete** (Separation steering now applies in final 70% of spawn animation instead of waiting for it to finish)
 - Ominous supernova: **Complete** (1.5s destabilize telegraph with visual effects + rising drone audio, then massive 400-particle detonation with screen flash, 300ms hitstop, enhanced BH death audio with metallic ring layer)
+- Pause feature: **Complete** (Press P during gameplay to pause and show config panel; paused state freezes updates but preserves visuals)
 - Phase 4 (Scores, Polish & Tuning): **Not started** — leaderboard, debug overlay, perf profiling
 
 ---
