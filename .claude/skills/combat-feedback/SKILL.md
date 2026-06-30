@@ -5,16 +5,18 @@ Use when working on hitstop, kill effects, heat system, recovery window, phase t
 
 ---
 
+> **System ownership:** Kill processing, kill signatures, hitstop accumulation, and the heat value live in `CombatSystem` (`web/src/systems/combat-system.ts`). Spawn telegraphs live in `SpawnSystem` (`web/src/systems/spawn-system.ts`). Boss encounters (warning/HP/defeated banners, stage-break hitstop) live in `BossSystem` (`web/src/systems/boss-system.ts`). `Game` applies the hitstop timer, drives heat→bloom/border/music, and renders phase banners + recovery shield.
+
 ## Hitstop
 
-Freezes gameplay simulation (enemies, bullets, spawner) while visuals keep running (explosions, grid, camera shake).
+Freezes gameplay simulation (enemies, bullets, spawner) while visuals keep running (explosions, grid, camera shake). Accumulated in `CombatSystem` (and `GravitySystem`/`BossSystem` via callbacks); consumed and applied by `Game`.
 - **Per-family durations:** square 35ms, sierpinski 50ms, blackhole 75ms, elite 65ms
 - **Multi-kill bonus:** 3+ kills same frame → 35ms
 - Config: `HITSTOP_SQUARE`, `HITSTOP_SIERPINSKI`, `HITSTOP_BLACKHOLE`, `HITSTOP_ELITE`, `HITSTOP_MULTIKILL`
 
 ## Kill Signatures
 
-Per-enemy-family death VFX rendered in additive blend pass (`KillEffect` array in game.ts):
+Per-enemy-family death VFX rendered in additive blend pass (`KillEffect` array in `CombatSystem`; family read from `enemy.family`):
 - **Rhombus:** crystal burst with narrow rays + white tips
 - **Square:** chunky rotating fragment outlines
 - **Pinwheel:** spark spiral with rotating particles + bright tips
@@ -42,7 +44,7 @@ Per-enemy-family death VFX rendered in additive blend pass (`KillEffect` array i
 
 ## Heat System
 
-Global `heat` value (0-1) in `game.ts` tracking run intensity.
+Global `heat` value (0-1) owned by `CombatSystem` (`combat.heatValue`) tracking run intensity; `Game` reads it for bloom/border/music.
 
 **Increases from:**
 - Kills: base 0.02, elite 0.08, blackhole 0.12
@@ -74,7 +76,7 @@ Activated on non-final respawn (after death slowmo). 3500ms duration. Non-stacka
 
 ## Run Stats & Medals
 
-**`RunStats` interface** in `game.ts` tracks: score, kills, timeSurvived, phaseReached, peakHeat, elitesKilled, blackholesKilled, minibossDefeated, livesUsed, recoveriesUsed, weaponStage.
+**`RunStats` interface** in `web/src/core/run-stats.ts` (with `computeMedals()`) tracks: score, kills, timeSurvived, phaseReached, peakHeat, elitesKilled, blackholesKilled, minibossDefeated, livesUsed, recoveriesUsed, weaponStage.
 
 **10 deterministic medals** (`MEDALS` in config.ts):
 | Medal | Condition |

@@ -95,7 +95,8 @@ web/src/
 │   ├── lifecycle-system.ts     # Centralized enemy + bullet trail lifecycle
 │   ├── combat-system.ts        # Kill processing, heat, hitstop, kill signatures
 │   ├── spawn-system.ts         # WaveManager execution, caps, spawn SFX, formation telegraphs
-│   └── gravity-system.ts       # BlackHole attraction/absorption/supernova, player pull, grid wells, circle flocks
+│   ├── gravity-system.ts       # BlackHole attraction/absorption/supernova, player pull, grid wells, circle flocks
+│   └── boss-system.ts          # Generic boss-encounter state machine (Sierpinski + Mandelbrot)
 │
 ├── spawner/
 │   ├── enemy-factory.ts        # Shared `createEnemy()` factory
@@ -113,6 +114,8 @@ web/src/
 
 ## Architecture Overview
 
+> **Refactor status:** `game.ts` is now a ~1,240-line orchestrator. The original god-object responsibilities are extracted into `systems/` (`LifecycleSystem`, `CombatSystem`, `SpawnSystem`, `GravitySystem`, `BossSystem`). All checklist items in `docs/REFACTOR_PLAN.md` are complete.
+
 ### Game Loop (`game.ts`)
 
 `update(dt)`: player movement → **GravitySystem.applyPlayerPull()** → bullets → **GravitySystem.applyAttraction() + updateFlocks()** → enemy AI → **enemy separation** → **SpawnSystem.update()** (wave manager execution) → collision → **CombatSystem.processKills()** → staggered child spawns/heat decay → LifecycleSystem trail update/cleanup → explosions/**GravitySystem.updateGravityWells()**/grid/camera → music intensity.
@@ -129,6 +132,7 @@ web/src/
 - **`CombatSystem`** (`web/src/systems/combat-system.ts`) — owns kill processing, heat value, hitstop accumulation, kill-signature VFX, and staggered child-spawn timing. `Game` calls `processKills(result)` after collision detection, `update(dt, gameTime)` each frame (handles heat decay/survival pressure and ready staggered spawns), and `render(renderer)` during the additive blend pass. `Game` reads `combat.heatValue` to drive bloom, arena border color, and music intensity.
 - **`SpawnSystem`** (`web/src/systems/spawn-system.ts`) — executes `WaveManager` spawn requests: cap enforcement (max enemies, ≤4 BlackHoles, elite cap), ambush spawn duration, edge-push for player-proximity spawns, trail registration, spawn grid ripples, spawn SFX (with formation leakthrough suppression), and the formation telegraph lifecycle. `Game` calls `spawn.update(dt)` each frame, `spawn.updateTelegraphs(dt)` from combat-feedback timers, `spawn.renderTelegraphs(renderer)` during the normal blend pass, and `spawn.clear()` on reset. `WaveManager` remains the scheduler; `SpawnSystem` executes its requests.
 - **`GravitySystem`** (`web/src/systems/gravity-system.ts`) — owns all BlackHole physics: enemy attraction + absorption + overload supernova (`applyAttraction(dt)`), bullet gravity bending, player pull (`applyPlayerPull(dt)`), grid gravity-well registration (`updateGravityWells()`), the elastic circle-flock centroids ejected by supernovae (`updateFlocks()`), and the gravity-well exemption set used by separation (`getEnemiesInGravityWell()`). Owns `circleFlocks` and the per-BlackHole supernova-warning set; `Game` calls `gravity.clear()` on reset/respawn. Game-owned feedback (border pulse, hitstop, supernova screen flash, haptics) is routed back via the `onSupernovaWarning` / `onSupernovaDetonate` callbacks.
+- **`BossSystem`** (`web/src/systems/boss-system.ts`) — a generic `BossEncounter` state machine (idle → time-trigger → warning → spawn → active → defeated, with shockwave-kill → respawn) instantiated twice from per-boss config: Sierpinski (no active phase) and Mandelbrot (active-phase hook spawns MiniMandels + handles stage transitions). Owns all boss timers/refs and the shared saved spawn-rate multiplier. `Game` calls `boss.update(dt)` each frame, `boss.renderHud(hud)` in the HUD pass, and `boss.reset()` on game start. `CombatSystem` boss-defeat callbacks call `boss.onSierpinskiDefeated()` / `boss.onMandelbrotDefeated()`. Game-owned feedback (warning border pulse, stage-break hitstop) is routed via the `onWarning` / `requestHitstop` callbacks.
 - **`enemy-factory.ts`** (`web/src/spawner/enemy-factory.ts`) — shared `createEnemy(type, pos, isElite, tier?)` used by `Game`, `CombatSystem`, and `SpawnSystem`.
 - **`run-stats.ts`** (`web/src/core/run-stats.ts`) — `RunStats` interface and `computeMedals()` extracted to avoid a circular dependency between `game.ts` and `CombatSystem`.
 
@@ -205,6 +209,7 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 - `GravitySystem` extraction: **Complete** (`web/src/systems/gravity-system.ts` centralizes BlackHole attraction/absorption/supernova, bullet bending, player pull, grid wells, circle flocks, and the separation gravity-well exemption. Game-owned supernova feedback routed via `onSupernovaWarning`/`onSupernovaDetonate` callbacks. `game.ts`: 1,664 → 1,489 lines.)
 - Data-driven enemy classification: **Complete** (`Enemy` now carries `family` (`EnemyFamily`), `isBouncer`, and `separationWeight` records set per-subclass. `CombatSystem.getEnemyFamily()` instanceof ladder deleted — kill VFX/SFX read `enemy.family`; separation weights read `enemy.separationWeight` (BlackHole 0, miniboss 0.25, else 1); bouncer deflection reads `enemy.isBouncer`. Remaining `instanceof` checks are only for concrete-type member access — BlackHole gravity API, `Sierpinski.tier`, `MiniMandel.parent`, `BlackHole.absorbedCount`.)
 - `config.ts` split: **Complete** (constants moved into 11 domain files under `web/src/config/`; `config.ts` is now a barrel re-exporting them. All 176 exports preserved; consumer imports from `'./config'` unchanged.)
+- `BossSystem` extraction: **Complete** (`web/src/systems/boss-system.ts` collapses the two structurally-identical Sierpinski + Mandelbrot encounter state machines into one generic `BossEncounter` template instantiated from per-boss config; Mandelbrot supplies an active-phase hook for minions/stage transitions. ~190 lines removed from `game.ts`: 1,488 → 1,238 lines. **Refactor plan complete.**)
 - Square removed: **Complete** (Square enemy deleted entirely — file, spawn pools, kill VFX, SFX, config all removed)
 - Haptics cleanup: **Complete** (All haptics calls removed except `haptics.supernova()` on BlackHole overload detonation)
 - Miniboss gravity immunity: **Complete** (Mandelbrot + Sierpinski tier 0 have `gravityImmune = true`)

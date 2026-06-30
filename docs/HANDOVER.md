@@ -1,12 +1,14 @@
-# Handover: Refactor in Progress
+# Handover: Refactor Complete
 
-> Created for the next Claude session to continue the `death-by-geometry` TypeScript/WebGL refactor.
+> Created for the next Claude session. The `death-by-geometry` TypeScript/WebGL system-extraction refactor is **done** — every checklist item in `docs/REFACTOR_PLAN.md` is complete.
 
 ## Current State
 
 The active codebase is the TypeScript/WebGL version under `web/src/`. Legacy Python files in the repo root are intentionally untouched, as are the 9 unwired enemy types.
 
-The refactor is being tracked in `docs/REFACTOR_PLAN.md` (running checklist) and `CLAUDE.md` (authoritative architecture/context). Both files were updated at the end of the last session.
+`game.ts` is now a ~1,238-line orchestrator (from 2,408). Subsystem logic lives in `web/src/systems/`: `LifecycleSystem`, `CombatSystem`, `SpawnSystem`, `GravitySystem`, `BossSystem`. Constants are split into domain files under `web/src/config/` (re-exported by the `config.ts` barrel). Enemy classification is data-driven via `family`/`isBouncer`/`separationWeight` records on `Enemy`.
+
+The refactor is tracked in `docs/REFACTOR_PLAN.md` (running checklist) and `CLAUDE.md` (authoritative architecture/context).
 
 ## Completed Work
 
@@ -70,10 +72,19 @@ The refactor is being tracked in `docs/REFACTOR_PLAN.md` (running checklist) and
 - Constants moved into 11 domain files under `web/src/config/`: `world`, `player`, `bullet`, `enemy`, `spawner`, `effects`, `ui`, `combat`, `boss`, `audio`, `medals`.
 - `config.ts` is now a barrel re-exporting all of them, so every `import { X } from './config'` is unchanged. All 176 exports preserved (verified by name-set diff). Add new constants to the matching domain file.
 
+### P3 — `BossSystem` generic template
+- New `web/src/systems/boss-system.ts`: one generic `BossEncounter` state machine (idle → time-trigger → warning → spawn → active → defeated, plus shockwave-kill → respawn timer) instantiated twice from per-boss config.
+- Sierpinski config: no active phase. Mandelbrot config: `onActiveUpdate` hook spawns MiniMandels + handles stage transitions. Single shared saved spawn-rate multiplier owned by `BossSystem` (preserves prior behavior).
+- `Game` calls `boss.update(dt)`, `boss.renderHud(hud)`, `boss.reset()`. CombatSystem boss-defeat callbacks call `boss.onSierpinskiDefeated()` / `boss.onMandelbrotDefeated()`. Warning border pulse + stage-break hitstop routed via `onWarning` / `requestHitstop` callbacks.
+- `game.ts` reduced from **1,488 → 1,238 lines**.
+
 ## Suggested Next Steps (in order)
 
-1. **P3 — `BossSystem` generic template**
-   - Collapse the structurally identical Sierpinski and Mandelbrot encounter state machines into a shared generic encounter template.
+**The refactor checklist is complete.** Remaining ideas are out-of-scope P3 polish from §4.4 of `docs/REFACTOR_PLAN.md`:
+
+1. Parameterize `BlackHole`'s four visual render methods into one.
+2. Share systems with `DesignLab` (it still duplicates gravity/trail/spawn logic).
+3. Separate enemy simulation from rendering for testability.
 
 ## Key Architectural Decisions
 
@@ -89,11 +100,13 @@ The refactor is being tracked in `docs/REFACTOR_PLAN.md` (running checklist) and
 |------|---------|
 | `docs/REFACTOR_PLAN.md` | Running checklist with detailed completion notes |
 | `CLAUDE.md` | Authoritative architecture, directory structure, conventions |
-| `web/src/game.ts` | Main orchestrator (still owns boss state machines, rendering, heat/recovery feedback) |
+| `web/src/game.ts` | Main orchestrator (rendering, heat/recovery feedback, death-slowmo, state machine) |
 | `web/src/systems/lifecycle-system.ts` | Trail lifecycle (in-place enemy cleanup) |
 | `web/src/systems/combat-system.ts` | Kill processing, heat, hitstop, kill signatures |
 | `web/src/systems/spawn-system.ts` | WaveManager execution, caps, spawn SFX, formation telegraphs |
 | `web/src/systems/gravity-system.ts` | BlackHole attraction/absorption/supernova, player pull, grid wells, circle flocks |
+| `web/src/systems/boss-system.ts` | Generic boss-encounter state machine (Sierpinski + Mandelbrot) |
+| `web/src/config/` | Domain-split constants, re-exported by `config.ts` barrel |
 | `web/src/spawner/enemy-factory.ts` | `createEnemy()` |
 | `web/src/spawner/wave-manager.ts` | Spawn scheduler (unchanged) |
 | `web/src/core/run-stats.ts` | `RunStats`, `computeMedals()` |
@@ -127,7 +140,7 @@ Always run `npx tsc --noEmit` and `npm run build` after changes. Playwright test
 - [x] Extract `GravitySystem`
 - [x] Data-driven enemy definitions
 - [x] Split `config.ts`
-- [ ] `BossSystem` generic template
+- [x] `BossSystem` generic template
 
 ## Success Criteria (from `docs/REFACTOR_PLAN.md`)
 

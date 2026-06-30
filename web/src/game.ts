@@ -21,12 +21,10 @@ import { LifecycleSystem } from './systems/lifecycle-system';
 import { CombatSystem } from './systems/combat-system';
 import { SpawnSystem } from './systems/spawn-system';
 import { GravitySystem } from './systems/gravity-system';
+import { BossSystem } from './systems/boss-system';
 import { RunStats, computeMedals } from './core/run-stats';
 import { createEnemy } from './spawner/enemy-factory';
-import { MiniMandel } from './entities/enemies/minimandel';
 import { BlackHole } from './entities/enemies/blackhole';
-import { Sierpinski } from './entities/enemies/sierpinski';
-import { Mandelbrot } from './entities/enemies/mandelbrot';
 import {
   WEAPON_STAGES,
   EXPLOSION_PARTICLE_COUNT_LARGE,
@@ -56,17 +54,6 @@ import {
   RECOVERY_FIRE_RATE_MULT,
   RECOVERY_SHIELD_COLOR,
   RECOVERY_SHIELD_RADIUS,
-  MINIBOSS_SPAWN_TIME,
-  MINIBOSS_WARNING_DURATION,
-  MINIBOSS_HITSTOP_STAGE,
-  MINIBOSS_RESPAWN_DELAY,
-  MINIBOSS_DEFEATED_BANNER_DURATION,
-  MINIBOSS_SPAWN_SUPPRESS_MULT,
-  SIERPINSKI_BOSS_SPAWN_TIME,
-  SIERPINSKI_BOSS_WARNING_DURATION,
-  SIERPINSKI_BOSS_RESPAWN_DELAY,
-  SIERPINSKI_BOSS_DEFEATED_BANNER_DURATION,
-  SIERPINSKI_BOSS_SPAWN_SUPPRESS_MULT,
   MedalDef,
   SUPERNOVA_HITSTOP,
   SUPERNOVA_FLASH_DURATION,
@@ -150,22 +137,8 @@ export class Game {
   // Design Lab
   private designLab: DesignLab | null = null;
 
-  // Sierpinski boss encounter state
-  private sierpinskiBossActive = false;
-  private sierpinskiBossDefeated = false;
-  private sierpinskiBossWarningTimer = 0;
-  private sierpinskiBossRef: Sierpinski | null = null;
-  private sierpinskiBossDefeatedBannerTimer = 0;
-  private sierpinskiBossRespawnTimer = 0;
-
-  // Miniboss encounter state
-  private minibossActive = false;
-  private minibossDefeated = false;
-  private minibossWarningTimer = 0; // ms remaining in warning phase
-  private minibossRef: Mandelbrot | null = null;
-  private minibossDefeatedBannerTimer = 0;
-  private minibossRespawnTimer = 0;   // ms until re-trigger after player death
-  private savedSpawnRateMultiplier = 1.0;
+  // Boss encounters (Sierpinski + Mandelbrot generic state machines)
+  private boss: BossSystem;
 
   constructor(private gameCanvas: HTMLCanvasElement, hudCanvas: HTMLCanvasElement) {
     this.mobile = isMobile();
@@ -209,8 +182,8 @@ export class Game {
       explosions: this.explosions,
       grid: this.grid,
       camera: this.camera,
-      onMinibossDefeated: () => this.onMinibossDefeated(),
-      onSierpinskiBossDefeated: () => this.onSierpinskiBossDefeated(),
+      onMinibossDefeated: () => this.boss.onMandelbrotDefeated(),
+      onSierpinskiBossDefeated: () => this.boss.onSierpinskiDefeated(),
     });
     this.aimIndicator = new AimIndicator();
     this.hud = new HUD(hudCanvas);
@@ -252,6 +225,18 @@ export class Game {
         this.hitstopTimer = Math.max(this.hitstopTimer, SUPERNOVA_HITSTOP);
         this.supernovaFlashTimer = SUPERNOVA_FLASH_DURATION;
       },
+    });
+    this.boss = new BossSystem({
+      player: this.player,
+      enemies: this.enemies,
+      lifecycle: this.lifecycle,
+      grid: this.grid,
+      camera: this.camera,
+      audio: this.audio,
+      waveManager: this.waveManager,
+      hud: this.hud,
+      onWarning: (durationMs) => { this.phaseBorderPulseTimer = durationMs; },
+      requestHitstop: (ms) => { this.hitstopTimer = Math.max(this.hitstopTimer, ms); },
     });
     this.starfield = new Starfield(80, gameSettings.arenaWidth, gameSettings.arenaHeight);
     this.haptics = new HapticsManager();
@@ -381,19 +366,7 @@ export class Game {
     this.gameOverMedals = [];
     this.medalRevealPlayed = false;
     this.supernovaFlashTimer = 0;
-    this.sierpinskiBossActive = false;
-    this.sierpinskiBossDefeated = false;
-    this.sierpinskiBossWarningTimer = 0;
-    this.sierpinskiBossRef = null;
-    this.sierpinskiBossDefeatedBannerTimer = 0;
-    this.sierpinskiBossRespawnTimer = 0;
-    this.minibossActive = false;
-    this.minibossDefeated = false;
-    this.minibossWarningTimer = 0;
-    this.minibossRef = null;
-    this.minibossDefeatedBannerTimer = 0;
-    this.minibossRespawnTimer = 0;
-    this.savedSpawnRateMultiplier = 1.0;
+    this.boss.reset();
     this.player.lives = gameSettings.startingLives;
     this.waveManager.spawnRateMultiplier = gameSettings.spawnRateMultiplier;
     if (gameSettings.startingPhase !== 'tutorial') {
@@ -659,8 +632,7 @@ export class Game {
     this.updateRecovery(dt);
 
     // --- Boss encounter updates ---
-    this.updateSierpinskiBoss(dt);
-    this.updateMiniboss(dt);
+    this.boss.update(dt);
 
     // Track weapon stage for run stats
     const wStage = this.player.getWeaponStage();
@@ -732,197 +704,6 @@ export class Game {
       this.recoveryTimer = 0;
       this.player.fireRateOverride = 1;
     }
-  }
-
-  /** Sierpinski boss encounter state machine */
-  private updateSierpinskiBoss(dt: number): void {
-    // Defeated banner timer
-    if (this.sierpinskiBossDefeatedBannerTimer > 0) {
-      this.sierpinskiBossDefeatedBannerTimer -= dt;
-    }
-
-    // Re-spawn timer (player died during boss fight)
-    if (this.sierpinskiBossRespawnTimer > 0) {
-      this.sierpinskiBossRespawnTimer -= dt;
-      if (this.sierpinskiBossRespawnTimer <= 0) {
-        this.startSierpinskiBossWarning();
-      }
-    }
-
-    // Check if it's time to trigger the boss
-    if (!this.sierpinskiBossDefeated && !this.sierpinskiBossActive
-        && this.sierpinskiBossWarningTimer <= 0
-        && this.sierpinskiBossRespawnTimer <= 0
-        && this.waveManager.elapsedTime >= SIERPINSKI_BOSS_SPAWN_TIME) {
-      this.startSierpinskiBossWarning();
-    }
-
-    // Warning countdown
-    if (this.sierpinskiBossWarningTimer > 0) {
-      this.sierpinskiBossWarningTimer -= dt;
-      if (this.sierpinskiBossWarningTimer <= 0) {
-        this.spawnSierpinskiBoss();
-      }
-      return;
-    }
-
-    // Boss died outside of normal kill flow (e.g., player death shockwave)
-    if (this.sierpinskiBossActive && this.sierpinskiBossRef && !this.sierpinskiBossRef.active) {
-      if (!this.sierpinskiBossDefeated) {
-        this.sierpinskiBossActive = false;
-        this.sierpinskiBossRef = null;
-        this.waveManager.spawnRateMultiplier = this.savedSpawnRateMultiplier;
-        this.sierpinskiBossRespawnTimer = SIERPINSKI_BOSS_RESPAWN_DELAY;
-      }
-    }
-  }
-
-  private startSierpinskiBossWarning(): void {
-    this.sierpinskiBossWarningTimer = SIERPINSKI_BOSS_WARNING_DURATION;
-    this.audio.playMinibossWarning();
-    this.phaseBorderPulseTimer = SIERPINSKI_BOSS_WARNING_DURATION;
-  }
-
-  private spawnSierpinskiBoss(): void {
-    this.sierpinskiBossActive = true;
-    const hw = gameSettings.arenaWidth / 2;
-    const hh = gameSettings.arenaHeight / 2;
-    const px = this.player.position.x;
-    const py = this.player.position.y;
-    // Spawn on the far side from the player
-    const spawnX = px > 0 ? -hw * 0.4 : hw * 0.4;
-    const spawnY = py > 0 ? -hh * 0.4 : hh * 0.4;
-
-    const boss = createEnemy('sierpinski', new Vec2(spawnX, spawnY)) as Sierpinski;
-    this.lifecycle.spawnEnemy(boss);
-    this.enemies.push(boss);
-    this.sierpinskiBossRef = boss;
-
-    // Suppress normal spawning during fight
-    this.savedSpawnRateMultiplier = this.waveManager.spawnRateMultiplier;
-    this.waveManager.spawnRateMultiplier = SIERPINSKI_BOSS_SPAWN_SUPPRESS_MULT;
-
-    this.audio.playMinibossArrive();
-    this.grid.applyImpulse(spawnX, spawnY, 600, 300);
-    this.camera.shake(SCREEN_SHAKE_LARGE);
-  }
-
-  private onSierpinskiBossDefeated(): void {
-    this.sierpinskiBossActive = false;
-    this.sierpinskiBossDefeated = true;
-    this.sierpinskiBossDefeatedBannerTimer = SIERPINSKI_BOSS_DEFEATED_BANNER_DURATION;
-    this.sierpinskiBossRef = null;
-    // Restore spawn rate
-    this.waveManager.spawnRateMultiplier = this.savedSpawnRateMultiplier;
-  }
-
-  /** Miniboss encounter state machine */
-  private updateMiniboss(dt: number): void {
-    // Defeated banner timer
-    if (this.minibossDefeatedBannerTimer > 0) {
-      this.minibossDefeatedBannerTimer -= dt;
-    }
-
-    // Re-spawn timer (player died during boss fight)
-    if (this.minibossRespawnTimer > 0) {
-      this.minibossRespawnTimer -= dt;
-      if (this.minibossRespawnTimer <= 0) {
-        this.startMinibossWarning();
-      }
-    }
-
-    // Check if it's time to trigger the miniboss
-    if (!this.minibossDefeated && !this.minibossActive && this.minibossWarningTimer <= 0
-        && this.minibossRespawnTimer <= 0
-        && this.waveManager.elapsedTime >= MINIBOSS_SPAWN_TIME) {
-      this.startMinibossWarning();
-    }
-
-    // Warning countdown
-    if (this.minibossWarningTimer > 0) {
-      this.minibossWarningTimer -= dt;
-      if (this.minibossWarningTimer <= 0) {
-        this.spawnMiniboss();
-      }
-      return;
-    }
-
-    // Active miniboss: process minion spawns + stage transitions
-    if (this.minibossActive && this.minibossRef && this.minibossRef.active) {
-      // Process pending minion spawns from the Mandelbrot
-      while (this.minibossRef.pendingMinions.length > 0) {
-        const minionPos = this.minibossRef.pendingMinions.shift()!;
-        const mm = new MiniMandel(minionPos);
-        mm.parent = this.minibossRef;
-        mm.speed *= gameSettings.enemySpeedMultiplier;
-        this.lifecycle.spawnEnemy(mm);
-        this.enemies.push(mm);
-        this.grid.applyImpulse(minionPos.x, minionPos.y, 60, 80);
-      }
-
-      // Check for stage transitions
-      if (this.minibossRef.checkStageTransition()) {
-        this.audio.playMinibossStageBreak();
-        this.hitstopTimer = Math.max(this.hitstopTimer, MINIBOSS_HITSTOP_STAGE);
-        this.camera.shake(SCREEN_SHAKE_LARGE);
-        this.grid.applyImpulse(
-          this.minibossRef.position.x, this.minibossRef.position.y, 600, 300,
-        );
-      }
-    }
-
-    // Miniboss died outside of normal kill flow (e.g., player death shockwave)
-    if (this.minibossActive && this.minibossRef && !this.minibossRef.active) {
-      // Boss was destroyed by shockwave — allow re-spawn
-      if (!this.minibossDefeated) {
-        this.minibossActive = false;
-        this.minibossRef = null;
-        // Restore spawn rate
-        this.waveManager.spawnRateMultiplier = this.savedSpawnRateMultiplier;
-        this.minibossRespawnTimer = MINIBOSS_RESPAWN_DELAY;
-      }
-    }
-  }
-
-  private startMinibossWarning(): void {
-    this.minibossWarningTimer = MINIBOSS_WARNING_DURATION;
-    this.audio.playMinibossWarning();
-    // Red border pulse for warning
-    this.phaseBorderPulseTimer = MINIBOSS_WARNING_DURATION;
-  }
-
-  private spawnMiniboss(): void {
-    this.minibossActive = true;
-    // Find a spawn position away from the player
-    const hw = gameSettings.arenaWidth / 2;
-    const hh = gameSettings.arenaHeight / 2;
-    const px = this.player.position.x;
-    const py = this.player.position.y;
-    // Spawn on the far side of the arena from the player
-    const spawnX = px > 0 ? -hw * 0.4 : hw * 0.4;
-    const spawnY = py > 0 ? -hh * 0.4 : hh * 0.4;
-
-    const boss = createEnemy('mandelbrot', new Vec2(spawnX, spawnY)) as Mandelbrot;
-    this.lifecycle.spawnEnemy(boss);
-    this.enemies.push(boss);
-    this.minibossRef = boss;
-
-    // Suppress normal spawning during fight
-    this.savedSpawnRateMultiplier = this.waveManager.spawnRateMultiplier;
-    this.waveManager.spawnRateMultiplier = MINIBOSS_SPAWN_SUPPRESS_MULT;
-
-    this.audio.playMinibossArrive();
-    this.grid.applyImpulse(spawnX, spawnY, 800, 400);
-    this.camera.shake(SCREEN_SHAKE_LARGE);
-  }
-
-  private onMinibossDefeated(): void {
-    this.minibossActive = false;
-    this.minibossDefeated = true;
-    this.minibossDefeatedBannerTimer = MINIBOSS_DEFEATED_BANNER_DURATION;
-    this.minibossRef = null;
-    // Restore spawn rate
-    this.waveManager.spawnRateMultiplier = this.savedSpawnRateMultiplier;
   }
 
   /** Per-frame pairwise separation: push overlapping enemies apart (Grid Wars style) */
@@ -1316,39 +1097,8 @@ export class Game {
         this.hud.drawPhaseBanner(this.phaseBannerName, progress);
       }
 
-      // Sierpinski boss warning banner
-      if (this.sierpinskiBossWarningTimer > 0) {
-        const progress = 1 - this.sierpinskiBossWarningTimer / SIERPINSKI_BOSS_WARNING_DURATION;
-        this.hud.drawMinibossWarning(progress);
-      }
-
-      // Sierpinski boss HP bar
-      if (this.sierpinskiBossActive && this.sierpinskiBossRef && this.sierpinskiBossRef.active) {
-        this.hud.drawMinibossHP('SIERPINSKI', this.sierpinskiBossRef.hp, this.sierpinskiBossRef.maxHp, 1);
-      }
-
-      // Sierpinski boss defeated banner
-      if (this.sierpinskiBossDefeatedBannerTimer > 0) {
-        const progress = 1 - this.sierpinskiBossDefeatedBannerTimer / SIERPINSKI_BOSS_DEFEATED_BANNER_DURATION;
-        this.hud.drawMinibossDefeatedBanner(progress);
-      }
-
-      // Miniboss warning banner
-      if (this.minibossWarningTimer > 0) {
-        const progress = 1 - this.minibossWarningTimer / MINIBOSS_WARNING_DURATION;
-        this.hud.drawMinibossWarning(progress);
-      }
-
-      // Miniboss HP bar
-      if (this.minibossActive && this.minibossRef && this.minibossRef.active) {
-        this.hud.drawMinibossHP('MANDELBROT', this.minibossRef.hp, this.minibossRef.maxHp, this.minibossRef.stage);
-      }
-
-      // Miniboss defeated banner
-      if (this.minibossDefeatedBannerTimer > 0) {
-        const progress = 1 - this.minibossDefeatedBannerTimer / MINIBOSS_DEFEATED_BANNER_DURATION;
-        this.hud.drawMinibossDefeatedBanner(progress);
-      }
+      // Boss warning banners, HP bars, and defeated banners
+      this.boss.renderHud(this.hud);
 
       // Virtual joysticks (drawn on HUD canvas, not during slowmo)
       if (this.state === 'playing') {

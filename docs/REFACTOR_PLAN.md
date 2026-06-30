@@ -173,7 +173,14 @@ Split `Game` into focused systems owned by `Game` but encapsulating their state.
 - [x] **Split `config.ts`** — domain-organized constants.
   - Constants moved into 11 domain files under `web/src/config/`: `world`, `player`, `bullet`, `enemy`, `spawner`, `effects`, `ui`, `combat`, `boss`, `audio`, `medals`.
   - `config.ts` is now a barrel (`export * from './config/...'`); all 176 exports preserved (verified by name-set diff), consumer imports from `'./config'` unchanged.
-- [ ] **`BossSystem` generic template** — collapse duplicate boss state machines.
+- [x] **`BossSystem` generic template** — collapse duplicate boss state machines.
+  - New `web/src/systems/boss-system.ts`: one generic `BossEncounter` state machine (idle → time-trigger → warning → spawn → active → defeated, with shockwave-kill → respawn) instantiated twice from per-boss config.
+  - Sierpinski config has no active phase; Mandelbrot config supplies an `onActiveUpdate` hook (MiniMandel spawns + stage transitions). Shared saved spawn-rate multiplier preserved (single value owned by `BossSystem`).
+  - Removed from `game.ts`: 6 sierpinski + 7 miniboss state fields, `updateSierpinskiBoss`/`startSierpinskiBossWarning`/`spawnSierpinskiBoss`/`onSierpinskiBossDefeated` and the four miniboss equivalents, plus the duplicated HUD banner/HP-bar render blocks (now `boss.renderHud(hud)`).
+  - `CombatSystem` boss-defeat callbacks now call `boss.onSierpinskiDefeated()` / `boss.onMandelbrotDefeated()`. Warning border-pulse + stage-break hitstop routed via `onWarning`/`requestHitstop`.
+  - `game.ts`: 1,488 → 1,238 lines.
+
+**All refactor checklist items complete.**
 
 ## 6. Suggested Implementation Order
 
@@ -192,12 +199,14 @@ Steps 2–4 alone should cut `game.ts` by roughly half and are the biggest reaso
 
 ## 6. Success Criteria
 
-- `npm run build` succeeds.
-- `npx tsc --noEmit` reports no errors.
-- Existing Playwright tests (if any) still pass.
-- `game.ts` is under ~1,200 lines.
-- No new `instanceof` ladders introduced; existing ones reduced.
-- New enemy type can be added by editing only the enemy class + one definition record + spawn pools.
+- ✅ `npm run build` succeeds.
+- ✅ `npx tsc --noEmit` reports no errors.
+- ✅ Existing Playwright tests still pass.
+- ✅ `game.ts` ~1,238 lines (from 2,408) — at the ~1,200 target.
+- ✅ No new `instanceof` ladders introduced; the `getEnemyFamily` ladder removed and separation/bouncer checks made data-driven. Remaining `instanceof` is concrete-member access only.
+- ✅ New enemy type can be added by editing only the enemy class (with behavior records) + `createEnemy()` case + spawn pools.
+
+**Status: all refactor steps complete (2026-07-01).**
 
 ---
 
