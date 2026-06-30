@@ -20,12 +20,12 @@ import { HapticsManager } from './core/haptics';
 import { LifecycleSystem } from './systems/lifecycle-system';
 import { CombatSystem } from './systems/combat-system';
 import { SpawnSystem } from './systems/spawn-system';
+import { GravitySystem } from './systems/gravity-system';
 import { RunStats, computeMedals } from './core/run-stats';
 import { createEnemy } from './spawner/enemy-factory';
 import { Pinwheel } from './entities/enemies/pinwheel';
 import { MiniMandel } from './entities/enemies/minimandel';
 import { BlackHole } from './entities/enemies/blackhole';
-import { CircleEnemy } from './entities/enemies/circle';
 import { Sierpinski } from './entities/enemies/sierpinski';
 import { Mandelbrot } from './entities/enemies/mandelbrot';
 import {
@@ -69,14 +69,8 @@ import {
   SIERPINSKI_BOSS_DEFEATED_BANNER_DURATION,
   SIERPINSKI_BOSS_SPAWN_SUPPRESS_MULT,
   MedalDef,
-  BULLET_GRAVITY_STRENGTH,
-  SUPERNOVA_PARTICLE_COUNT,
-  SUPERNOVA_GRID_IMPULSE,
   SUPERNOVA_HITSTOP,
   SUPERNOVA_FLASH_DURATION,
-  CIRCLE_EJECT_SPEED_MIN,
-  CIRCLE_EJECT_SPEED_MAX,
-  CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER,
 } from './config';
 import { gameSettings } from './settings';
 import { showDesktopSettings, hideDesktopSettings } from './ui/settings-panel';
@@ -126,6 +120,9 @@ export class Game {
   // Spawn system (wave-manager execution, caps, spawn SFX, formation telegraphs)
   private spawn: SpawnSystem;
 
+  // Gravity system (BlackHole attraction, absorption/supernova, player pull, grid wells, circle flocks)
+  private gravity: GravitySystem;
+
   // Combat feedback: hitstop timer applied by Game
   private hitstopTimer = 0;
 
@@ -148,12 +145,8 @@ export class Game {
   private gameOverMedals: MedalDef[] = [];
   private medalRevealPlayed = false;
 
-  // Supernova flash + warning tracking
+  // Supernova screen flash (set by GravitySystem via onSupernovaDetonate callback)
   private supernovaFlashTimer = 0;
-  private supernovaWarningPlayed = new Set<BlackHole>();
-
-  // Circle flock groups: shared centroid Vec2 updated each frame so circles snap back together
-  private circleFlocks: Array<{ center: Vec2; members: CircleEnemy[] }> = [];
 
   // Design Lab
   private designLab: DesignLab | null = null;
@@ -244,6 +237,22 @@ export class Game {
       audio: this.audio,
       grid: this.grid,
       waveManager: this.waveManager,
+    });
+    this.gravity = new GravitySystem(this.mobile, {
+      player: this.player,
+      enemies: this.enemies,
+      bullets: this.bullets,
+      lifecycle: this.lifecycle,
+      explosions: this.explosions,
+      grid: this.grid,
+      camera: this.camera,
+      audio: this.audio,
+      onSupernovaWarning: () => { this.phaseBorderPulseTimer = PHASE_BORDER_PULSE_DURATION; },
+      onSupernovaDetonate: () => {
+        this.haptics.supernova();
+        this.hitstopTimer = Math.max(this.hitstopTimer, SUPERNOVA_HITSTOP);
+        this.supernovaFlashTimer = SUPERNOVA_FLASH_DURATION;
+      },
     });
     this.starfield = new Starfield(80, gameSettings.arenaWidth, gameSettings.arenaHeight);
     this.haptics = new HapticsManager();
@@ -352,7 +361,7 @@ export class Game {
     this.player.reset();
     this.bullets.clear();
     this.enemies.length = 0;
-    this.circleFlocks = [];
+    this.gravity.clear();
     this.explosions.clear();
     this.lifecycle.clear();
     this.combat.clear();
@@ -373,7 +382,6 @@ export class Game {
     this.gameOverMedals = [];
     this.medalRevealPlayed = false;
     this.supernovaFlashTimer = 0;
-    this.supernovaWarningPlayed.clear();
     this.sierpinskiBossActive = false;
     this.sierpinskiBossDefeated = false;
     this.sierpinskiBossWarningTimer = 0;
@@ -437,163 +445,6 @@ export class Game {
     return Math.min(base + enemyBoost + phaseBump + heatBoost, 1);
   }
 
-  private updateGravityWells(): void {
-    for (const e of this.enemies) {
-      if (!e.active) continue;
-      if (e instanceof BlackHole) {
-        // Ramp gravity during spawn so the fabric warps in gradually
-        let spawnFactor = 1;
-        if (e.isSpawning) {
-          spawnFactor = 1 - e.spawnTimer / e.spawnDuration; // 0→1 over spawn
-          spawnFactor = spawnFactor * spawnFactor; // ease-in (quadratic)
-        }
-        const mass = -(gameSettings.bhGridMassBase + e.absorbedCount * gameSettings.bhGridMassPerAbsorb) * e.breathMassMultiplier * spawnFactor;
-        const radius = BlackHole.ATTRACT_RADIUS * gameSettings.bhGridRadiusMultiplier * spawnFactor;
-        this.grid.applyGravityWell(e.position.x, e.position.y, mass, radius);
-      }
-    }
-  }
-
-  /** Apply BlackHole gravitational attraction to nearby enemies + absorb on contact */
-  private applyBlackHoleAttraction(dt: number): void {
-    const blackholes: BlackHole[] = [];
-    for (const e of this.enemies) {
-      if (e.active && !e.isSpawning && e instanceof BlackHole) {
-        blackholes.push(e);
-      }
-    }
-    if (blackholes.length === 0) return;
-
-    for (const bh of blackholes) {
-      const attractR2 = BlackHole.ATTRACT_RADIUS * BlackHole.ATTRACT_RADIUS;
-      const absorbR2 = (bh.collisionRadius + 10) * (bh.collisionRadius + 10);
-
-      for (const e of this.enemies) {
-        if (!e.active || e.isSpawning || e === bh || e instanceof BlackHole || e.gravityImmune) continue;
-
-        const dx = bh.position.x - e.position.x;
-        const dy = bh.position.y - e.position.y;
-        const dist2 = dx * dx + dy * dy;
-
-        // Absorb enemies that get too close
-        if (dist2 < absorbR2 && bh.absorbedCount < BlackHole.MAX_ABSORB) {
-          e.active = false;
-          bh.absorbEnemy();
-          this.explosions.spawn(e.position.x, e.position.y, e.color, 15, 0.6);
-          this.grid.applyImpulse(e.position.x, e.position.y, -20, 120);
-
-          // Destabilize warning — play once per BH
-          if (bh.destabilizing && !bh.overloaded && !this.supernovaWarningPlayed.has(bh)) {
-            this.supernovaWarningPlayed.add(bh);
-            this.audio.playSupernovaWarning();
-            this.phaseBorderPulseTimer = PHASE_BORDER_PULSE_DURATION;
-          }
-
-          // Auto-explode on overload (after 1.5s destabilize)
-          if (bh.overloaded) {
-            bh.active = false;
-            const absorbed = bh.absorbedCount;
-            // Spawn circles — 2x count, random angles, elastic flock snap-back
-            const circleCount = absorbed * CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER;
-            const flockCenter = new Vec2(bh.position.x, bh.position.y);
-            const flockGroup: CircleEnemy[] = [];
-            for (let ci = 0; ci < circleCount; ci++) {
-              const angle = Math.random() * Math.PI * 2;
-              const dist = 60 + Math.random() * 90;
-              const cPos = new Vec2(
-                bh.position.x + Math.cos(angle) * dist,
-                bh.position.y + Math.sin(angle) * dist,
-              );
-              const ce = createEnemy('circle', cPos) as CircleEnemy;
-              const ejectSpeed = CIRCLE_EJECT_SPEED_MIN + Math.random() * (CIRCLE_EJECT_SPEED_MAX - CIRCLE_EJECT_SPEED_MIN);
-              ce.ejectVel.set(Math.cos(angle) * ejectSpeed, Math.sin(angle) * ejectSpeed);
-              ce.flockCenter = flockCenter;
-              this.lifecycle.spawnEnemy(ce);
-              this.enemies.push(ce);
-              flockGroup.push(ce);
-            }
-            this.circleFlocks.push({ center: flockCenter, members: flockGroup });
-            // Layer 1: Primary supernova explosion (massive)
-            this.explosions.spawn(
-              bh.position.x, bh.position.y, bh.color,
-              this.mobile ? 150 : SUPERNOVA_PARTICLE_COUNT,
-              EXPLOSION_DURATION_LARGE,
-            );
-            // Layer 2: White flash particles
-            this.explosions.spawn(
-              bh.position.x, bh.position.y, [1, 1, 1],
-              this.mobile ? 60 : Math.floor(SUPERNOVA_PARTICLE_COUNT * 0.4),
-              EXPLOSION_DURATION_LARGE * 0.6,
-            );
-            // Layer 3: Orange embers (long duration)
-            this.explosions.spawn(
-              bh.position.x, bh.position.y, [1, 0.5, 0.1],
-              this.mobile ? 40 : Math.floor(SUPERNOVA_PARTICLE_COUNT * 0.3),
-              EXPLOSION_DURATION_LARGE * 1.5,
-              0.3,
-            );
-            this.grid.applyImpulse(bh.position.x, bh.position.y, SUPERNOVA_GRID_IMPULSE, 600);
-            this.camera.shake(SCREEN_SHAKE_DEATH);
-            this.audio.playBlackHoleDeath(absorbed);
-            this.player.score += bh.scoreValue;
-            this.player.enemiesKilled++;
-            this.haptics.supernova();
-            this.hitstopTimer = Math.max(this.hitstopTimer, SUPERNOVA_HITSTOP);
-            this.supernovaFlashTimer = SUPERNOVA_FLASH_DURATION;
-            this.supernovaWarningPlayed.delete(bh);
-          }
-          continue;
-        }
-
-        // Attract within radius
-        if (dist2 < attractR2 && dist2 > 1) {
-          const dist = Math.sqrt(dist2);
-          const force = BlackHole.GRAVITY_STRENGTH * dt / dist;
-          e.position.x += dx / dist * force;
-          e.position.y += dy / dist * force;
-        }
-      }
-
-      // Bullet gravity bending — curve trajectories near BlackHoles
-      for (const b of this.bullets.bullets) {
-        if (!b.active) continue;
-        const bdx = bh.position.x - b.position.x;
-        const bdy = bh.position.y - b.position.y;
-        const bdist2 = bdx * bdx + bdy * bdy;
-        if (bdist2 >= attractR2 || bdist2 < 1) continue;
-        const bdist = Math.sqrt(bdist2);
-        const force = BULLET_GRAVITY_STRENGTH * dt / bdist;
-        b.velocity.x += bdx / bdist * force;
-        b.velocity.y += bdy / bdist * force;
-        b.angle = Math.atan2(b.velocity.y, b.velocity.x);
-      }
-    }
-  }
-
-  /** Pull player toward active BlackHoles */
-  private applyBlackHolePlayerPull(dt: number): void {
-    const hw = gameSettings.arenaWidth / 2;
-    const hh = gameSettings.arenaHeight / 2;
-    for (const e of this.enemies) {
-      if (!e.active || e.isSpawning || !(e instanceof BlackHole)) continue;
-      const dx = e.position.x - this.player.position.x;
-      const dy = e.position.y - this.player.position.y;
-      const dist2 = dx * dx + dy * dy;
-      const attractR = BlackHole.ATTRACT_RADIUS;
-      if (dist2 < attractR * attractR && dist2 > 1) {
-        const dist = Math.sqrt(dist2);
-        const force = gameSettings.bhPlayerPull * (1 + e.absorbedCount * 0.08) * dt / dist;
-        this.player.position.x += dx / dist * force;
-        this.player.position.y += dy / dist * force;
-      }
-    }
-    // Re-clamp player to world bounds
-    if (this.player.position.x < -hw) this.player.position.x = -hw;
-    if (this.player.position.x > hw) this.player.position.x = hw;
-    if (this.player.position.y < -hh) this.player.position.y = -hh;
-    if (this.player.position.y > hh) this.player.position.y = hh;
-  }
-
   /** Update during game over: keep enemies alive with idle animation + gravity */
   private updateGameOver(dt: number): void {
     this.gameOverTime += dt / 1000;
@@ -630,7 +481,7 @@ export class Game {
     }
 
     // Update gravity wells for grid warping
-    this.updateGravityWells();
+    this.gravity.updateGravityWells();
 
     // Redraw HUD with animation progress
     this.hud.drawGameOver(this.runStats, this.gameOverMedals, this.gameOverTime);
@@ -686,7 +537,7 @@ export class Game {
     if (this.hitstopTimer > 0) {
       this.hitstopTimer -= dt;
       this.explosions.update(dt);
-      this.updateGravityWells();
+      this.gravity.updateGravityWells();
       this.grid.update(dt);
       this.audio.setMusicIntensity(this.computeIntensity());
       return;
@@ -696,7 +547,7 @@ export class Game {
 
     // Player
     this.player.update(dt);
-    this.applyBlackHolePlayerPull(dt);
+    this.gravity.applyPlayerPull(dt);
 
     // Shooting
     const shots = this.player.tryShoot();
@@ -716,18 +567,10 @@ export class Game {
     this.lifecycle.updateBulletTrails(this.bullets);
 
     // BlackHole attraction — pull nearby non-blackhole enemies toward black holes
-    this.applyBlackHoleAttraction(dt);
+    this.gravity.applyAttraction(dt);
 
     // Update circle flock centroids (shared Vec2 refs held by each CircleEnemy)
-    for (let fi = this.circleFlocks.length - 1; fi >= 0; fi--) {
-      const flock = this.circleFlocks[fi];
-      const active = flock.members.filter(m => m.active);
-      if (active.length === 0) { this.circleFlocks.splice(fi, 1); continue; }
-      flock.members = active;
-      let cx = 0, cy = 0;
-      for (const m of active) { cx += m.position.x; cy += m.position.y; }
-      flock.center.set(cx / active.length, cy / active.length);
-    }
+    this.gravity.updateFlocks();
 
     // Enemies — Pass 1: AI + movement
     for (const e of this.enemies) {
@@ -781,7 +624,7 @@ export class Game {
     this.explosions.update(dt);
 
     // Update gravity wells for grid warping during gameplay
-    this.updateGravityWells();
+    this.gravity.updateGravityWells();
 
     // Grid micro-forces from moving enemies
     for (const e of this.enemies) {
@@ -1091,7 +934,7 @@ export class Game {
     const len = enemies.length;
 
     // Build set of enemies currently being pulled by a BlackHole (skip separation for them)
-    const inGravityWell = this.getEnemiesInGravityWell();
+    const inGravityWell = this.gravity.getEnemiesInGravityWell();
 
     for (let i = 0; i < len; i++) {
       const a = enemies[i];
@@ -1167,24 +1010,6 @@ export class Game {
         }
       }
     }
-  }
-
-  /** Return the set of non-BlackHole enemies currently within a BlackHole's attract radius */
-  private getEnemiesInGravityWell(): Set<Enemy> {
-    const result = new Set<Enemy>();
-    const attractR2 = BlackHole.ATTRACT_RADIUS * BlackHole.ATTRACT_RADIUS;
-    for (const e of this.enemies) {
-      if (!e.active || e.isSpawning || !(e instanceof BlackHole)) continue;
-      for (const other of this.enemies) {
-        if (!other.active || other.isSpawning || other === e || other instanceof BlackHole || other.gravityImmune) continue;
-        const dx = e.position.x - other.position.x;
-        const dy = e.position.y - other.position.y;
-        if (dx * dx + dy * dy < attractR2) {
-          result.add(other);
-        }
-      }
-    }
-    return result;
   }
 
   /** Render phase transition border pulse */
@@ -1348,7 +1173,7 @@ export class Game {
         this.lifecycle.clear();
         this.enemies.length = 0;
         this.combat.clearPendingSpawns();
-        this.circleFlocks = [];
+        this.gravity.clear();
         this.player.respawn();
         this.player.active = true;
         this.camera.snapTo(this.player.position);

@@ -159,7 +159,12 @@ Split `Game` into focused systems owned by `Game` but encapsulating their state.
   - Removed from `game.ts`: the inline spawn loop, `createTelegraph`, `renderTelegraphs`, `playEnemySpawnSFX`, `playSFXAtVolume`, the `Telegraph` interface, `telegraphs`, and `formationSpawnCounts`.
   - **Bug fix:** `Game` previously reassigned `this.enemies` (via `cleanupEnemies` returning a new array and `= []` resets), so the array reference captured by `CombatSystem`/`SpawnSystem` deps went stale and combat-spawned children were orphaned. `cleanupEnemies()` now filters in place and `Game` resets via `.length = 0`, so the enemies array is a single shared reference.
   - `game.ts`: 1,856 → 1,664 lines.
-- [ ] **Extract `GravitySystem`** — centralizes BlackHole physics.
+- [x] **Extract `GravitySystem`** — centralizes BlackHole physics.
+  - New `web/src/systems/gravity-system.ts` owns `applyAttraction(dt)` (enemy attraction + absorption + overload supernova + bullet bending), `applyPlayerPull(dt)`, `updateGravityWells()`, `updateFlocks()`, and `getEnemiesInGravityWell()` (used by `separateEnemies`).
+  - State moved out of `game.ts`: `circleFlocks` and the per-BlackHole `supernovaWarningPlayed` set.
+  - Game-owned supernova feedback (border pulse, hitstop, screen flash, haptics) routed back via `onSupernovaWarning`/`onSupernovaDetonate` callbacks; `supernovaFlashTimer` stays in `Game` (read in render).
+  - `Game.update()` call sites unchanged in order: `gravity.applyPlayerPull` → `gravity.applyAttraction` → `gravity.updateFlocks`; `gravity.updateGravityWells()` retained at all three prior sites (gameover/hitstop/normal). `gravity.clear()` on reset + respawn.
+  - `game.ts`: 1,664 → 1,489 lines.
 - [ ] **Data-driven enemy defs** — replace `instanceof` ladders.
 - [ ] **Split `config.ts`** — domain-organized constants.
 - [ ] **`BossSystem` generic template** — collapse duplicate boss state machines.

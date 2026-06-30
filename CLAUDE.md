@@ -94,7 +94,8 @@ web/src/
 ├── systems/
 │   ├── lifecycle-system.ts     # Centralized enemy + bullet trail lifecycle
 │   ├── combat-system.ts        # Kill processing, heat, hitstop, kill signatures
-│   └── spawn-system.ts         # WaveManager execution, caps, spawn SFX, formation telegraphs
+│   ├── spawn-system.ts         # WaveManager execution, caps, spawn SFX, formation telegraphs
+│   └── gravity-system.ts       # BlackHole attraction/absorption/supernova, player pull, grid wells, circle flocks
 │
 ├── spawner/
 │   ├── enemy-factory.ts        # Shared `createEnemy()` factory
@@ -114,7 +115,7 @@ web/src/
 
 ### Game Loop (`game.ts`)
 
-`update(dt)`: player movement → BlackHole gravity → bullets → enemy AI → **enemy separation** → **SpawnSystem.update()** (wave manager execution) → collision → **CombatSystem.processKills()** → staggered child spawns/heat decay → LifecycleSystem trail update/cleanup → explosions/grid/camera → music intensity.
+`update(dt)`: player movement → **GravitySystem.applyPlayerPull()** → bullets → **GravitySystem.applyAttraction() + updateFlocks()** → enemy AI → **enemy separation** → **SpawnSystem.update()** (wave manager execution) → collision → **CombatSystem.processKills()** → staggered child spawns/heat decay → LifecycleSystem trail update/cleanup → explosions/**GravitySystem.updateGravityWells()**/grid/camera → music intensity.
 
 **Enemy separation** (`separateEnemies()`): Per-frame O(n²/2) pairwise position correction. If two enemies overlap (distance < sum of collision radii + `ENEMY_SEPARATION_BUFFER`), push both apart proportionally. Near-zero distance uses deterministic direction (index-derived, not random) for consistent frame-to-frame separation. Heavy overlaps (>50% of minDist) get 1.5× push strength for faster cluster resolution. BlackHoles immovable (weight 0), minibosses resist (0.25), all others 50/50. Enemies inside a BlackHole gravity well exempt (gravity wins). Spawning enemies participate in separation during the final 70% of their spawn animation (allows clustered formations to spread before spawn completes).
 
@@ -127,6 +128,7 @@ web/src/
 - **`LifecycleSystem`** (`web/src/systems/lifecycle-system.ts`) — owns the `TrailSystem` and automates trail attach/detach for enemies and bullets. `Game` calls `spawnEnemy()` / `spawnBullet()` when entities are created, `cleanupEnemies()` / `updateBulletTrails()` each frame, and `clear()` / `clearBulletTrails()` on reset. `cleanupEnemies()` filters the enemies array **in place** (returns the same reference) so systems holding the array stay in sync — `Game` never reassigns `this.enemies` (uses `.length = 0` to reset), keeping the single shared reference valid across `Game`, `CombatSystem`, and `SpawnSystem`.
 - **`CombatSystem`** (`web/src/systems/combat-system.ts`) — owns kill processing, heat value, hitstop accumulation, kill-signature VFX, and staggered child-spawn timing. `Game` calls `processKills(result)` after collision detection, `update(dt, gameTime)` each frame (handles heat decay/survival pressure and ready staggered spawns), and `render(renderer)` during the additive blend pass. `Game` reads `combat.heatValue` to drive bloom, arena border color, and music intensity.
 - **`SpawnSystem`** (`web/src/systems/spawn-system.ts`) — executes `WaveManager` spawn requests: cap enforcement (max enemies, ≤4 BlackHoles, elite cap), ambush spawn duration, edge-push for player-proximity spawns, trail registration, spawn grid ripples, spawn SFX (with formation leakthrough suppression), and the formation telegraph lifecycle. `Game` calls `spawn.update(dt)` each frame, `spawn.updateTelegraphs(dt)` from combat-feedback timers, `spawn.renderTelegraphs(renderer)` during the normal blend pass, and `spawn.clear()` on reset. `WaveManager` remains the scheduler; `SpawnSystem` executes its requests.
+- **`GravitySystem`** (`web/src/systems/gravity-system.ts`) — owns all BlackHole physics: enemy attraction + absorption + overload supernova (`applyAttraction(dt)`), bullet gravity bending, player pull (`applyPlayerPull(dt)`), grid gravity-well registration (`updateGravityWells()`), the elastic circle-flock centroids ejected by supernovae (`updateFlocks()`), and the gravity-well exemption set used by separation (`getEnemiesInGravityWell()`). Owns `circleFlocks` and the per-BlackHole supernova-warning set; `Game` calls `gravity.clear()` on reset/respawn. Game-owned feedback (border pulse, hitstop, supernova screen flash, haptics) is routed back via the `onSupernovaWarning` / `onSupernovaDetonate` callbacks.
 - **`enemy-factory.ts`** (`web/src/spawner/enemy-factory.ts`) — shared `createEnemy(type, pos, isElite, tier?)` used by `Game`, `CombatSystem`, and `SpawnSystem`.
 - **`run-stats.ts`** (`web/src/core/run-stats.ts`) — `RunStats` interface and `computeMedals()` extracted to avoid a circular dependency between `game.ts` and `CombatSystem`.
 
@@ -198,6 +200,7 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 - `LifecycleSystem` extraction: **Complete** (`web/src/systems/lifecycle-system.ts` centralizes enemy + bullet trail lifecycle; `Game` no longer manually tracks `trailId` lifetimes)
 - `CombatSystem` extraction: **Complete** (`web/src/systems/combat-system.ts` centralizes kill processing, heat, hitstop, kill signatures, and staggered child spawns; `web/src/spawner/enemy-factory.ts` and `web/src/core/run-stats.ts` extracted as shared dependencies)
 - `SpawnSystem` extraction: **Complete** (`web/src/systems/spawn-system.ts` centralizes WaveManager spawn execution, caps, edge-push, spawn SFX, and formation telegraphs. Fixed a latent bug: `Game` previously reassigned `this.enemies` each frame, orphaning the array reference held by `CombatSystem`/`SpawnSystem` — child spawns now land in the shared array. `game.ts`: 1,856 → 1,664 lines.)
+- `GravitySystem` extraction: **Complete** (`web/src/systems/gravity-system.ts` centralizes BlackHole attraction/absorption/supernova, bullet bending, player pull, grid wells, circle flocks, and the separation gravity-well exemption. Game-owned supernova feedback routed via `onSupernovaWarning`/`onSupernovaDetonate` callbacks. `game.ts`: 1,664 → 1,489 lines.)
 - Square removed: **Complete** (Square enemy deleted entirely — file, spawn pools, kill VFX, SFX, config all removed)
 - Haptics cleanup: **Complete** (All haptics calls removed except `haptics.supernova()` on BlackHole overload detonation)
 - Miniboss gravity immunity: **Complete** (Mandelbrot + Sierpinski tier 0 have `gravityImmune = true`)

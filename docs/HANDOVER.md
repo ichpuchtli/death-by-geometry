@@ -48,21 +48,28 @@ The refactor is being tracked in `docs/REFACTOR_PLAN.md` (running checklist) and
 - **Bug fix:** `Game` was reassigning `this.enemies` each frame, orphaning the array reference held by `CombatSystem`/`SpawnSystem` deps (combat-spawned children were lost). `LifecycleSystem.cleanupEnemies()` now filters in place and `Game` resets via `.length = 0`, so the enemies array is one shared reference across `Game` + all systems. **Do not reintroduce `this.enemies = ...` reassignments.**
 - `game.ts` reduced from **1,856 → 1,664 lines**.
 
+### P1 — `GravitySystem` (BlackHole physics)
+- New `web/src/systems/gravity-system.ts` owns all BlackHole physics:
+  - `applyAttraction(dt)` — enemy attraction, absorption, overload supernova (circle ejection + flock), bullet gravity bending
+  - `applyPlayerPull(dt)` — player pull + world-bound re-clamp
+  - `updateGravityWells()` — grid gravity-well registration
+  - `updateFlocks()` — elastic circle-flock centroids
+  - `getEnemiesInGravityWell()` — separation exemption set (called by `separateEnemies`)
+- State moved out of `Game`: `circleFlocks`, `supernovaWarningPlayed`. `supernovaFlashTimer` stays in `Game` (render reads it).
+- Game-owned supernova feedback is routed back via constructor callbacks `onSupernovaWarning` (border pulse) and `onSupernovaDetonate` (hitstop + screen flash + haptics). `gravity.clear()` runs on reset + respawn.
+- `game.ts` reduced from **1,664 → 1,489 lines**.
+
 ## Suggested Next Steps (in order)
 
-1. **Extract `GravitySystem`** — centralize BlackHole physics.
-   - Move `applyBlackHoleAttraction()`, `applyBlackHolePlayerPull()`, `updateGravityWells()`, and circle-flock centroid update into a system.
-   - Responsibilities: enemy attraction, absorption/overload/supernova, bullet gravity bending, player pull, grid well registration, circle flock centers.
-
-2. **P2 — Data-driven enemy definitions**
+1. **P2 — Data-driven enemy definitions**
    - Replace `instanceof` ladders (`getEnemyFamily`, separation weights, gravity immunity checks) with behavior records on `Enemy` (`family`, `gravityImmune`, `separationWeight`, `isMiniboss`, etc.).
    - Goal: new enemy type requires only the enemy class + one definition record + spawn pool entry.
 
-3. **P2 — Split `config.ts`**
+2. **P2 — Split `config.ts`**
    - Domain-organized files under `web/src/config/` re-exported from `config.ts`.
    - Domains: world, player, bullet, enemy, audio, spawner, UI, heat/recovery, boss, medals.
 
-4. **P3 — `BossSystem` generic template**
+3. **P3 — `BossSystem` generic template**
    - Collapse the structurally identical Sierpinski and Mandelbrot encounter state machines into a shared generic encounter template.
 
 ## Key Architectural Decisions
@@ -79,10 +86,11 @@ The refactor is being tracked in `docs/REFACTOR_PLAN.md` (running checklist) and
 |------|---------|
 | `docs/REFACTOR_PLAN.md` | Running checklist with detailed completion notes |
 | `CLAUDE.md` | Authoritative architecture, directory structure, conventions |
-| `web/src/game.ts` | Main orchestrator (still owns gravity, boss state machines, rendering) |
+| `web/src/game.ts` | Main orchestrator (still owns boss state machines, rendering, heat/recovery feedback) |
 | `web/src/systems/lifecycle-system.ts` | Trail lifecycle (in-place enemy cleanup) |
 | `web/src/systems/combat-system.ts` | Kill processing, heat, hitstop, kill signatures |
 | `web/src/systems/spawn-system.ts` | WaveManager execution, caps, spawn SFX, formation telegraphs |
+| `web/src/systems/gravity-system.ts` | BlackHole attraction/absorption/supernova, player pull, grid wells, circle flocks |
 | `web/src/spawner/enemy-factory.ts` | `createEnemy()` |
 | `web/src/spawner/wave-manager.ts` | Spawn scheduler (unchanged) |
 | `web/src/core/run-stats.ts` | `RunStats`, `computeMedals()` |
@@ -113,7 +121,7 @@ Always run `npx tsc --noEmit` and `npm run build` after changes. Playwright test
 - [x] Extract `LifecycleSystem`
 - [x] Extract `CombatSystem`
 - [x] Extract `SpawnSystem`
-- [ ] Extract `GravitySystem`
+- [x] Extract `GravitySystem`
 - [ ] Data-driven enemy definitions
 - [ ] Split `config.ts`
 - [ ] `BossSystem` generic template
