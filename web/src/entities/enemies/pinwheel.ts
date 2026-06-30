@@ -4,6 +4,9 @@ import { Renderer } from '../../renderer/sprite-batch';
 import { COLORS, ENEMY_SPEED, ENEMY_SCORES } from '../../config';
 
 export class Pinwheel extends Enemy {
+  override family = 'pinwheel' as const;
+  override isBouncer = true;
+
   constructor() {
     super();
     const s = 20;

@@ -9,9 +9,6 @@ import { Mandelbrot } from '../entities/enemies/mandelbrot';
 import { MiniMandel } from '../entities/enemies/minimandel';
 import { BlackHole } from '../entities/enemies/blackhole';
 import { Sierpinski } from '../entities/enemies/sierpinski';
-import { Pinwheel } from '../entities/enemies/pinwheel';
-import { Rhombus } from '../entities/enemies/rhombus';
-import { CircleEnemy } from '../entities/enemies/circle';
 import { LifecycleSystem } from './lifecycle-system';
 import { createEnemy } from '../spawner/enemy-factory';
 import { CollisionResult } from '../core/collision';
@@ -107,7 +104,7 @@ export class CombatSystem {
       if (kill.scoreValue > 0) this.deps.player.enemiesKilled++;
       frameKillCount++;
 
-      const family = this.getEnemyFamily(kill.enemy);
+      const family = kill.enemy.family;
       const isEliteKill = kill.enemy.isElite;
 
       if (isEliteKill) this.deps.runStats.elitesKilled++;
@@ -441,17 +438,6 @@ export class CombatSystem {
 
   clearPendingSpawns(): void {
     this.pendingSpawns = [];
-  }
-
-  private getEnemyFamily(enemy: Enemy): string {
-    if (enemy instanceof Mandelbrot) return 'mandelbrot';
-    if (enemy instanceof MiniMandel) return 'minimandel';
-    if (enemy instanceof BlackHole) return 'blackhole';
-    if (enemy instanceof Sierpinski) return 'sierpinski';
-    if (enemy instanceof Pinwheel) return 'pinwheel';
-    if (enemy instanceof Rhombus) return 'rhombus';
-    if (enemy instanceof CircleEnemy) return 'circle';
-    return 'rhombus';
   }
 
   private spawnKillSignature(

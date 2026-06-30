@@ -45,6 +45,8 @@ export class BlackHole extends Enemy {
 
   override hp = BLACKHOLE_HP;
   override maxHp = BLACKHOLE_HP;
+  override family = 'blackhole' as const;
+  override separationWeight = 0; // immovable
 
   visualMode: BlackHoleVisualMode = 'dense';
 

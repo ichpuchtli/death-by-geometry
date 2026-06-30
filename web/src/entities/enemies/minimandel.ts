@@ -6,6 +6,8 @@ import type { Mandelbrot } from './mandelbrot';
 
 /** MiniMandel — small cardioid minion spawned by Mandelbrot miniboss */
 export class MiniMandel extends Enemy {
+  override family = 'minimandel' as const;
+
   parent: Mandelbrot | null = null;
 
   constructor(pos?: Vec2) {

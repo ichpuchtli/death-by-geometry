@@ -15,9 +15,10 @@ Use when working on enemy types, spawning, the wave manager, enemy AI, BlackHole
 ## How to Enable/Disable an Enemy
 
 1. **`spawn-patterns.ts`**: Add/remove from pool arrays
-2. **`game.ts`**: Add/remove import and `case` in `createEnemy()`
-3. The `default` case falls back to Rhombus (graceful degradation)
-4. Config entries can be left — unused config is harmless
+2. **`enemy-factory.ts`**: Add/remove import and `case` in `createEnemy()` (`web/src/spawner/enemy-factory.ts`)
+3. The enemy class sets its behavior records (`family`, `isBouncer`, `separationWeight`, `isMiniboss`, `gravityImmune`) as `override` fields — systems read these, so no `instanceof` ladders need editing
+4. The `default` case falls back to Rhombus (graceful degradation); a missing `family` defaults to `'rhombus'`
+5. Config entries can be left — unused config is harmless
 
 ## Enemy Class Hierarchy
 
@@ -28,18 +29,22 @@ All enemies extend `Enemy` (extends `Entity`). Key methods:
 - `hit()` → `boolean` (true if dead)
 - `onDeath()` → `EnemyDeathResult` (optional child spawning)
 
-Special mechanics in `game.ts` (not enemy classes):
-- BlackHole attraction + absorption: `applyBlackHoleAttraction()` + `applyBlackHolePlayerPull()`
-- BlackHole hard cap: max 4 active (enforced in spawn loop)
+Special mechanics in systems (not enemy classes):
+- BlackHole attraction + absorption: `GravitySystem.applyAttraction()` + `applyPlayerPull()` (`web/src/systems/gravity-system.ts`)
+- BlackHole hard cap: max 4 active (enforced in `SpawnSystem`)
 
 ## Kill Family Mapping
 
-`getEnemyFamily()` in `game.ts` maps instances to family strings for kill signatures/SFX:
-- Circle → `'circle'` (default handler)
-- Shard → `'sierpinski'`
-- Mandelbrot → `'mandelbrot'`
+Each enemy carries a data-driven `family: EnemyFamily` field (set as an `override` in the subclass); `CombatSystem` reads `enemy.family` for kill signatures/SFX (no `instanceof` ladder):
+- Rhombus / Shard → `'rhombus'` (base default; Shard does not override)
+- Pinwheel → `'pinwheel'` (also sets `isBouncer = true`)
+- Circle → `'circle'` (default kill handler)
+- BlackHole → `'blackhole'` (kill path accesses `absorbedCount`; also `separationWeight = 0`)
+- Sierpinski → `'sierpinski'` (tier-0 sets `separationWeight = 0.25`)
+- Mandelbrot → `'mandelbrot'` (`separationWeight = 0.25`)
 - MiniMandel → `'minimandel'`
-- Only actual `BlackHole` instances use `'blackhole'` kill path (accesses `absorbedCount`)
+
+Separation behavior is likewise data-driven: `separationWeight` (0 = immovable, 0.25 = miniboss, 1 = normal) and `isBouncer` (ricochet) on each `Enemy`.
 
 ## BlackHole Mechanics
 

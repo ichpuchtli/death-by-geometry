@@ -12,6 +12,8 @@ import {
 /** Mandelbrot cardioid — signature miniboss with 3 HP stages */
 export class Mandelbrot extends Enemy {
   isMiniboss = true;
+  override family = 'mandelbrot' as const;
+  override separationWeight = 0.25; // miniboss resists separation pushes
   activeMinions = 0;
   private minionSpawnTimer = 0;
   private budTimers: number[] = [0, 0, 0, 0, -2, -2, -2, -2]; // 4 active buds in stage 1, -2 = locked

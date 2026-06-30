@@ -11,6 +11,11 @@ export type EnemyDeathResult = {
   staggeredSpawn?: boolean;
 };
 
+/** Behavior family used for kill VFX/SFX classification (data-driven; no instanceof). */
+export type EnemyFamily =
+  | 'rhombus' | 'pinwheel' | 'circle' | 'blackhole'
+  | 'sierpinski' | 'mandelbrot' | 'minimandel' | 'shard';
+
 export abstract class Enemy extends Entity {
   speed = 0.1;
   scoreValue = 0;
@@ -36,6 +41,14 @@ export abstract class Enemy extends Entity {
   isMiniboss = false;
   /** Whether this enemy is immune to BlackHole gravitational pull and absorption */
   gravityImmune = false;
+
+  // Data-driven behavior records (replace instanceof ladders in systems)
+  /** Family classifier for kill VFX/SFX. */
+  family: EnemyFamily = 'rhombus';
+  /** Whether this enemy ricochets off others on contact (Pinwheel-style bouncer). */
+  isBouncer = false;
+  /** Separation push weight: 0 = immovable (BlackHole), 0.25 = resists (miniboss), 1 = normal. */
+  separationWeight = 1;
 
   constructor() {
     super();

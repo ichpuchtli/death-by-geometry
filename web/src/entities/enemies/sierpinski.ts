@@ -11,6 +11,7 @@ import { COLORS, SIERPINSKI_TIER_HP, SIERPINSKI_TIER_RADIUS, SIERPINSKI_TIER_SPE
  * Tier 2 (small): depth 1, 25px, 1 HP → dies (no children)
  */
 export class Sierpinski extends Enemy {
+  override family = 'sierpinski' as const;
   readonly tier: number;
   private depth: number;
   private hitFlash = 0;
@@ -31,6 +32,7 @@ export class Sierpinski extends Enemy {
     if (tier === 0) {
       this.isMiniboss = true;
       this.gravityImmune = true;
+      this.separationWeight = 0.25;
     }
 
     // Precompute outer triangle as shape points for collision

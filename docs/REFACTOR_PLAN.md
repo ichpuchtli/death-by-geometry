@@ -165,7 +165,11 @@ Split `Game` into focused systems owned by `Game` but encapsulating their state.
   - Game-owned supernova feedback (border pulse, hitstop, screen flash, haptics) routed back via `onSupernovaWarning`/`onSupernovaDetonate` callbacks; `supernovaFlashTimer` stays in `Game` (read in render).
   - `Game.update()` call sites unchanged in order: `gravity.applyPlayerPull` → `gravity.applyAttraction` → `gravity.updateFlocks`; `gravity.updateGravityWells()` retained at all three prior sites (gameover/hitstop/normal). `gravity.clear()` on reset + respawn.
   - `game.ts`: 1,664 → 1,489 lines.
-- [ ] **Data-driven enemy defs** — replace `instanceof` ladders.
+- [x] **Data-driven enemy defs** — replace `instanceof` ladders.
+  - Added behavior records to base `Enemy`: `family: EnemyFamily`, `isBouncer`, `separationWeight`. Set as `override` fields in Pinwheel (`pinwheel`/bouncer), CircleEnemy (`circle`), BlackHole (`blackhole`/weight 0), Mandelbrot (`mandelbrot`/weight 0.25), Sierpinski (`sierpinski`, tier-0 weight 0.25), MiniMandel (`minimandel`). Rhombus/Shard use the `rhombus` default (preserves prior `getEnemyFamily` fallback).
+  - Deleted `CombatSystem.getEnemyFamily()` instanceof ladder — kill processing reads `enemy.family`.
+  - `separateEnemies()` reads `enemy.separationWeight` and `enemy.isBouncer` instead of `instanceof BlackHole` / `instanceof Pinwheel`.
+  - Remaining `instanceof` is only for concrete-member access (BlackHole gravity API, `Sierpinski.tier`, `MiniMandel.parent`, `BlackHole.absorbedCount`) — not classification ladders.
 - [ ] **Split `config.ts`** — domain-organized constants.
 - [ ] **`BossSystem` generic template** — collapse duplicate boss state machines.
 

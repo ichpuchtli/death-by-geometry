@@ -23,7 +23,6 @@ import { SpawnSystem } from './systems/spawn-system';
 import { GravitySystem } from './systems/gravity-system';
 import { RunStats, computeMedals } from './core/run-stats';
 import { createEnemy } from './spawner/enemy-factory';
-import { Pinwheel } from './entities/enemies/pinwheel';
 import { MiniMandel } from './entities/enemies/minimandel';
 import { BlackHole } from './entities/enemies/blackhole';
 import { Sierpinski } from './entities/enemies/sierpinski';
@@ -973,8 +972,8 @@ export class Game {
         const pushStrength = overlap > minDist * 0.5 ? overlap * 1.5 : overlap;
 
         // Weight: BlackHoles immovable (0), minibosses resist (0.25), others equal (1)
-        const wA = (a instanceof BlackHole) ? 0 : a.isMiniboss ? 0.25 : 1;
-        const wB = (b instanceof BlackHole) ? 0 : b.isMiniboss ? 0.25 : 1;
+        const wA = a.separationWeight;
+        const wB = b.separationWeight;
         const totalW = wA + wB;
         if (totalW < 0.001) continue; // both immovable
 
@@ -988,8 +987,8 @@ export class Game {
         b.position.y = Math.max(-hh, Math.min(hh, b.position.y - ny * pushB));
 
         // Bouncers (Pinwheel): deflect velocity off collision normal
-        const aIsBouncer = a instanceof Pinwheel;
-        const bIsBouncer = b instanceof Pinwheel;
+        const aIsBouncer = a.isBouncer;
+        const bIsBouncer = b.isBouncer;
         if (aIsBouncer || bIsBouncer) {
           if (aIsBouncer) {
             // Reflect A's velocity off normal (n points from B→A)

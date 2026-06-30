@@ -201,6 +201,7 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 - `CombatSystem` extraction: **Complete** (`web/src/systems/combat-system.ts` centralizes kill processing, heat, hitstop, kill signatures, and staggered child spawns; `web/src/spawner/enemy-factory.ts` and `web/src/core/run-stats.ts` extracted as shared dependencies)
 - `SpawnSystem` extraction: **Complete** (`web/src/systems/spawn-system.ts` centralizes WaveManager spawn execution, caps, edge-push, spawn SFX, and formation telegraphs. Fixed a latent bug: `Game` previously reassigned `this.enemies` each frame, orphaning the array reference held by `CombatSystem`/`SpawnSystem` — child spawns now land in the shared array. `game.ts`: 1,856 → 1,664 lines.)
 - `GravitySystem` extraction: **Complete** (`web/src/systems/gravity-system.ts` centralizes BlackHole attraction/absorption/supernova, bullet bending, player pull, grid wells, circle flocks, and the separation gravity-well exemption. Game-owned supernova feedback routed via `onSupernovaWarning`/`onSupernovaDetonate` callbacks. `game.ts`: 1,664 → 1,489 lines.)
+- Data-driven enemy classification: **Complete** (`Enemy` now carries `family` (`EnemyFamily`), `isBouncer`, and `separationWeight` records set per-subclass. `CombatSystem.getEnemyFamily()` instanceof ladder deleted — kill VFX/SFX read `enemy.family`; separation weights read `enemy.separationWeight` (BlackHole 0, miniboss 0.25, else 1); bouncer deflection reads `enemy.isBouncer`. Remaining `instanceof` checks are only for concrete-type member access — BlackHole gravity API, `Sierpinski.tier`, `MiniMandel.parent`, `BlackHole.absorbedCount`.)
 - Square removed: **Complete** (Square enemy deleted entirely — file, spawn pools, kill VFX, SFX, config all removed)
 - Haptics cleanup: **Complete** (All haptics calls removed except `haptics.supernova()` on BlackHole overload detonation)
 - Miniboss gravity immunity: **Complete** (Mandelbrot + Sierpinski tier 0 have `gravityImmune = true`)
@@ -234,7 +235,7 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 ## Important Conventions
 
 - **All constants in `config.ts`.** New tunables go there.
-- **Enemy classes are self-contained** (shape, colors, AI, rendering). Cross-system mechanics wired in `game.ts`.
+- **Enemy classes are self-contained** (shape, colors, AI, rendering). Cross-system mechanics are driven by behavior records on `Enemy` — `family` (kill VFX/SFX), `isBouncer` (separation ricochet), `separationWeight` (separation push), `isMiniboss`, `gravityImmune` — set as `override` fields per subclass, so systems read fields instead of `instanceof`.
 - **Object pooling** for bullets and explosions. Enemies are not pooled.
 - **Additive blending** for trails/explosions. Normal blending for entities.
 - **Mobile detection** via `'ontouchstart' in window` (reduced bloom, particles, trails).

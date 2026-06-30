@@ -7,6 +7,7 @@ import { COLORS, ENEMY_SPEED, ENEMY_SCORES, SPAWN_DURATION_CHILD,
 export class CircleEnemy extends Enemy {
   radius = 10;
   override gravityImmune = true;
+  override family = 'circle' as const;
 
   /** Initial outward burst velocity set on supernova spawn — decays over ~730ms */
   ejectVel = new Vec2(0, 0);

@@ -59,17 +59,20 @@ The refactor is being tracked in `docs/REFACTOR_PLAN.md` (running checklist) and
 - Game-owned supernova feedback is routed back via constructor callbacks `onSupernovaWarning` (border pulse) and `onSupernovaDetonate` (hitstop + screen flash + haptics). `gravity.clear()` runs on reset + respawn.
 - `game.ts` reduced from **1,664 → 1,489 lines**.
 
+### P2 — Data-driven enemy classification
+- Base `Enemy` gained behavior records: `family: EnemyFamily`, `isBouncer`, `separationWeight` (alongside existing `isMiniboss`, `gravityImmune`). Each subclass sets them as `override` fields.
+- `CombatSystem.getEnemyFamily()` instanceof ladder **deleted** — kill VFX/SFX read `enemy.family`.
+- `separateEnemies()` reads `enemy.separationWeight` (BlackHole 0, miniboss 0.25, else 1) and `enemy.isBouncer` (Pinwheel) instead of `instanceof`.
+- Remaining `instanceof` is intentional — concrete-member access only (BlackHole gravity API, `Sierpinski.tier`, `MiniMandel.parent`, `BlackHole.absorbedCount`), not classification.
+- Adding a new enemy now needs: the enemy class (with `family`/weights set) + `createEnemy()` case + spawn pool entry. No system-side ladders to touch.
+
 ## Suggested Next Steps (in order)
 
-1. **P2 — Data-driven enemy definitions**
-   - Replace `instanceof` ladders (`getEnemyFamily`, separation weights, gravity immunity checks) with behavior records on `Enemy` (`family`, `gravityImmune`, `separationWeight`, `isMiniboss`, etc.).
-   - Goal: new enemy type requires only the enemy class + one definition record + spawn pool entry.
-
-2. **P2 — Split `config.ts`**
+1. **P2 — Split `config.ts`**
    - Domain-organized files under `web/src/config/` re-exported from `config.ts`.
    - Domains: world, player, bullet, enemy, audio, spawner, UI, heat/recovery, boss, medals.
 
-3. **P3 — `BossSystem` generic template**
+2. **P3 — `BossSystem` generic template**
    - Collapse the structurally identical Sierpinski and Mandelbrot encounter state machines into a shared generic encounter template.
 
 ## Key Architectural Decisions
@@ -122,7 +125,7 @@ Always run `npx tsc --noEmit` and `npm run build` after changes. Playwright test
 - [x] Extract `CombatSystem`
 - [x] Extract `SpawnSystem`
 - [x] Extract `GravitySystem`
-- [ ] Data-driven enemy definitions
+- [x] Data-driven enemy definitions
 - [ ] Split `config.ts`
 - [ ] `BossSystem` generic template
 
