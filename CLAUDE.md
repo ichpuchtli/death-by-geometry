@@ -144,6 +144,8 @@ Bloom: ping-pong FBOs, half-res on mobile. Grid: own shader with gravity well un
 
 **Every tunable value** lives in `config.ts` (compile-time) or `settings.ts` (runtime, localStorage). Nothing hardcoded in entity classes.
 
+**`config.ts`** is a barrel that re-exports domain files under `web/src/config/` (`world`, `player`, `bullet`, `enemy`, `spawner`, `effects`, `ui`, `combat`, `boss`, `audio`, `medals`). Import from `'./config'` as before; add a new constant to the matching domain file.
+
 **`settings.ts`** (runtime-tunable via settings panel):
 - Gameplay: spawn rate, lives, player/enemy speed, fire rate, starting phase, max enemies
 - Visual: bloom intensity, trail length, resolution scale (0.25–2.0x)
@@ -202,6 +204,7 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 - `SpawnSystem` extraction: **Complete** (`web/src/systems/spawn-system.ts` centralizes WaveManager spawn execution, caps, edge-push, spawn SFX, and formation telegraphs. Fixed a latent bug: `Game` previously reassigned `this.enemies` each frame, orphaning the array reference held by `CombatSystem`/`SpawnSystem` — child spawns now land in the shared array. `game.ts`: 1,856 → 1,664 lines.)
 - `GravitySystem` extraction: **Complete** (`web/src/systems/gravity-system.ts` centralizes BlackHole attraction/absorption/supernova, bullet bending, player pull, grid wells, circle flocks, and the separation gravity-well exemption. Game-owned supernova feedback routed via `onSupernovaWarning`/`onSupernovaDetonate` callbacks. `game.ts`: 1,664 → 1,489 lines.)
 - Data-driven enemy classification: **Complete** (`Enemy` now carries `family` (`EnemyFamily`), `isBouncer`, and `separationWeight` records set per-subclass. `CombatSystem.getEnemyFamily()` instanceof ladder deleted — kill VFX/SFX read `enemy.family`; separation weights read `enemy.separationWeight` (BlackHole 0, miniboss 0.25, else 1); bouncer deflection reads `enemy.isBouncer`. Remaining `instanceof` checks are only for concrete-type member access — BlackHole gravity API, `Sierpinski.tier`, `MiniMandel.parent`, `BlackHole.absorbedCount`.)
+- `config.ts` split: **Complete** (constants moved into 11 domain files under `web/src/config/`; `config.ts` is now a barrel re-exporting them. All 176 exports preserved; consumer imports from `'./config'` unchanged.)
 - Square removed: **Complete** (Square enemy deleted entirely — file, spawn pools, kill VFX, SFX, config all removed)
 - Haptics cleanup: **Complete** (All haptics calls removed except `haptics.supernova()` on BlackHole overload detonation)
 - Miniboss gravity immunity: **Complete** (Mandelbrot + Sierpinski tier 0 have `gravityImmune = true`)
@@ -234,7 +237,7 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 
 ## Important Conventions
 
-- **All constants in `config.ts`.** New tunables go there.
+- **All constants in `config.ts`.** New tunables go in the matching domain file under `web/src/config/` (re-exported by the `config.ts` barrel).
 - **Enemy classes are self-contained** (shape, colors, AI, rendering). Cross-system mechanics are driven by behavior records on `Enemy` — `family` (kill VFX/SFX), `isBouncer` (separation ricochet), `separationWeight` (separation push), `isMiniboss`, `gravityImmune` — set as `override` fields per subclass, so systems read fields instead of `instanceof`.
 - **Object pooling** for bullets and explosions. Enemies are not pooled.
 - **Additive blending** for trails/explosions. Normal blending for entities.

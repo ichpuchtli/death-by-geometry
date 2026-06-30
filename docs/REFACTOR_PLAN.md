@@ -170,7 +170,9 @@ Split `Game` into focused systems owned by `Game` but encapsulating their state.
   - Deleted `CombatSystem.getEnemyFamily()` instanceof ladder — kill processing reads `enemy.family`.
   - `separateEnemies()` reads `enemy.separationWeight` and `enemy.isBouncer` instead of `instanceof BlackHole` / `instanceof Pinwheel`.
   - Remaining `instanceof` is only for concrete-member access (BlackHole gravity API, `Sierpinski.tier`, `MiniMandel.parent`, `BlackHole.absorbedCount`) — not classification ladders.
-- [ ] **Split `config.ts`** — domain-organized constants.
+- [x] **Split `config.ts`** — domain-organized constants.
+  - Constants moved into 11 domain files under `web/src/config/`: `world`, `player`, `bullet`, `enemy`, `spawner`, `effects`, `ui`, `combat`, `boss`, `audio`, `medals`.
+  - `config.ts` is now a barrel (`export * from './config/...'`); all 176 exports preserved (verified by name-set diff), consumer imports from `'./config'` unchanged.
 - [ ] **`BossSystem` generic template** — collapse duplicate boss state machines.
 
 ## 6. Suggested Implementation Order

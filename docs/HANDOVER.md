@@ -66,13 +66,13 @@ The refactor is being tracked in `docs/REFACTOR_PLAN.md` (running checklist) and
 - Remaining `instanceof` is intentional — concrete-member access only (BlackHole gravity API, `Sierpinski.tier`, `MiniMandel.parent`, `BlackHole.absorbedCount`), not classification.
 - Adding a new enemy now needs: the enemy class (with `family`/weights set) + `createEnemy()` case + spawn pool entry. No system-side ladders to touch.
 
+### P2 — Split `config.ts`
+- Constants moved into 11 domain files under `web/src/config/`: `world`, `player`, `bullet`, `enemy`, `spawner`, `effects`, `ui`, `combat`, `boss`, `audio`, `medals`.
+- `config.ts` is now a barrel re-exporting all of them, so every `import { X } from './config'` is unchanged. All 176 exports preserved (verified by name-set diff). Add new constants to the matching domain file.
+
 ## Suggested Next Steps (in order)
 
-1. **P2 — Split `config.ts`**
-   - Domain-organized files under `web/src/config/` re-exported from `config.ts`.
-   - Domains: world, player, bullet, enemy, audio, spawner, UI, heat/recovery, boss, medals.
-
-2. **P3 — `BossSystem` generic template**
+1. **P3 — `BossSystem` generic template**
    - Collapse the structurally identical Sierpinski and Mandelbrot encounter state machines into a shared generic encounter template.
 
 ## Key Architectural Decisions
@@ -126,7 +126,7 @@ Always run `npx tsc --noEmit` and `npm run build` after changes. Playwright test
 - [x] Extract `SpawnSystem`
 - [x] Extract `GravitySystem`
 - [x] Data-driven enemy definitions
-- [ ] Split `config.ts`
+- [x] Split `config.ts`
 - [ ] `BossSystem` generic template
 
 ## Success Criteria (from `docs/REFACTOR_PLAN.md`)
