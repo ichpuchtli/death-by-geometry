@@ -87,14 +87,6 @@ export class Camera {
     this.viewportHeight = h;
   }
 
-  /** Convert screen pixel coordinates to world coordinates (uses unshaken position) */
-  screenToWorld(sx: number, sy: number): Vec2 {
-    return new Vec2(
-      sx - this.viewportWidth / 2 + this.position.x,
-      -(sy - this.viewportHeight / 2) + this.position.y,
-    );
-  }
-
   /** Check if a world position is visible on screen (with padding) */
   isVisible(wx: number, wy: number, padding: number = 100): boolean {
     const halfW = this.viewportWidth / 2 + padding;

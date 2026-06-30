@@ -1,5 +1,5 @@
 import { HUD_FONT, HUD_COLOR, MedalDef, PHASE_DISPLAY_NAMES, WEAPON_STAGES } from '../config';
-import { RunStats } from '../game';
+import { RunStats } from '../core/run-stats';
 
 export class HUD {
   private ctx: CanvasRenderingContext2D;

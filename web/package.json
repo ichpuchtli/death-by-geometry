@@ -19,7 +19,6 @@
     "yaml": "^2.8.2"
   },
   "dependencies": {
-    "peerjs": "^1.5.5",
-    "web-haptics": "^0.0.6"
+    "peerjs": "^1.5.5"
   }
 }

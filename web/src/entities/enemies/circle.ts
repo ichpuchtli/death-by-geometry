@@ -1,11 +1,17 @@
 import { Enemy } from './enemy';
 import { Vec2 } from '../../core/vector';
 import { Renderer } from '../../renderer/sprite-batch';
-import { COLORS, ENEMY_SPEED, ENEMY_SCORES, SPAWN_DURATION_CHILD } from '../../config';
+import { COLORS, ENEMY_SPEED, ENEMY_SCORES, SPAWN_DURATION_CHILD,
+         CIRCLE_EJECT_DECAY, CIRCLE_FLOCK_PULL } from '../../config';
 
 export class CircleEnemy extends Enemy {
   radius = 10;
   override gravityImmune = true;
+
+  /** Initial outward burst velocity set on supernova spawn — decays over ~730ms */
+  ejectVel = new Vec2(0, 0);
+  /** Shared Vec2 pointing to group centroid — updated each frame by game.ts */
+  flockCenter: Vec2 | null = null;
 
   constructor(pos?: Vec2, radius: number = 10) {
     super();
@@ -24,7 +30,31 @@ export class CircleEnemy extends Enemy {
 
   update(dt: number, playerPos?: Vec2): void {
     if (!this.active || !playerPos) return;
+
+    // Decay ejection burst
+    const decay = Math.max(0, 1 - dt * CIRCLE_EJECT_DECAY);
+    this.ejectVel.x *= decay;
+    this.ejectVel.y *= decay;
+
+    // Base player-follow velocity
     this.follow(playerPos);
+
+    // Elastic flock pull toward group centroid
+    if (this.flockCenter) {
+      const dx = this.flockCenter.x - this.position.x;
+      const dy = this.flockCenter.y - this.position.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 1) {
+        const pullSpeed = CIRCLE_FLOCK_PULL * dist;
+        this.velocity.x += (dx / dist) * pullSpeed;
+        this.velocity.y += (dy / dist) * pullSpeed;
+      }
+    }
+
+    // Layer ejection on top of computed velocity
+    this.velocity.x += this.ejectVel.x;
+    this.velocity.y += this.ejectVel.y;
+
     this.move(dt);
   }
 

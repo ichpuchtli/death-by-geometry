@@ -1,12 +1,11 @@
 import { Renderer } from './renderer/sprite-batch';
 import { BloomPass } from './renderer/bloom';
 import { SpringMassGrid } from './renderer/grid';
-import { TrailSystem } from './renderer/trails';
 import { Camera } from './core/camera';
 import { Input } from './core/input';
 import { AudioManager } from './core/audio';
 import { Player } from './entities/player';
-import { BulletPool, Bullet } from './entities/bullet';
+import { BulletPool } from './entities/bullet';
 import { Enemy } from './entities/enemies/enemy';
 import { ExplosionPool } from './entities/explosion';
 import { AimIndicator } from './entities/crosshair';
@@ -18,19 +17,24 @@ import { Starfield } from './renderer/starfield';
 import { checkCollisions } from './core/collision';
 import { Vec2 } from './core/vector';
 import { HapticsManager } from './core/haptics';
+import { LifecycleSystem } from './systems/lifecycle-system';
+import { CombatSystem } from './systems/combat-system';
+import { SpawnSystem } from './systems/spawn-system';
+import { RunStats, computeMedals } from './core/run-stats';
+import { createEnemy } from './spawner/enemy-factory';
+import { Pinwheel } from './entities/enemies/pinwheel';
+import { MiniMandel } from './entities/enemies/minimandel';
+import { BlackHole } from './entities/enemies/blackhole';
+import { CircleEnemy } from './entities/enemies/circle';
+import { Sierpinski } from './entities/enemies/sierpinski';
+import { Mandelbrot } from './entities/enemies/mandelbrot';
 import {
   WEAPON_STAGES,
-  EXPLOSION_PARTICLE_COUNT_SMALL,
   EXPLOSION_PARTICLE_COUNT_LARGE,
   EXPLOSION_PARTICLE_COUNT_DEATH,
   EXPLOSION_DURATION_DEFAULT,
   EXPLOSION_DURATION_LARGE,
   EXPLOSION_DURATION_DEATH,
-  TRAIL_LENGTH_ENEMY,
-  TRAIL_LENGTH_BULLET,
-  MOBILE_TRAIL_LENGTH_ENEMY,
-  MOBILE_TRAIL_LENGTH_BULLET,
-  BULLET_COLOR,
   DIFFICULTY_PHASES,
   SCREEN_SHAKE_SMALL,
   SCREEN_SHAKE_LARGE,
@@ -41,30 +45,11 @@ import {
   DEATH_SLOWMO_DURATION,
   DEATH_SLOWMO_TIME_SCALE,
   DEATH_SLOWMO_SHOCKWAVE_SPEED,
-  MIN_SPAWN_DISTANCE,
   ENEMY_SEPARATION_BUFFER,
-  SPAWN_DURATION_AMBUSH,
-  HITSTOP_SIERPINSKI,
-  HITSTOP_BLACKHOLE,
-  HITSTOP_MULTI,
-  KILL_SIG_DURATION,
-  KILL_SIG_RAY_COUNT,
-  KILL_SIG_RAY_LENGTH,
   PHASE_BANNER_DURATION,
   PHASE_BORDER_PULSE_DURATION,
   PHASE_DISPLAY_NAMES,
-  TELEGRAPH_DURATION,
-  TELEGRAPH_COLOR,
-  ELITE_MODIFIERS,
-  MAX_CONCURRENT_ELITES,
-  HITSTOP_ELITE,
-  HEAT_DECAY_RATE,
-  HEAT_KILL_BASE,
-  HEAT_KILL_ELITE,
-  HEAT_KILL_BLACKHOLE,
-  HEAT_DENSE_COMBAT_BONUS,
   HEAT_PHASE_BUMP,
-  HEAT_SURVIVAL_RATE,
   HEAT_BORDER_BRIGHTNESS_MAX,
   HEAT_BLOOM_BOOST_MAX,
   HEAT_GRID_TURBULENCE_MAX,
@@ -75,141 +60,29 @@ import {
   MINIBOSS_SPAWN_TIME,
   MINIBOSS_WARNING_DURATION,
   MINIBOSS_HITSTOP_STAGE,
-  MINIBOSS_HITSTOP_DEATH,
   MINIBOSS_RESPAWN_DELAY,
   MINIBOSS_DEFEATED_BANNER_DURATION,
   MINIBOSS_SPAWN_SUPPRESS_MULT,
-  MINIBOSS_HEAT_ON_DEATH,
   SIERPINSKI_BOSS_SPAWN_TIME,
   SIERPINSKI_BOSS_WARNING_DURATION,
   SIERPINSKI_BOSS_RESPAWN_DELAY,
   SIERPINSKI_BOSS_DEFEATED_BANNER_DURATION,
   SIERPINSKI_BOSS_SPAWN_SUPPRESS_MULT,
-  MEDALS,
   MedalDef,
-  FORMATION_SOUND_MIN_COUNT,
-  FORMATION_LEAKTHROUGH_COUNT,
-  FORMATION_LEAKTHROUGH_VOLUME,
   BULLET_GRAVITY_STRENGTH,
   SUPERNOVA_PARTICLE_COUNT,
   SUPERNOVA_GRID_IMPULSE,
   SUPERNOVA_HITSTOP,
   SUPERNOVA_FLASH_DURATION,
+  CIRCLE_EJECT_SPEED_MIN,
+  CIRCLE_EJECT_SPEED_MAX,
+  CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER,
 } from './config';
-import { FormationMeta } from './spawner/spawn-patterns';
-
-/** Run statistics accumulated during a single game */
-export interface RunStats {
-  score: number;
-  kills: number;
-  timeSurvived: number;
-  phaseReached: string;
-  peakHeat: number;
-  elitesKilled: number;
-  blackholesKilled: number;
-  minibossDefeated: boolean;
-  livesUsed: number;
-  recoveriesUsed: number;
-  weaponStage: number;      // index into WEAPON_STAGES
-}
-
-function computeMedals(stats: RunStats): MedalDef[] {
-  const earned: MedalDef[] = [];
-  for (const m of MEDALS) {
-    let qualifies = false;
-    switch (m.id) {
-      case 'untouchable': qualifies = stats.livesUsed === 0; break;
-      case 'chaos_walker': qualifies = stats.phaseReached === 'chaos'; break;
-      case 'survivor': qualifies = stats.phaseReached === 'intense' || stats.phaseReached === 'chaos'; break;
-      case 'boss_slayer': qualifies = stats.minibossDefeated; break;
-      case 'elite_hunter': qualifies = stats.elitesKilled >= 5; break;
-      case 'gravity_master': qualifies = stats.blackholesKilled >= 3; break;
-      case 'inferno': qualifies = stats.peakHeat >= 0.85; break;
-      case 'comeback_kid': qualifies = stats.recoveriesUsed >= 2; break;
-      case 'centurion': qualifies = stats.kills >= 100; break;
-      case 'thousand': qualifies = stats.kills >= 1000; break;
-    }
-    if (qualifies) earned.push(m);
-  }
-  return earned;
-}
-
-// Enemy factory imports
-import { Rhombus } from './entities/enemies/rhombus';
-import { Pinwheel } from './entities/enemies/pinwheel';
-import { CircleEnemy } from './entities/enemies/circle';
-import { BlackHole } from './entities/enemies/blackhole';
-import { Shard } from './entities/enemies/shard';
-import { Sierpinski } from './entities/enemies/sierpinski';
-import { Mandelbrot } from './entities/enemies/mandelbrot';
-import { MiniMandel } from './entities/enemies/minimandel';
 import { gameSettings } from './settings';
 import { showDesktopSettings, hideDesktopSettings } from './ui/settings-panel';
 import { DesignLab } from './design-lab';
 
 type GameState = 'menu' | 'playing' | 'death_slowmo' | 'gameover' | 'design_lab';
-
-interface KillEffect {
-  x: number;
-  y: number;
-  color: [number, number, number];
-  family: string;
-  elapsed: number;
-  duration: number;
-  angles: number[]; // ray/spiral angles, randomized per kill
-}
-
-interface Telegraph {
-  formation: string;
-  side?: number;      // 0=top, 1=bottom, 2=left, 3=right
-  center?: Vec2;
-  elapsed: number;
-  duration: number;
-}
-
-function createEnemy(type: string, pos?: Vec2, isElite = false, tier?: number): Enemy {
-  let e: Enemy;
-  switch (type) {
-    case 'rhombus': e = new Rhombus(); break;
-    case 'pinwheel': e = new Pinwheel(); break;
-    case 'circle': e = new CircleEnemy(pos); e.speed *= gameSettings.enemySpeedMultiplier; return e;
-    case 'blackhole': e = new BlackHole(); break;
-    case 'shard': e = new Shard(pos); e.speed *= gameSettings.enemySpeedMultiplier; return e;
-    case 'sierpinski': e = new Sierpinski(tier ?? 0, pos); break;
-    case 'mandelbrot': e = new Mandelbrot(); break;
-    case 'minimandel': { const mm = new MiniMandel(pos); mm.speed *= gameSettings.enemySpeedMultiplier; return mm; }
-    default: e = new Rhombus(); break;
-  }
-  e.baseType = type;
-  if (!pos) {
-    if (type === 'blackhole') {
-      e.spawnAnywhere();
-    } else {
-      e.spawnAtEdge();
-    }
-  } else {
-    e.position.copyFrom(pos);
-  }
-  e.speed *= gameSettings.enemySpeedMultiplier;
-
-  // Apply elite modifiers
-  if (isElite) {
-    const mod = ELITE_MODIFIERS[type];
-    if (mod) {
-      e.isElite = true;
-      e.speed *= mod.speedMult;
-      e.scoreValue = Math.floor(e.scoreValue * mod.scoreMult);
-      e.hp += mod.hpAdd;
-      e.maxHp += mod.hpAdd;
-      e.color = [
-        Math.min(1, e.color[0] + mod.colorBright),
-        Math.min(1, e.color[1] + mod.colorBright),
-        Math.min(1, e.color[2] + mod.colorBright),
-      ];
-    }
-  }
-  return e;
-}
 
 function isMobile(): boolean {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -219,7 +92,7 @@ export class Game {
   private renderer: Renderer;
   private bloom: BloomPass;
   private grid: SpringMassGrid;
-  private trails: TrailSystem;
+  private lifecycle: LifecycleSystem;
   private camera: Camera;
   private input: Input;
   private audio: AudioManager;
@@ -241,42 +114,25 @@ export class Game {
   private mobile: boolean;
   private paused = false;
 
-  // Trail IDs for bullets (keyed by bullet index)
-  private bulletTrailIds = new Map<Bullet, number>();
-
-  // Track trail lengths (adjusted for mobile)
-  private trailLenEnemy: number;
-  private trailLenBullet: number;
-
-  // Staggered spawn queue for theatrical enemy deaths (e.g. Sierpinski)
-  private pendingSpawns: { type: string; position: Vec2; delay: number; origin: Vec2 }[] = [];
-
   // Death slowmo state
   private slowmoTimer = 0;
   private slowmoShockwaveRadius = 0;
   private slowmoOrigin = new Vec2(0, 0);
   private slowmoIsFinal = false; // true = game over after slowmo, false = respawn
 
-  // Combat feedback: hitstop
-  private hitstopTimer = 0;
+  // Combat system (kill processing, heat, hitstop, kill signatures)
+  private combat: CombatSystem;
 
-  // Combat feedback: kill signature effects
-  private killEffects: KillEffect[] = [];
+  // Spawn system (wave-manager execution, caps, spawn SFX, formation telegraphs)
+  private spawn: SpawnSystem;
+
+  // Combat feedback: hitstop timer applied by Game
+  private hitstopTimer = 0;
 
   // Combat feedback: phase transition
   private phaseBannerTimer = 0;
   private phaseBannerName = '';
   private phaseBorderPulseTimer = 0;
-
-  // Combat feedback: spawn telegraphs
-  private telegraphs: Telegraph[] = [];
-
-  // Formation group spawn sound: tracks how many enemies have spawned per formation
-  private formationSpawnCounts = new Map<number, number>();
-
-  // Heat system (0-1, presentation-first run intensity)
-  private heat = 0;
-  private timeSinceLastKill = 0; // seconds, for heat decay
 
   // Recovery window (post-respawn buff)
   private recoveryTimer = 0;     // ms remaining
@@ -295,6 +151,9 @@ export class Game {
   // Supernova flash + warning tracking
   private supernovaFlashTimer = 0;
   private supernovaWarningPlayed = new Set<BlackHole>();
+
+  // Circle flock groups: shared centroid Vec2 updated each frame so circles snap back together
+  private circleFlocks: Array<{ center: Vec2; members: CircleEnemy[] }> = [];
 
   // Design Lab
   private designLab: DesignLab | null = null;
@@ -318,8 +177,6 @@ export class Game {
 
   constructor(private gameCanvas: HTMLCanvasElement, hudCanvas: HTMLCanvasElement) {
     this.mobile = isMobile();
-    this.trailLenEnemy = this.mobile ? MOBILE_TRAIL_LENGTH_ENEMY : TRAIL_LENGTH_ENEMY;
-    this.trailLenBullet = this.mobile ? MOBILE_TRAIL_LENGTH_BULLET : TRAIL_LENGTH_BULLET;
 
     this.renderer = new Renderer(gameCanvas);
     {
@@ -340,7 +197,7 @@ export class Game {
     this.bloom.blurRadius = gameSettings.bloomBlurRadius;
 
     this.grid = new SpringMassGrid(gl, this.mobile);
-    this.trails = new TrailSystem();
+    this.lifecycle = new LifecycleSystem(this.mobile);
     this.camera = new Camera(this.renderer.width, this.renderer.height);
     this.camera.fixedView = !this.mobile;
     this.camera.clampToArena = !this.mobile;
@@ -351,6 +208,18 @@ export class Game {
     this.player = new Player(this.input);
     this.bullets = new BulletPool();
     this.explosions = new ExplosionPool();
+    this.combat = new CombatSystem(this.mobile, {
+      player: this.player,
+      runStats: this.runStats,
+      enemies: this.enemies,
+      lifecycle: this.lifecycle,
+      audio: this.audio,
+      explosions: this.explosions,
+      grid: this.grid,
+      camera: this.camera,
+      onMinibossDefeated: () => this.onMinibossDefeated(),
+      onSierpinskiBossDefeated: () => this.onSierpinskiBossDefeated(),
+    });
     this.aimIndicator = new AimIndicator();
     this.hud = new HUD(hudCanvas);
     this.joystickRenderer = new VirtualJoystickRenderer(hudCanvas);
@@ -365,9 +234,17 @@ export class Game {
         // Track phase reached for run stats
         this.runStats.phaseReached = newPhase;
         // Heat bump on phase transition
-        this.heat = Math.min(1, this.heat + HEAT_PHASE_BUMP);
+        this.combat.bumpHeat(HEAT_PHASE_BUMP);
       }
     };
+    this.spawn = new SpawnSystem({
+      player: this.player,
+      enemies: this.enemies,
+      lifecycle: this.lifecycle,
+      audio: this.audio,
+      grid: this.grid,
+      waveManager: this.waveManager,
+    });
     this.starfield = new Starfield(80, gameSettings.arenaWidth, gameSettings.arenaHeight);
     this.haptics = new HapticsManager();
 
@@ -474,21 +351,17 @@ export class Game {
     if (!this.mobile) hideDesktopSettings();
     this.player.reset();
     this.bullets.clear();
-    this.enemies = [];
-    this.pendingSpawns = [];
+    this.enemies.length = 0;
+    this.circleFlocks = [];
     this.explosions.clear();
-    this.trails.clear();
-    this.bulletTrailIds.clear();
+    this.lifecycle.clear();
+    this.combat.clear();
     this.waveManager.reset();
     this.hitstopTimer = 0;
-    this.killEffects = [];
     this.phaseBannerTimer = 0;
     this.phaseBannerName = '';
     this.phaseBorderPulseTimer = 0;
-    this.telegraphs = [];
-    this.formationSpawnCounts.clear();
-    this.heat = 0;
-    this.timeSinceLastKill = 0;
+    this.spawn.clear();
     this.recoveryTimer = 0;
     this.recoveryActive = false;
     this.recoveryExpirePlayed = false;
@@ -559,7 +432,7 @@ export class Game {
     }
 
     // Heat adds to music density
-    const heatBoost = this.heat * 0.15;
+    const heatBoost = this.combat.heatValue * 0.15;
 
     return Math.min(base + enemyBoost + phaseBump + heatBoost, 1);
   }
@@ -606,7 +479,6 @@ export class Game {
         if (dist2 < absorbR2 && bh.absorbedCount < BlackHole.MAX_ABSORB) {
           e.active = false;
           bh.absorbEnemy();
-          if (e.trailId >= 0) this.trails.unregister(e.trailId);
           this.explosions.spawn(e.position.x, e.position.y, e.color, 15, 0.6);
           this.grid.applyImpulse(e.position.x, e.position.y, -20, 120);
 
@@ -621,18 +493,26 @@ export class Game {
           if (bh.overloaded) {
             bh.active = false;
             const absorbed = bh.absorbedCount;
-            // Spawn circles radially
-            for (let ci = 0; ci < absorbed; ci++) {
-              const angle = (ci / absorbed) * Math.PI * 2;
-              const dist = 50 + Math.random() * 40;
+            // Spawn circles — 2x count, random angles, elastic flock snap-back
+            const circleCount = absorbed * CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER;
+            const flockCenter = new Vec2(bh.position.x, bh.position.y);
+            const flockGroup: CircleEnemy[] = [];
+            for (let ci = 0; ci < circleCount; ci++) {
+              const angle = Math.random() * Math.PI * 2;
+              const dist = 60 + Math.random() * 90;
               const cPos = new Vec2(
                 bh.position.x + Math.cos(angle) * dist,
                 bh.position.y + Math.sin(angle) * dist,
               );
-              const ce = createEnemy('circle', cPos);
-              ce.trailId = this.trails.register(ce.color, this.trailLenEnemy);
+              const ce = createEnemy('circle', cPos) as CircleEnemy;
+              const ejectSpeed = CIRCLE_EJECT_SPEED_MIN + Math.random() * (CIRCLE_EJECT_SPEED_MAX - CIRCLE_EJECT_SPEED_MIN);
+              ce.ejectVel.set(Math.cos(angle) * ejectSpeed, Math.sin(angle) * ejectSpeed);
+              ce.flockCenter = flockCenter;
+              this.lifecycle.spawnEnemy(ce);
               this.enemies.push(ce);
+              flockGroup.push(ce);
             }
+            this.circleFlocks.push({ center: flockCenter, members: flockGroup });
             // Layer 1: Primary supernova explosion (massive)
             this.explosions.spawn(
               bh.position.x, bh.position.y, bh.color,
@@ -657,7 +537,6 @@ export class Game {
             this.audio.playBlackHoleDeath(absorbed);
             this.player.score += bh.scoreValue;
             this.player.enemiesKilled++;
-            if (bh.trailId >= 0) this.trails.unregister(bh.trailId);
             this.haptics.supernova();
             this.hitstopTimer = Math.max(this.hitstopTimer, SUPERNOVA_HITSTOP);
             this.supernovaFlashTimer = SUPERNOVA_FLASH_DURATION;
@@ -825,8 +704,7 @@ export class Game {
       for (const angle of shots) {
         const b = this.bullets.spawn(this.player.position.x, this.player.position.y, angle);
         if (b) {
-          const tid = this.trails.register(BULLET_COLOR, this.trailLenBullet);
-          this.bulletTrailIds.set(b, tid);
+          this.lifecycle.spawnBullet(b);
         }
       }
     }
@@ -835,20 +713,21 @@ export class Game {
     this.bullets.update(dt);
 
     // Update bullet trails + clean up inactive
-    for (const b of this.bullets.bullets) {
-      const tid = this.bulletTrailIds.get(b);
-      if (tid !== undefined) {
-        if (b.active) {
-          this.trails.update(tid, b.position.x, b.position.y);
-        } else {
-          this.trails.unregister(tid);
-          this.bulletTrailIds.delete(b);
-        }
-      }
-    }
+    this.lifecycle.updateBulletTrails(this.bullets);
 
     // BlackHole attraction — pull nearby non-blackhole enemies toward black holes
     this.applyBlackHoleAttraction(dt);
+
+    // Update circle flock centroids (shared Vec2 refs held by each CircleEnemy)
+    for (let fi = this.circleFlocks.length - 1; fi >= 0; fi--) {
+      const flock = this.circleFlocks[fi];
+      const active = flock.members.filter(m => m.active);
+      if (active.length === 0) { this.circleFlocks.splice(fi, 1); continue; }
+      flock.members = active;
+      let cx = 0, cy = 0;
+      for (const m of active) { cx += m.position.x; cy += m.position.y; }
+      flock.center.set(cx / active.length, cy / active.length);
+    }
 
     // Enemies — Pass 1: AI + movement
     for (const e of this.enemies) {
@@ -863,64 +742,8 @@ export class Game {
     // Enemies — Pass 2: Separation (push overlapping enemies apart)
     this.separateEnemies();
 
-    // Enemies — Pass 3: Record final positions for trails
-    for (const e of this.enemies) {
-      if (!e.active) continue;
-      if (e.trailId >= 0) {
-        this.trails.update(e.trailId, e.position.x, e.position.y);
-      }
-    }
-
-    // Spawn
-    const spawns = this.waveManager.update(dt, this.player.position);
-    for (const req of spawns) {
-      if (this.enemies.length >= gameSettings.maxEnemies) continue;
-      // Hard cap: max 4 BlackHoles active at once
-      if (req.type === 'blackhole') {
-        const bhCount = this.enemies.filter(e => e.active && e instanceof BlackHole).length;
-        if (bhCount >= 4) continue;
-      }
-      // Enforce elite concurrent cap
-      let elite = req.isElite ?? false;
-      if (elite) {
-        const eliteCount = this.enemies.filter(e => e.active && e.isElite).length;
-        if (eliteCount >= MAX_CONCURRENT_ELITES) elite = false;
-      }
-      const enemy = createEnemy(req.type, req.position, elite);
-      // If ambush spawn, use longer spawn animation
-      if (req.isAmbush) { enemy.spawnDuration = enemy.spawnTimer = SPAWN_DURATION_AMBUSH; }
-      // Push enemies that spawn too close to the player to the edge
-      const dx = enemy.position.x - this.player.position.x;
-      const dy = enemy.position.y - this.player.position.y;
-      if (dx * dx + dy * dy < MIN_SPAWN_DISTANCE * MIN_SPAWN_DISTANCE) {
-        enemy.spawnAtEdge();
-      }
-      // Register trail for enemy
-      enemy.trailId = this.trails.register(enemy.color, this.trailLenEnemy);
-      this.enemies.push(enemy);
-      // Grid ripple on spawn
-      this.grid.applyImpulse(enemy.position.x, enemy.position.y, 80, 120);
-      // Play spawn SFX — suppress individual sounds for large formations
-      if (req.formationId != null) {
-        const cnt = (this.formationSpawnCounts.get(req.formationId) ?? 0) + 1;
-        this.formationSpawnCounts.set(req.formationId, cnt);
-        if (cnt <= FORMATION_LEAKTHROUGH_COUNT) {
-          this.playSFXAtVolume(req.type, FORMATION_LEAKTHROUGH_VOLUME);
-        }
-        // rest suppressed — group sound plays from telegraph
-      } else {
-        this.playEnemySpawnSFX(req.type);
-      }
-      if (elite) this.audio.playEliteArrive();
-    }
-
-    // Create telegraphs from formation events + play group spawn sounds
-    for (const fm of this.waveManager.formationEvents) {
-      this.createTelegraph(fm);
-      if (fm.count >= FORMATION_SOUND_MIN_COUNT) {
-        this.audio.playFormationSpawn(fm.formation, fm.count);
-      }
-    }
+    // Spawn — WaveManager execution, caps, spawn SFX, formation telegraphs
+    this.spawn.update(dt);
 
     // Collision
     const result = checkCollisions(
@@ -930,212 +753,10 @@ export class Game {
     );
 
     // Process kills with per-family kill signatures
-    let frameKillCount = 0;
-    let maxHitstop = 0;
-    for (const kill of result.killedEnemies) {
-      this.player.score += kill.scoreValue;
-      if (kill.scoreValue > 0) this.player.enemiesKilled++;
-      frameKillCount++;
-
-      // Determine enemy family for kill signature
-      const family = this.getEnemyFamily(kill.enemy);
-      const isEliteKill = kill.enemy.isElite;
-
-      // Run stats: track kills by type
-      if (isEliteKill) this.runStats.elitesKilled++;
-      if (family === 'blackhole') this.runStats.blackholesKilled++;
-      if (family === 'mandelbrot') this.runStats.minibossDefeated = true;
-
-      // Heat: increase on kills
-      if (family === 'mandelbrot') {
-        this.heat = MINIBOSS_HEAT_ON_DEATH;
-      } else if (family === 'blackhole') {
-        this.heat = Math.min(1, this.heat + HEAT_KILL_BLACKHOLE);
-      } else if (isEliteKill) {
-        this.heat = Math.min(1, this.heat + HEAT_KILL_ELITE);
-      } else {
-        this.heat = Math.min(1, this.heat + HEAT_KILL_BASE);
-      }
-      this.timeSinceLastKill = 0;
-
-      // Notify Mandelbrot parent when MiniMandel dies
-      if (kill.enemy instanceof MiniMandel && kill.enemy.parent && kill.enemy.parent.active) {
-        kill.enemy.parent.onMinionDeath();
-      }
-
-      // Per-family kill signature: VFX + SFX + hitstop
-      this.spawnKillSignature(kill.position.x, kill.position.y, kill.color, family, isEliteKill);
-      if (family === 'mandelbrot') {
-        this.audio.playMinibossDeath();
-      } else {
-        this.audio.playKillSignature(family);
-      }
-      if (isEliteKill) {
-        this.audio.playEliteKill();
-        maxHitstop = Math.max(maxHitstop, HITSTOP_ELITE);
-      }
-
-      // Per-family explosion + grid + shake
-      switch (family) {
-        case 'mandelbrot': {
-          // Massive boss death explosion
-          this.explosions.spawn(
-            kill.position.x, kill.position.y, [1, 0.4, 0.1],
-            this.mobile ? 120 : 250, EXPLOSION_DURATION_LARGE,
-          );
-          // Secondary white flash
-          this.explosions.spawn(
-            kill.position.x, kill.position.y, [1, 1, 0.8],
-            this.mobile ? 60 : 120, EXPLOSION_DURATION_DEFAULT,
-          );
-          // Third layer — red ember spread
-          this.explosions.spawn(
-            kill.position.x, kill.position.y, kill.color,
-            this.mobile ? 40 : 80, EXPLOSION_DURATION_LARGE * 1.2, 0.3,
-          );
-          this.grid.applyImpulse(kill.position.x, kill.position.y, 1200, 500);
-          this.camera.shake(SCREEN_SHAKE_DEATH);
-          maxHitstop = Math.max(maxHitstop, MINIBOSS_HITSTOP_DEATH);
-          // Kill all active MiniMandels
-          for (const e of this.enemies) {
-            if (e.active && e instanceof MiniMandel) {
-              e.active = false;
-              this.explosions.spawn(e.position.x, e.position.y, e.color,
-                this.mobile ? 20 : 40, EXPLOSION_DURATION_DEFAULT * 0.6);
-              this.grid.applyImpulse(e.position.x, e.position.y, 300, 150);
-              if (e.trailId >= 0) this.trails.unregister(e.trailId);
-            }
-          }
-          // End miniboss encounter
-          this.onMinibossDefeated();
-          break;
-        }
-        case 'blackhole': {
-          const absorbed = kill.enemy instanceof BlackHole ? kill.enemy.absorbedCount : 0;
-          this.audio.playBlackHoleDeath(absorbed);
-          this.explosions.spawn(
-            kill.position.x, kill.position.y, kill.color,
-            this.mobile ? 60 : 120, EXPLOSION_DURATION_DEFAULT,
-          );
-          if (absorbed > 0) {
-            this.explosions.spawn(
-              kill.position.x, kill.position.y, kill.color,
-              this.mobile ? Math.floor(absorbed * 8) : absorbed * 15,
-              EXPLOSION_DURATION_LARGE * 0.8,
-            );
-            this.grid.applyImpulse(kill.position.x, kill.position.y, 600 + absorbed * 50, 300);
-            this.camera.shake(SCREEN_SHAKE_LARGE);
-          } else {
-            this.grid.applyImpulse(kill.position.x, kill.position.y, 500, 250);
-            this.camera.shake(SCREEN_SHAKE_LARGE);
-          }
-          maxHitstop = Math.max(maxHitstop, HITSTOP_BLACKHOLE);
-          break;
-        }
-        case 'sierpinski': {
-          const sTier = (kill.enemy instanceof Sierpinski) ? kill.enemy.tier : 2;
-          if (sTier === 0) {
-            // Tier 0 boss death — massive explosion
-            this.explosions.spawn(
-              kill.position.x, kill.position.y, kill.color,
-              this.mobile ? 80 : 160, EXPLOSION_DURATION_LARGE,
-            );
-            this.explosions.spawn(
-              kill.position.x, kill.position.y, [1, 0.9, 0.3],
-              this.mobile ? 40 : 80, EXPLOSION_DURATION_DEFAULT,
-            );
-            this.explosions.spawn(
-              kill.position.x, kill.position.y, [1, 0.7, 0.1],
-              this.mobile ? 30 : 60, EXPLOSION_DURATION_LARGE * 0.8, 0.3,
-            );
-            this.grid.applyImpulse(kill.position.x, kill.position.y, 800, 350);
-            this.camera.shake(SCREEN_SHAKE_DEATH);
-            maxHitstop = Math.max(maxHitstop, HITSTOP_SIERPINSKI * 2);
-            // End boss encounter
-            this.onSierpinskiBossDefeated();
-          } else if (sTier === 1) {
-            // Tier 1 medium death — medium explosion
-            this.explosions.spawn(
-              kill.position.x, kill.position.y, kill.color,
-              this.mobile ? 40 : 80, EXPLOSION_DURATION_DEFAULT,
-            );
-            this.explosions.spawn(
-              kill.position.x, kill.position.y, [1, 0.9, 0.3],
-              this.mobile ? 20 : 40, EXPLOSION_DURATION_DEFAULT * 0.7,
-            );
-            this.grid.applyImpulse(kill.position.x, kill.position.y, 500, 220);
-            this.camera.shake(SCREEN_SHAKE_LARGE);
-            maxHitstop = Math.max(maxHitstop, HITSTOP_SIERPINSKI);
-          } else {
-            // Tier 2 small death — small explosion
-            this.explosions.spawn(
-              kill.position.x, kill.position.y, kill.color,
-              this.mobile ? 25 : 50, EXPLOSION_DURATION_DEFAULT * 0.8,
-            );
-            this.grid.applyImpulse(kill.position.x, kill.position.y, 350, 150);
-          }
-          break;
-        }
-        case 'pinwheel':
-          this.explosions.spawn(
-            kill.position.x, kill.position.y, kill.color,
-            this.mobile ? 30 : 60, EXPLOSION_DURATION_DEFAULT * 0.8, 1.3,
-          );
-          this.grid.applyImpulse(kill.position.x, kill.position.y, 350, 180);
-          // No camera shake — grid impulse is enough for small enemies
-          break;
-        default: // rhombus, circle, shard, minimandel, etc.
-          this.explosions.spawn(
-            kill.position.x, kill.position.y, kill.color,
-            this.mobile ? Math.floor(EXPLOSION_PARTICLE_COUNT_SMALL * 0.6) : EXPLOSION_PARTICLE_COUNT_SMALL,
-            EXPLOSION_DURATION_DEFAULT,
-          );
-          this.grid.applyImpulse(kill.position.x, kill.position.y, 400, 200);
-          // No camera shake for basic kills
-          break;
-      }
-
-      // Unregister trail
-      if (kill.enemy.trailId >= 0) {
-        this.trails.unregister(kill.enemy.trailId);
-      }
-
-      // Spawn children
-      const deathResult = kill.enemy.onDeath();
-      if (deathResult.spawnEnemies) {
-        if (deathResult.staggeredSpawn) {
-          const origin = kill.position.clone();
-          this.explosions.spawn(
-            origin.x, origin.y, kill.color,
-            this.mobile ? 30 : 60, 0.6,
-          );
-          this.camera.shake(SCREEN_SHAKE_SMALL);
-          for (let i = 0; i < deathResult.spawnEnemies.length; i++) {
-            const child = deathResult.spawnEnemies[i];
-            this.pendingSpawns.push({
-              type: child.type,
-              position: child.position.clone(),
-              delay: 300 + i * 120,
-              origin,
-            });
-          }
-        } else {
-          for (const child of deathResult.spawnEnemies) {
-            const ce = createEnemy(child.type, child.position, false, child.tier);
-            ce.trailId = this.trails.register(ce.color, this.trailLenEnemy);
-            this.enemies.push(ce);
-          }
-        }
-      }
-    }
-
-    // Multi-kill hitstop bonus + dense combat heat bonus
-    if (frameKillCount >= 3) {
-      maxHitstop = Math.max(maxHitstop, HITSTOP_MULTI);
-      this.heat = Math.min(1, this.heat + HEAT_DENSE_COMBAT_BONUS * frameKillCount);
-    }
-    if (maxHitstop > 0) {
-      this.hitstopTimer = maxHitstop;
+    this.combat.processKills(result);
+    const combatHitstop = this.combat.consumeHitstop();
+    if (combatHitstop > 0) {
+      this.hitstopTimer = combatHitstop;
     }
 
     // Player hit
@@ -1150,32 +771,11 @@ export class Game {
       }
     }
 
-    // Process staggered spawn queue (theatrical enemy deaths)
-    for (const ps of this.pendingSpawns) {
-      ps.delay -= dt;
-      if (ps.delay <= 0) {
-        const ce = createEnemy(ps.type, ps.position);
-        ce.trailId = this.trails.register(ce.color, this.trailLenEnemy);
-        this.enemies.push(ce);
-        // Mini flash per spawn
-        this.explosions.spawn(ps.position.x, ps.position.y, [1, 0.6, 0.2], 12, 0.3);
-        this.grid.applyImpulse(ps.position.x, ps.position.y, 200, 150);
-      }
-    }
-    // Emit a pulsing warning ring at the origin while spawns are pending
-    if (this.pendingSpawns.length > 0) {
-      const origin = this.pendingSpawns[0].origin;
-      this.grid.applyImpulse(origin.x, origin.y, 120, 200);
-    }
-    this.pendingSpawns = this.pendingSpawns.filter(ps => ps.delay > 0);
+    // Process staggered child spawns, heat decay, and kill effect timers
+    this.combat.update(dt, this.gameTime);
 
-    // Clean up inactive enemies
-    this.enemies = this.enemies.filter(e => {
-      if (!e.active && e.trailId >= 0) {
-        this.trails.unregister(e.trailId);
-      }
-      return e.active;
-    });
+    // Update trails for active enemies and clean up inactive ones
+    this.lifecycle.cleanupEnemies(this.enemies);
 
     // Explosions
     this.explosions.update(dt);
@@ -1229,104 +829,34 @@ export class Game {
     this.audio.setMusicIntensity(this.computeIntensity());
   }
 
-  /** Get base enemy family name for kill signature lookup */
-  private getEnemyFamily(enemy: Enemy): string {
-    if (enemy instanceof Mandelbrot) return 'mandelbrot';
-    if (enemy instanceof MiniMandel) return 'minimandel';
-    if (enemy instanceof BlackHole) return 'blackhole';
-    if (enemy instanceof Sierpinski) return 'sierpinski';
-    if (enemy instanceof Pinwheel) return 'pinwheel';
-    if (enemy instanceof Rhombus) return 'rhombus';
-    if (enemy instanceof CircleEnemy) return 'circle';
-    return 'rhombus'; // default
-  }
-
-  /** Spawn per-family kill signature visual effect */
-  private spawnKillSignature(x: number, y: number, color: [number, number, number], family: string, isElite = false): void {
-    // Only spawn for families with distinct signatures
-    if (family === 'rhombus' || family === 'pinwheel' || family === 'sierpinski' || family === 'mandelbrot') {
-      const angles: number[] = [];
-      const baseCount = family === 'pinwheel' ? 8 : KILL_SIG_RAY_COUNT;
-      const count = isElite ? Math.floor(baseCount * 1.5) : baseCount;
-      const baseAngle = Math.random() * Math.PI * 2;
-      for (let i = 0; i < count; i++) {
-        angles.push(baseAngle + (i / count) * Math.PI * 2);
-      }
-      this.killEffects.push({
-        x, y,
-        color: isElite ? [1, 1, 0.7] : color, // elite = bright golden-white
-        family,
-        elapsed: 0,
-        duration: isElite ? KILL_SIG_DURATION * 1.3 : KILL_SIG_DURATION,
-        angles,
-      });
-      // Elite kills get a second burst layer
-      if (isElite) {
-        const outerAngles: number[] = [];
-        for (let i = 0; i < count; i++) {
-          outerAngles.push(baseAngle + Math.PI / count + (i / count) * Math.PI * 2);
-        }
-        this.killEffects.push({
-          x, y, color, family,
-          elapsed: 0,
-          duration: KILL_SIG_DURATION * 1.5,
-          angles: outerAngles,
-        });
-      }
-    }
-  }
-
-  /** Update combat feedback timers (kill effects, banners, telegraphs, border pulse, supernova flash) */
+  /** Update combat feedback timers (banners, telegraphs, border pulse, supernova flash) */
   private updateCombatFeedback(dt: number): void {
     if (this.supernovaFlashTimer > 0) this.supernovaFlashTimer -= dt;
-    const dtSec = dt / 1000;
-    // Kill effects
-    for (const ke of this.killEffects) {
-      ke.elapsed += dtSec;
-    }
-    this.killEffects = this.killEffects.filter(ke => ke.elapsed < ke.duration);
 
     // Phase banner
     if (this.phaseBannerTimer > 0) this.phaseBannerTimer -= dt;
     // Border pulse
     if (this.phaseBorderPulseTimer > 0) this.phaseBorderPulseTimer -= dt;
 
-    // Telegraphs
-    for (const tg of this.telegraphs) {
-      tg.elapsed += dtSec;
-    }
-    this.telegraphs = this.telegraphs.filter(tg => tg.elapsed < tg.duration);
+    // Spawn telegraphs
+    this.spawn.updateTelegraphs(dt);
   }
 
-  /** Update heat: decay, survival trickle, visual hooks */
+  /** Apply heat-driven visual hooks (heat value is owned by CombatSystem). */
   private updateHeat(dt: number): void {
-    const dtSec = dt / 1000;
-    this.timeSinceLastKill += dtSec;
-
-    // Passive heat decay during calm periods (>2s since last kill)
-    if (this.timeSinceLastKill > 2) {
-      this.heat = Math.max(0, this.heat - HEAT_DECAY_RATE * dtSec);
-    }
-
-    // Slow heat increase during intense+ phases from survival pressure
-    if (this.gameTime >= DIFFICULTY_PHASES.intense.start) {
-      this.heat = Math.min(1, this.heat + HEAT_SURVIVAL_RATE * dtSec);
-    }
+    const heat = this.combat.heatValue;
 
     // Track peak heat for run stats
-    if (this.heat > this.runStats.peakHeat) this.runStats.peakHeat = this.heat;
-
-    // --- Visual hooks ---
+    if (heat > this.runStats.peakHeat) this.runStats.peakHeat = heat;
 
     // Bloom intensity boost
     const baseBloom = gameSettings.bloomIntensity;
-    this.bloom.intensity = baseBloom + this.heat * HEAT_BLOOM_BOOST_MAX;
+    this.bloom.intensity = baseBloom + heat * HEAT_BLOOM_BOOST_MAX;
 
     // Grid turbulence: random micro-impulses scaled by heat
-    if (this.heat > 0.1) {
-      const turbulence = (this.heat - 0.1) / 0.9 * HEAT_GRID_TURBULENCE_MAX;
-      // Apply a few random impulses across the arena
-      const count = Math.ceil(this.heat * 3);
+    if (heat > 0.1) {
+      const turbulence = (heat - 0.1) / 0.9 * HEAT_GRID_TURBULENCE_MAX;
+      const count = Math.ceil(heat * 3);
       const hw = gameSettings.arenaWidth / 2;
       const hh = gameSettings.arenaHeight / 2;
       for (let i = 0; i < count; i++) {
@@ -1422,7 +952,7 @@ export class Game {
     const spawnY = py > 0 ? -hh * 0.4 : hh * 0.4;
 
     const boss = createEnemy('sierpinski', new Vec2(spawnX, spawnY)) as Sierpinski;
-    boss.trailId = this.trails.register(boss.color, this.trailLenEnemy);
+    this.lifecycle.spawnEnemy(boss);
     this.enemies.push(boss);
     this.sierpinskiBossRef = boss;
 
@@ -1483,7 +1013,7 @@ export class Game {
         const mm = new MiniMandel(minionPos);
         mm.parent = this.minibossRef;
         mm.speed *= gameSettings.enemySpeedMultiplier;
-        mm.trailId = this.trails.register(mm.color, this.trailLenEnemy);
+        this.lifecycle.spawnEnemy(mm);
         this.enemies.push(mm);
         this.grid.applyImpulse(minionPos.x, minionPos.y, 60, 80);
       }
@@ -1531,7 +1061,7 @@ export class Game {
     const spawnY = py > 0 ? -hh * 0.4 : hh * 0.4;
 
     const boss = createEnemy('mandelbrot', new Vec2(spawnX, spawnY)) as Mandelbrot;
-    boss.trailId = this.trails.register(boss.color, this.trailLenEnemy);
+    this.lifecycle.spawnEnemy(boss);
     this.enemies.push(boss);
     this.minibossRef = boss;
 
@@ -1657,216 +1187,6 @@ export class Game {
     return result;
   }
 
-  /** Create a spawn telegraph from a formation event */
-  private createTelegraph(fm: FormationMeta): void {
-    this.telegraphs.push({
-      formation: fm.formation,
-      side: fm.side,
-      center: fm.center,
-      elapsed: 0,
-      duration: TELEGRAPH_DURATION / 1000,
-    });
-    this.audio.playTelegraphWarning();
-  }
-
-  /** Render kill signature effects (called during additive blend pass) */
-  private renderKillEffects(): void {
-    for (const ke of this.killEffects) {
-      const t = ke.elapsed / ke.duration;
-      const alpha = Math.max(0, 1 - t);
-      const [r, g, b] = ke.color;
-
-      switch (ke.family) {
-        case 'rhombus': {
-          // Crystal burst: narrow rays emanating outward with bright tips
-          for (const angle of ke.angles) {
-            const len = t * KILL_SIG_RAY_LENGTH;
-            const innerLen = len * 0.3;
-            const x1 = ke.x + Math.cos(angle) * innerLen;
-            const y1 = ke.y + Math.sin(angle) * innerLen;
-            const x2 = ke.x + Math.cos(angle) * len;
-            const y2 = ke.y + Math.sin(angle) * len;
-            // Bright white tip
-            this.renderer.drawLine(x1, y1, x2, y2, 1, 1, 1, alpha * 0.8);
-            // Colored afterglow
-            const x3 = ke.x + Math.cos(angle) * len * 1.2;
-            const y3 = ke.y + Math.sin(angle) * len * 1.2;
-            this.renderer.drawLine(x2, y2, x3, y3, r, g, b, alpha * 0.4);
-          }
-          break;
-        }
-        case 'pinwheel': {
-          // Spark spiral: particles in rotating spiral pattern
-          const spiralRot = t * Math.PI * 3; // 1.5 full rotations
-          for (let i = 0; i < ke.angles.length; i++) {
-            const angle = ke.angles[i] + spiralRot;
-            const dist = t * 70;
-            const x1 = ke.x + Math.cos(angle) * dist;
-            const y1 = ke.y + Math.sin(angle) * dist;
-            const trail = 12;
-            const x2 = ke.x + Math.cos(angle - 0.3) * (dist - trail);
-            const y2 = ke.y + Math.sin(angle - 0.3) * (dist - trail);
-            this.renderer.drawLine(x1, y1, x2, y2, r, g, b, alpha * 0.7);
-            // Bright spark tip
-            this.renderer.drawLine(x1, y1, x1 + Math.cos(angle) * 4, y1 + Math.sin(angle) * 4, 1, 1, 1, alpha * 0.5);
-          }
-          break;
-        }
-        case 'sierpinski': {
-          // Layered fractal collapse: concentric triangles expanding then fading
-          for (let layer = 0; layer < 3; layer++) {
-            const layerT = Math.max(0, t - layer * 0.1);
-            if (layerT <= 0) continue;
-            const layerAlpha = alpha * (1 - layer * 0.25);
-            const radius = layerT * 50 + layer * 15;
-            const rot = t * 1.5 + layer * Math.PI / 6;
-            // Draw triangle
-            for (let j = 0; j < 3; j++) {
-              const a1 = rot + (j / 3) * Math.PI * 2;
-              const a2 = rot + ((j + 1) / 3) * Math.PI * 2;
-              this.renderer.drawLine(
-                ke.x + Math.cos(a1) * radius, ke.y + Math.sin(a1) * radius,
-                ke.x + Math.cos(a2) * radius, ke.y + Math.sin(a2) * radius,
-                r, g, b, layerAlpha * 0.6,
-              );
-            }
-          }
-          break;
-        }
-        case 'mandelbrot': {
-          // Massive fractal overload burst — multiple expanding cardioid layers + rays
-          for (let layer = 0; layer < 5; layer++) {
-            const layerT = Math.max(0, t - layer * 0.06);
-            if (layerT <= 0) continue;
-            const layerAlpha = alpha * (1 - layer * 0.15);
-            const radius = layerT * 120 + layer * 20;
-            const rot = t * 2 + layer * Math.PI / 5;
-            // Cardioid outlines expanding
-            const segs = 20;
-            for (let j = 0; j < segs; j++) {
-              const theta1 = rot + (j / segs) * Math.PI * 2;
-              const theta2 = rot + ((j + 1) / segs) * Math.PI * 2;
-              const r1 = (1 - Math.cos(theta1)) * radius * 0.5;
-              const r2 = (1 - Math.cos(theta2)) * radius * 0.5;
-              this.renderer.drawLine(
-                ke.x + Math.cos(theta1) * r1, ke.y + Math.sin(theta1) * r1,
-                ke.x + Math.cos(theta2) * r2, ke.y + Math.sin(theta2) * r2,
-                layer < 2 ? 1 : r, layer < 2 ? 0.8 : g, layer < 2 ? 0.3 : b, layerAlpha * 0.5,
-              );
-            }
-          }
-          // Bright white rays
-          for (const angle of ke.angles) {
-            const len = t * 150;
-            const x1 = ke.x + Math.cos(angle) * 20;
-            const y1 = ke.y + Math.sin(angle) * 20;
-            const x2 = ke.x + Math.cos(angle) * len;
-            const y2 = ke.y + Math.sin(angle) * len;
-            this.renderer.drawLine(x1, y1, x2, y2, 1, 1, 1, alpha * 0.6);
-          }
-          break;
-        }
-      }
-    }
-  }
-
-  /** Render spawn telegraph arcs on arena border */
-  private renderTelegraphs(): void {
-    const hw = gameSettings.arenaWidth / 2;
-    const hh = gameSettings.arenaHeight / 2;
-    const [tr, tg, tb] = TELEGRAPH_COLOR;
-
-    for (const tel of this.telegraphs) {
-      const t = tel.elapsed / tel.duration;
-      const pulse = 0.5 + 0.5 * Math.sin(tel.elapsed * 12); // fast pulse
-      const alpha = (1 - t) * 0.6 * pulse;
-
-      if (tel.side !== undefined) {
-        // Edge-based telegraph: glowing arc on the relevant border
-        const segments = 20;
-        let x1: number, y1: number, x2: number, y2: number;
-
-        switch (tel.side) {
-          case 0: // top
-            for (let i = 0; i < segments; i++) {
-              x1 = -hw + (i / segments) * hw * 2;
-              x2 = -hw + ((i + 1) / segments) * hw * 2;
-              y1 = y2 = hh;
-              this.renderer.drawLine(x1, y1, x2, y2, tr, tg, tb, alpha);
-              // Inner glow
-              this.renderer.drawLine(x1, y1 - 6, x2, y2 - 6, tr, tg, tb, alpha * 0.4);
-            }
-            break;
-          case 1: // bottom
-            for (let i = 0; i < segments; i++) {
-              x1 = -hw + (i / segments) * hw * 2;
-              x2 = -hw + ((i + 1) / segments) * hw * 2;
-              y1 = y2 = -hh;
-              this.renderer.drawLine(x1, y1, x2, y2, tr, tg, tb, alpha);
-              this.renderer.drawLine(x1, y1 + 6, x2, y2 + 6, tr, tg, tb, alpha * 0.4);
-            }
-            break;
-          case 2: // left
-            for (let i = 0; i < segments; i++) {
-              y1 = -hh + (i / segments) * hh * 2;
-              y2 = -hh + ((i + 1) / segments) * hh * 2;
-              x1 = x2 = -hw;
-              this.renderer.drawLine(x1, y1, x2, y2, tr, tg, tb, alpha);
-              this.renderer.drawLine(x1 + 6, y1, x2 + 6, y2, tr, tg, tb, alpha * 0.4);
-            }
-            break;
-          case 3: // right
-            for (let i = 0; i < segments; i++) {
-              y1 = -hh + (i / segments) * hh * 2;
-              y2 = -hh + ((i + 1) / segments) * hh * 2;
-              x1 = x2 = hw;
-              this.renderer.drawLine(x1, y1, x2, y2, tr, tg, tb, alpha);
-              this.renderer.drawLine(x1 - 6, y1, x2 - 6, y2, tr, tg, tb, alpha * 0.4);
-            }
-            break;
-        }
-
-        // Pincer: also show opposite side
-        if (tel.formation === 'pincer' && tel.side !== undefined) {
-          const oppSide = tel.side < 2 ? (tel.side === 0 ? 1 : 0) : (tel.side === 2 ? 3 : 2);
-          switch (oppSide) {
-            case 0:
-              this.renderer.drawLine(-hw, hh, hw, hh, tr, tg, tb, alpha * 0.7);
-              break;
-            case 1:
-              this.renderer.drawLine(-hw, -hh, hw, -hh, tr, tg, tb, alpha * 0.7);
-              break;
-            case 2:
-              this.renderer.drawLine(-hw, -hh, -hw, hh, tr, tg, tb, alpha * 0.7);
-              break;
-            case 3:
-              this.renderer.drawLine(hw, -hh, hw, hh, tr, tg, tb, alpha * 0.7);
-              break;
-          }
-        }
-      }
-
-      if (tel.center) {
-        // Position-based telegraph: warning ring (surround/ambush)
-        const radius = tel.formation === 'ambush' ? 300 + t * 50 : 280 + t * 40;
-        const ringSegments = 24;
-        for (let i = 0; i < ringSegments; i++) {
-          const a1 = (i / ringSegments) * Math.PI * 2;
-          const a2 = ((i + 1) / ringSegments) * Math.PI * 2;
-          // Dashed effect: skip every other segment
-          if (i % 2 === 0) continue;
-          this.renderer.drawLine(
-            tel.center.x + Math.cos(a1) * radius,
-            tel.center.y + Math.sin(a1) * radius,
-            tel.center.x + Math.cos(a2) * radius,
-            tel.center.y + Math.sin(a2) * radius,
-            tr, tg, tb, alpha,
-          );
-        }
-      }
-    }
-  }
-
   /** Render phase transition border pulse */
   private renderBorderPulse(): void {
     if (this.phaseBorderPulseTimer <= 0) return;
@@ -1887,25 +1207,6 @@ export class Game {
     this.renderer.drawLine(hw - inset, -hh + inset, hw - inset, hh - inset, 1, 0.6, 0.2, alpha * 0.5);
     this.renderer.drawLine(hw - inset, hh - inset, -hw + inset, hh - inset, 1, 0.6, 0.2, alpha * 0.5);
     this.renderer.drawLine(-hw + inset, hh - inset, -hw + inset, -hh + inset, 1, 0.6, 0.2, alpha * 0.5);
-  }
-
-  private playEnemySpawnSFX(type: string): void {
-    switch (type) {
-      case 'rhombus': this.audio.playSFX('rhombus'); break;
-      case 'pinwheel': this.audio.playSFX('pinwheel'); break;
-      case 'blackhole': this.audio.playSFX('deathstar'); break;
-      case 'sierpinski': this.audio.playSFX('octagon'); break;
-    }
-  }
-
-  /** Play spawn SFX at reduced volume (for formation leakthrough) */
-  private playSFXAtVolume(type: string, volume: number): void {
-    switch (type) {
-      case 'rhombus': this.audio.playSFXAtVolume('rhombus', volume); break;
-      case 'pinwheel': this.audio.playSFXAtVolume('pinwheel', volume); break;
-      case 'blackhole': this.audio.playSFXAtVolume('deathstar', volume); break;
-      case 'sierpinski': this.audio.playSFXAtVolume('octagon', volume); break;
-    }
   }
 
   private onPlayerDeath(): void {
@@ -1942,10 +1243,7 @@ export class Game {
     this.camera.shake(SCREEN_SHAKE_DEATH, 0.8);
 
     // Clean up bullet trails
-    for (const [, tid] of this.bulletTrailIds) {
-      this.trails.unregister(tid);
-    }
-    this.bulletTrailIds.clear();
+    this.lifecycle.clearBulletTrails(this.bullets);
     this.bullets.clear();
 
     this.audio.playSFX('die');
@@ -1972,10 +1270,7 @@ export class Game {
     this.camera.shake(SCREEN_SHAKE_LARGE, 0.5);
 
     // Clean up bullet trails
-    for (const [, tid] of this.bulletTrailIds) {
-      this.trails.unregister(tid);
-    }
-    this.bulletTrailIds.clear();
+    this.lifecycle.clearBulletTrails(this.bullets);
     this.bullets.clear();
 
     this.audio.playSFX('die1');
@@ -2007,7 +1302,6 @@ export class Game {
         this.grid.applyImpulse(e.position.x, e.position.y, 400, 200);
         this.camera.shake(SCREEN_SHAKE_SMALL * 0.5, 0.1);
         this.audio.playSFX('crash');
-        if (e.trailId >= 0) this.trails.unregister(e.trailId);
       }
     }
 
@@ -2028,13 +1322,8 @@ export class Game {
       120, this.slowmoShockwaveRadius,
     );
 
-    // Clean up dead enemies
-    this.enemies = this.enemies.filter(e => {
-      if (!e.active && e.trailId >= 0) {
-        this.trails.unregister(e.trailId);
-      }
-      return e.active;
-    });
+    // Update trails for active enemies and clean up inactive ones
+    this.lifecycle.cleanupEnemies(this.enemies);
 
     // End slowmo
     if (this.slowmoTimer >= DEATH_SLOWMO_DURATION) {
@@ -2056,11 +1345,10 @@ export class Game {
       } else {
         // Respawn and continue playing with recovery buff
         this.state = 'playing';
-        for (const e of this.enemies) {
-          if (e.trailId >= 0) this.trails.unregister(e.trailId);
-        }
-        this.enemies = [];
-        this.pendingSpawns = [];
+        this.lifecycle.clear();
+        this.enemies.length = 0;
+        this.combat.clearPendingSpawns();
+        this.circleFlocks = [];
         this.player.respawn();
         this.player.active = true;
         this.camera.snapTo(this.player.position);
@@ -2112,7 +1400,7 @@ export class Game {
 
     if (this.state === 'playing' || this.state === 'death_slowmo') {
       // Render spawn telegraphs (behind entities)
-      this.renderTelegraphs();
+      this.spawn.renderTelegraphs(this.renderer);
       for (const e of this.enemies) e.render(this.renderer);
       if (this.state === 'playing') {
         this.bullets.render(this.renderer);
@@ -2166,9 +1454,9 @@ export class Game {
 
     // 4. Switch to additive blend for trails, explosions, glow, kill signatures
     this.renderer.setBlendMode('additive');
-    this.trails.render(this.renderer);
+    this.lifecycle.trailSystem.render(this.renderer);
     this.explosions.render(this.renderer);
-    this.renderKillEffects();
+    this.combat.render(this.renderer);
     // setBlendMode('normal') flushes additive batch and restores blend func
     this.renderer.setBlendMode('normal');
     this.renderer.end();
@@ -2277,7 +1565,7 @@ export class Game {
     const hw = gameSettings.arenaWidth / 2;
     const hh = gameSettings.arenaHeight / 2;
     // Heat shifts border toward warm colors (orange/white) and increases brightness
-    const heatMix = this.heat * HEAT_BORDER_BRIGHTNESS_MAX;
+    const heatMix = this.combat.heatValue * HEAT_BORDER_BRIGHTNESS_MAX;
     const br = Math.min(1, ARENA_BORDER_COLOR[0] + heatMix * 2.0);  // push toward warm
     const bg = Math.min(1, ARENA_BORDER_COLOR[1] + heatMix * 0.6);
     const bb = Math.min(1, ARENA_BORDER_COLOR[2] - heatMix * 0.3);  // reduce blue at high heat
@@ -2323,7 +1611,7 @@ export class Game {
     if (!this.mobile) hideDesktopSettings();
     if (!this.designLab) {
       this.designLab = new DesignLab(
-        this.renderer, this.bloom, this.grid, this.trails,
+        this.renderer, this.bloom, this.grid, this.lifecycle.trailSystem,
         this.camera, this.input, this.audio, this.hud, this.starfield,
       );
     }
@@ -2371,11 +1659,6 @@ export class Game {
     this.bloom.threshold = gameSettings.bloomThreshold;
     this.bloom.blurPasses = this.mobile ? Math.min(gameSettings.bloomBlurPasses, 2) : gameSettings.bloomBlurPasses;
     this.bloom.blurRadius = gameSettings.bloomBlurRadius;
-    this.trailLenEnemy = this.mobile
-      ? Math.min(gameSettings.trailLength, MOBILE_TRAIL_LENGTH_ENEMY)
-      : gameSettings.trailLength;
-    this.trailLenBullet = this.mobile
-      ? MOBILE_TRAIL_LENGTH_BULLET
-      : Math.min(gameSettings.trailLength, TRAIL_LENGTH_BULLET);
+    this.lifecycle.applyVisualSettings(this.mobile);
   }
 }

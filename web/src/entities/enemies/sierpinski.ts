@@ -1,6 +1,7 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
 import { Renderer } from '../../renderer/sprite-batch';
+import { EnemyType } from '../../spawner/spawn-patterns';
 import { COLORS, SIERPINSKI_TIER_HP, SIERPINSKI_TIER_RADIUS, SIERPINSKI_TIER_SPEED, SIERPINSKI_TIER_SCORE, SIERPINSKI_TIER_DEPTH } from '../../config';
 
 /**
@@ -125,7 +126,7 @@ export class Sierpinski extends Enemy {
     ];
 
     const childTier = this.tier + 1;
-    const spawns: { type: string; position: Vec2; tier: number }[] = [];
+    const spawns: { type: EnemyType; position: Vec2; tier: number }[] = [];
 
     for (const [ox, oy] of offsets) {
       // Rotate offset by parent rotation

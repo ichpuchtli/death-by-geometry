@@ -1,0 +1,82 @@
+name: "Circle Flock Scatter — Supernova ejects double circles with flock snap-back"
+tags: [regression, blackhole, visual]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Intense phase: BHs spawn often, high spawn rate to get enemies absorbed fast
+  - action: evalCheck
+    description: "Configure for rapid BH overload"
+    script: |
+      const settings = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      settings.startingPhase = 'intense';
+      settings.startingLives = 99;
+      settings.spawnRateMultiplier = 4;
+      settings.maxEnemies = 200;
+      settings.bhEnemyPull = 8.0;
+      settings.bhAttractRadius = 600;
+      localStorage.setItem('gg_settings', JSON.stringify(settings));
+      return true;
+
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Start game
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  - action: wait
+    ms: 200
+
+  # Enable auto-fire
+  - action: keyPress
+    key: "f"
+    duration: 100
+
+  - action: mouseMove
+    x: 800
+    y: 400
+
+  # Play for 25s — enough for BH to spawn, absorb 12 enemies, destabilize (1.5s), overload
+  - action: keys
+    keys: ["w", "d"]
+    duration: 4000
+
+  - action: keys
+    keys: ["s", "a"]
+    duration: 4000
+
+  - action: keys
+    keys: ["w", "a"]
+    duration: 4000
+
+  - action: keys
+    keys: ["s", "d"]
+    duration: 4000
+
+  - action: keys
+    keys: ["w"]
+    duration: 4000
+
+  - action: screenshot
+    name: "72-circle-flock-scatter-gameplay"
+
+  - action: keys
+    keys: ["s"]
+    duration: 5000
+
+  - action: screenshot
+    name: "72-circle-flock-scatter-late"
+
+  - action: assertNoErrors
+    description: "No JS errors — doubled circle count and flock mechanic work correctly"

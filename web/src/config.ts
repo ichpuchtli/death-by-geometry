@@ -161,6 +161,13 @@ export const SUPERNOVA_PARTICLE_COUNT = 400;
 export const SUPERNOVA_GRID_IMPULSE = 2500;
 export const SUPERNOVA_HITSTOP = 300;
 export const SUPERNOVA_FLASH_DURATION = 200; // ms
+
+// --- Circle (BlackHole supernova ejecta) ---
+export const CIRCLE_EJECT_SPEED_MIN = 0.35;       // px/ms min ejection speed
+export const CIRCLE_EJECT_SPEED_MAX = 0.85;       // px/ms max ejection speed
+export const CIRCLE_EJECT_DECAY = 0.0022;          // fraction lost per ms (~80% gone in 730ms)
+export const CIRCLE_FLOCK_PULL = 0.0008;           // elastic spring: speed px/ms = pull * distPx
+export const CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER = 2; // circles emitted = absorbedCount * this
 export const BULLET_GRAVITY_STRENGTH = 0.15; // bullet bending near BlackHoles (much weaker than enemy pull)
 export const BLACKHOLE_LENSING_BASE = 1.5;
 export const BLACKHOLE_LENSING_PER_ABSORB = 0.35;
@@ -237,7 +244,6 @@ export const TRAIL_LENGTH_BULLET = 10;
 // --- Mobile ---
 export const MOBILE_BLOOM_SCALE = 0.25; // bloom FBO at quarter-res on mobile
 export const MOBILE_MAX_ENEMIES = 100;
-export const MOBILE_MAX_PARTICLES = 30;
 export const MOBILE_TRAIL_LENGTH_ENEMY = 8;
 export const MOBILE_TRAIL_LENGTH_BULLET = 5;
 

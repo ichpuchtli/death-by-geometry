@@ -12,6 +12,7 @@ import { gameSettings } from '../settings';
 
 export class Bullet extends Entity {
   angle = 0;
+  trailId = -1; // assigned by LifecycleSystem
 
   init(x: number, y: number, angle: number): void {
     this.position.set(x, y);

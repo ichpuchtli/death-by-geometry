@@ -318,7 +318,7 @@ export class DesignLab {
     ce.spawnDuration = 0.5;
     ce.spawnTimer = 0.5;
     ce.speed *= gameSettings.enemySpeedMultiplier;
-    ce.velocity.set(Math.cos(angle) * ejectSpeed, Math.sin(angle) * ejectSpeed);
+    ce.ejectVel.set(Math.cos(angle) * ejectSpeed, Math.sin(angle) * ejectSpeed);
     ce.trailId = this.trails.register(ce.color, TRAIL_LENGTH_ENEMY);
     this.enemies.push(ce);
   }
