@@ -1,4 +1,4 @@
-import { Renderer } from '../renderer/sprite-batch';
+import type { Renderer } from '../renderer/sprite-batch';
 import {
   CROSSHAIR_SIZE,
   CROSSHAIR_CHEVRON_SIZE,

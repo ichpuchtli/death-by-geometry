@@ -1,5 +1,5 @@
-import { Renderer } from '../renderer/sprite-batch';
-import { Camera } from '../core/camera';
+import type { Renderer } from '../renderer/sprite-batch';
+import type { Camera } from '../core/camera';
 import { Enemy } from '../entities/enemies/enemy';
 import { OFFSCREEN_INDICATOR_RANGE } from '../config';
 

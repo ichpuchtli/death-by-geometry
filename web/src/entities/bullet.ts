@@ -1,6 +1,6 @@
 import { Entity } from './entity';
 import { Vec2 } from '../core/vector';
-import { Renderer } from '../renderer/sprite-batch';
+import type { Renderer } from '../renderer/sprite-batch';
 import {
   BULLET_SPEED,
   BULLET_SCALE,

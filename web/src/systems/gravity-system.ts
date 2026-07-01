@@ -1,12 +1,12 @@
-import { SpringMassGrid } from '../renderer/grid';
-import { Camera } from '../core/camera';
-import { AudioManager } from '../core/audio';
+import type { SpringMassGrid } from '../renderer/grid';
+import type { Camera } from '../core/camera';
+import type { AudioManager } from '../core/audio';
 import { Player } from '../entities/player';
 import { BulletPool } from '../entities/bullet';
 import { Enemy } from '../entities/enemies/enemy';
 import { BlackHole } from '../entities/enemies/blackhole';
 import { CircleEnemy } from '../entities/enemies/circle';
-import { ExplosionPool } from '../entities/explosion';
+import type { ExplosionPool } from '../entities/explosion';
 import { LifecycleSystem } from './lifecycle-system';
 import { createEnemy } from '../spawner/enemy-factory';
 import { Vec2 } from '../core/vector';

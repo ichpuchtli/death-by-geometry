@@ -1,5 +1,5 @@
 import { Vec2 } from '../core/vector';
-import { Renderer } from '../renderer/sprite-batch';
+import type { Renderer } from '../renderer/sprite-batch';
 import { EXPLOSION_POOL_SIZE } from '../config';
 
 interface Particle {

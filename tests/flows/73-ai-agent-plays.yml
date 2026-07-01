@@ -1,0 +1,54 @@
+name: "AI Agent — trained policy plays the game live"
+tags: [ai, bot, regression]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Give the agent a few lives + an active phase so there's visible combat for the screenshot
+  - action: evalCheck
+    description: "Configure a lively run for the bot"
+    script: |
+      const s = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      s.startingLives = 5;
+      s.startingPhase = 'rampUp';
+      s.spawnRateMultiplier = 1;
+      localStorage.setItem('gg_settings', JSON.stringify(s));
+      return true;
+
+  # Reload with the AI agent auto-starting
+  - action: launch
+    url: "/?bot=1"
+    waitFor: "canvas#game"
+
+  # Let the agent play
+  - action: wait
+    ms: 2000
+
+  - action: assertVisible
+    selector: "#bot-badge"
+
+  # The agent should have auto-started a run and be playing
+  - action: waitForEval
+    description: "AI agent has started playing"
+    timeout: 5000
+    script: |
+      return window.game && window.game.state === 'playing';
+
+  - action: wait
+    ms: 5000
+
+  # Agent should be actively killing enemies (score climbs well above idle) and still alive
+  - action: assertEval
+    description: "Agent is alive and scoring from kills"
+    script: |
+      const g = window.game;
+      return g.state === 'playing' && g.player.lives > 0 && g.player.score > 100;
+
+  - action: screenshot
+    name: "73-ai-agent-playing"
+
+  - action: assertNoErrors

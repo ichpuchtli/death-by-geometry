@@ -1,7 +1,7 @@
 import { Entity } from './entity';
 import { Vec2 } from '../core/vector';
-import { Input } from '../core/input';
-import { Renderer } from '../renderer/sprite-batch';
+import type { InputSource } from '../core/input';
+import type { Renderer } from '../renderer/sprite-batch';
 import {
   PLAYER_SPEED,
   PLAYER_COLLISION_RADIUS,
@@ -51,7 +51,7 @@ export class Player extends Entity {
   private slowTimer = 0;
   private slowFactor = 1;
 
-  constructor(private input: Input) {
+  constructor(private input: InputSource) {
     super();
     this.collisionRadius = PLAYER_COLLISION_RADIUS;
   }

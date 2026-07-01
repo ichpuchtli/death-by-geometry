@@ -1,4 +1,4 @@
-import { Renderer } from './sprite-batch';
+import type { Renderer } from './sprite-batch';
 
 const MAX_TRAIL_ENTITIES = 500;
 const DEFAULT_TRAIL_LENGTH = 10;

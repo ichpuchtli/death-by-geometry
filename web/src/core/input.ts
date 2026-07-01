@@ -1,8 +1,20 @@
 import { Vec2 } from './vector';
-import { Camera } from './camera';
+import type { Camera } from './camera';
 import { JOYSTICK_MAX_RADIUS, JOYSTICK_DEAD_ZONE } from '../config';
 
 export type InputMode = 'keyboard' | 'touch';
+
+/**
+ * Minimal input surface the Player depends on. Implemented by the real DOM-backed
+ * `Input` and by the headless `ScriptedInput` used for the AI digital twin, so the
+ * exact same Player/entity code runs in the browser and in the Node training sim.
+ */
+export interface InputSource {
+  getMovementDir(): Vec2;
+  updateAimFromPlayer(playerPos: Vec2): void;
+  getAimAngle(): number;
+  isMouseDown(): boolean;
+}
 
 interface TouchStick {
   active: boolean;
@@ -11,11 +23,18 @@ interface TouchStick {
   current: Vec2;  // where finger is now
 }
 
-export class Input {
+export class Input implements InputSource {
   private keys = new Map<string, boolean>();
   private mouseDown = false;
   private camera: Camera | null = null;
   autoFire = false;
+
+  // AI bot override: when botControl is true, the AI agent drives movement/aim/fire
+  // directly (set each frame by the Bot controller) and human keyboard/mouse is ignored.
+  botControl = false;
+  botMove = new Vec2(0, 0);
+  botAimAngle = 0;
+  botFire = false;
 
   // Mouse position aim (desktop) — screen CSS coordinates
   private mouseScreenX = 0;
@@ -148,6 +167,7 @@ export class Input {
   }
 
   isMouseDown(): boolean {
+    if (this.botControl) return this.botFire;
     if (this.mode === 'touch') {
       const rv = this.getStickVector(this.rightStick);
       return rv.magnitudeSq() > 0;
@@ -171,6 +191,7 @@ export class Input {
   /** Update aim angle from player position toward mouse cursor world position.
    *  Called each frame from Player.update(). */
   updateAimFromPlayer(playerPos: Vec2): void {
+    if (this.botControl) { this._aimAngle = this.botAimAngle; return; }
     if (this.mode !== 'keyboard') return;
     const mouseWorld = this.getMouseWorldPos();
     const dx = mouseWorld.x - playerPos.x;
@@ -200,6 +221,7 @@ export class Input {
 
   /** Get movement direction from WASD / arrow keys / left joystick */
   getMovementDir(): Vec2 {
+    if (this.botControl) return this.botMove.clone();
     if (this.mode === 'touch') {
       const v = this.getStickVector(this.leftStick);
       // Invert Y because screen Y is down but world Y is up

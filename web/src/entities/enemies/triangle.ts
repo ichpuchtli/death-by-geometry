@@ -1,6 +1,6 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
-import { Renderer } from '../../renderer/sprite-batch';
+import type { Renderer } from '../../renderer/sprite-batch';
 import { COLORS, ENEMY_SPEED, ENEMY_SCORES } from '../../config';
 
 export class Triangle extends Enemy {

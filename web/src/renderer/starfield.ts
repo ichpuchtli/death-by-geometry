@@ -1,4 +1,4 @@
-import { Renderer } from './sprite-batch';
+import type { Renderer } from './sprite-batch';
 
 interface Star {
   x: number;

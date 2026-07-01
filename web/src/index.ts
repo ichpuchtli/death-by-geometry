@@ -10,6 +10,8 @@ const gameCanvas = document.getElementById('game') as HTMLCanvasElement;
 const hudCanvas = document.getElementById('hud') as HTMLCanvasElement;
 
 const game = new Game(gameCanvas, hudCanvas);
+// Debug/test hook: lets Playwright flows inspect live game state (score, lives, state).
+(window as unknown as { game: Game }).game = game;
 
 let lastTime = performance.now();
 let paused = false;

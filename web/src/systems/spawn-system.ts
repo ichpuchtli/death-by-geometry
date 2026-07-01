@@ -1,6 +1,6 @@
-import { Renderer } from '../renderer/sprite-batch';
-import { SpringMassGrid } from '../renderer/grid';
-import { AudioManager } from '../core/audio';
+import type { Renderer } from '../renderer/sprite-batch';
+import type { SpringMassGrid } from '../renderer/grid';
+import type { AudioManager } from '../core/audio';
 import { Player } from '../entities/player';
 import { Enemy } from '../entities/enemies/enemy';
 import { BlackHole } from '../entities/enemies/blackhole';

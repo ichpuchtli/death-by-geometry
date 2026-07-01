@@ -1,6 +1,6 @@
-import { SpringMassGrid } from '../renderer/grid';
-import { Camera } from '../core/camera';
-import { AudioManager } from '../core/audio';
+import type { SpringMassGrid } from '../renderer/grid';
+import type { Camera } from '../core/camera';
+import type { AudioManager } from '../core/audio';
 import { Player } from '../entities/player';
 import { Enemy } from '../entities/enemies/enemy';
 import { Mandelbrot } from '../entities/enemies/mandelbrot';
@@ -10,7 +10,7 @@ import { WaveManager } from '../spawner/wave-manager';
 import { createEnemy } from '../spawner/enemy-factory';
 import { EnemyType } from '../spawner/spawn-patterns';
 import { Vec2 } from '../core/vector';
-import { HUD } from '../ui/hud';
+import type { HUD } from '../ui/hud';
 import { gameSettings } from '../settings';
 import {
   SCREEN_SHAKE_LARGE,

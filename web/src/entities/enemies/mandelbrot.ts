@@ -1,6 +1,6 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
-import { Renderer } from '../../renderer/sprite-batch';
+import type { Renderer } from '../../renderer/sprite-batch';
 import {
   COLORS,
   MINIBOSS_HP, MINIBOSS_SCORE, MINIBOSS_COLLISION_RADIUS,

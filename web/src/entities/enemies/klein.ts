@@ -1,6 +1,6 @@
 import { Enemy } from './enemy';
 import { Vec2 } from '../../core/vector';
-import { Renderer } from '../../renderer/sprite-batch';
+import type { Renderer } from '../../renderer/sprite-batch';
 import { COLORS, ENEMY_SPEED, ENEMY_SCORES, KLEIN_HP } from '../../config';
 
 /** Klein bottle cross-section — reflects bullets from wrong angles */

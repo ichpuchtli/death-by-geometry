@@ -1,6 +1,6 @@
 import { Entity } from '../entity';
 import { Vec2 } from '../../core/vector';
-import { Renderer } from '../../renderer/sprite-batch';
+import type { Renderer } from '../../renderer/sprite-batch';
 import { ENEMY_COLLISION_RADIUS, SPAWN_DURATION_DEFAULT } from '../../config';
 import { gameSettings } from '../../settings';
 import { EnemyType } from '../../spawner/spawn-patterns';

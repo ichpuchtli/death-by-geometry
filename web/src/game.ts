@@ -22,6 +22,8 @@ import { CombatSystem } from './systems/combat-system';
 import { SpawnSystem } from './systems/spawn-system';
 import { GravitySystem } from './systems/gravity-system';
 import { BossSystem } from './systems/boss-system';
+import { separateEnemies as runSeparation } from './systems/separation';
+import { Bot } from './ai/bot';
 import { RunStats, computeMedals } from './core/run-stats';
 import { createEnemy } from './spawner/enemy-factory';
 import { BlackHole } from './entities/enemies/blackhole';
@@ -42,7 +44,6 @@ import {
   DEATH_SLOWMO_DURATION,
   DEATH_SLOWMO_TIME_SCALE,
   DEATH_SLOWMO_SHOCKWAVE_SPEED,
-  ENEMY_SEPARATION_BUFFER,
   PHASE_BANNER_DURATION,
   PHASE_BORDER_PULSE_DURATION,
   PHASE_DISPLAY_NAMES,
@@ -136,6 +137,10 @@ export class Game {
 
   // Design Lab
   private designLab: DesignLab | null = null;
+
+  // AI agent: trained policy that plays the game (watch live). Toggle with `?bot=1` or the B key.
+  private bot: Bot | null = null;
+  private botEnabled = false;
 
   // Boss encounters (Sierpinski + Mandelbrot generic state machines)
   private boss: BossSystem;
@@ -258,6 +263,11 @@ export class Game {
       if (e.code === 'KeyF') {
         this.input.autoFire = !this.input.autoFire;
       }
+      // Toggle the AI agent (watch it play). Starts a run from the menu/game over.
+      if (e.code === 'KeyB') {
+        this.setBotEnabled(!this.botEnabled);
+        if (this.botEnabled && this.state !== 'playing') this.onInteract();
+      }
       // Pause during gameplay: P to toggle pause + show/hide config panel
       if (e.code === 'KeyP' && (this.state === 'playing' || this.state === 'death_slowmo')) {
         this.paused = !this.paused;
@@ -289,6 +299,55 @@ export class Game {
     if (!this.mobile) showDesktopSettings();
     // Show system cursor on menu
     gameCanvas.style.cursor = 'default';
+
+    // AI agent auto-start via `?bot=1` (handy for recorded/automated demo runs)
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('bot') === '1') {
+      this.setBotEnabled(true);
+      // Defer so the canvas/audio are ready, then start a run
+      setTimeout(() => this.onInteract(), 300);
+    }
+  }
+
+  /** Enable/disable the AI agent. Lazily constructs the policy-backed Bot on first use. */
+  setBotEnabled(enabled: boolean): void {
+    this.botEnabled = enabled;
+    if (enabled && !this.bot) this.bot = new Bot();
+    this.input.botControl = enabled && this.state === 'playing';
+    this.botBadge(enabled);
+  }
+
+  /** Small on-screen badge so it's obvious the AI is driving. */
+  private botBadge(show: boolean): void {
+    if (typeof document === 'undefined') return;
+    let el = document.getElementById('bot-badge');
+    if (show) {
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'bot-badge';
+        el.textContent = '🤖 AI AGENT PLAYING';
+        el.style.cssText =
+          'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9999;' +
+          'font:600 14px system-ui,sans-serif;letter-spacing:1px;color:#0ff;' +
+          'background:rgba(0,0,0,0.55);padding:6px 14px;border:1px solid #0ff;border-radius:4px;' +
+          'pointer-events:none;text-shadow:0 0 6px #0ff;';
+        document.body.appendChild(el);
+      }
+      el.style.display = 'block';
+    } else if (el) {
+      el.style.display = 'none';
+    }
+  }
+
+  /** Feed the AI agent's decision into the input layer for this frame. */
+  private driveBot(): void {
+    if (!this.botEnabled || !this.bot) return;
+    this.input.botControl = true;
+    const a = this.bot.computeAction(
+      this.player, this.enemies, gameSettings.arenaWidth, gameSettings.arenaHeight,
+    );
+    this.input.botMove.set(a.moveX, a.moveY);
+    this.input.botAimAngle = a.aimAngle;
+    this.input.botFire = a.fire;
   }
 
   private resize(): void {
@@ -386,6 +445,8 @@ export class Game {
 
     // Reset aim angle
     this.input.setAimAngle(0);
+    // Hand control to the AI agent if it's enabled
+    this.input.botControl = this.botEnabled;
 
     this.audio.playSFX('start');
     this.audio.startMusic();
@@ -457,6 +518,11 @@ export class Game {
 
     // Redraw HUD with animation progress
     this.hud.drawGameOver(this.runStats, this.gameOverMedals, this.gameOverTime);
+
+    // AI agent: auto-restart so it keeps playing for continuous live viewing
+    if (this.botEnabled && this.gameOverTime >= 3) {
+      this.startGame();
+    }
   }
 
   update(dt: number): void {
@@ -516,6 +582,9 @@ export class Game {
     }
 
     this.gameTime += dt / 1000;
+
+    // AI agent decision for this frame (writes into the input layer)
+    this.driveBot();
 
     // Player
     this.player.update(dt);
@@ -708,88 +777,7 @@ export class Game {
 
   /** Per-frame pairwise separation: push overlapping enemies apart (Grid Wars style) */
   private separateEnemies(): void {
-    const hw = gameSettings.arenaWidth / 2 - 10;
-    const hh = gameSettings.arenaHeight / 2 - 10;
-    const enemies = this.enemies;
-    const len = enemies.length;
-
-    // Build set of enemies currently being pulled by a BlackHole (skip separation for them)
-    const inGravityWell = this.gravity.getEnemiesInGravityWell();
-
-    for (let i = 0; i < len; i++) {
-      const a = enemies[i];
-      if (!a.active) continue;
-      if (a.isSpawning && a.spawnTimer > a.spawnDuration * 0.3) continue;
-
-      for (let j = i + 1; j < len; j++) {
-        const b = enemies[j];
-        if (!b.active) continue;
-        if (b.isSpawning && b.spawnTimer > b.spawnDuration * 0.3) continue;
-
-        // Don't fight gravity — if either enemy is being pulled into a BlackHole, skip
-        if (inGravityWell.has(a) || inGravityWell.has(b)) continue;
-
-        const dx = a.position.x - b.position.x;
-        const dy = a.position.y - b.position.y;
-        const distSq = dx * dx + dy * dy;
-        const minDist = a.collisionRadius + b.collisionRadius + ENEMY_SEPARATION_BUFFER;
-
-        if (distSq >= minDist * minDist) continue;
-
-        const dist = Math.sqrt(distSq);
-        let nx: number, ny: number;
-        if (dist < 0.5) {
-          // Near-zero distance — deterministic direction from indices so it's consistent across frames
-          const angle = ((i * 7919 + j * 104729) % 6283) * 0.001;
-          nx = Math.cos(angle);
-          ny = Math.sin(angle);
-        } else {
-          nx = dx / dist;
-          ny = dy / dist;
-        }
-
-        const overlap = minDist - dist;
-        // Push harder when heavily overlapping (>50% of minDist) to resolve clusters faster
-        const pushStrength = overlap > minDist * 0.5 ? overlap * 1.5 : overlap;
-
-        // Weight: BlackHoles immovable (0), minibosses resist (0.25), others equal (1)
-        const wA = a.separationWeight;
-        const wB = b.separationWeight;
-        const totalW = wA + wB;
-        if (totalW < 0.001) continue; // both immovable
-
-        const pushA = pushStrength * (wA / totalW);
-        const pushB = pushStrength * (wB / totalW);
-
-        // Push A along +normal, B along -normal
-        a.position.x = Math.max(-hw, Math.min(hw, a.position.x + nx * pushA));
-        a.position.y = Math.max(-hh, Math.min(hh, a.position.y + ny * pushA));
-        b.position.x = Math.max(-hw, Math.min(hw, b.position.x - nx * pushB));
-        b.position.y = Math.max(-hh, Math.min(hh, b.position.y - ny * pushB));
-
-        // Bouncers (Pinwheel): deflect velocity off collision normal
-        const aIsBouncer = a.isBouncer;
-        const bIsBouncer = b.isBouncer;
-        if (aIsBouncer || bIsBouncer) {
-          if (aIsBouncer) {
-            // Reflect A's velocity off normal (n points from B→A)
-            const dot = a.velocity.x * nx + a.velocity.y * ny;
-            if (dot < 0) { // only if moving toward B
-              a.velocity.x -= 2 * dot * nx;
-              a.velocity.y -= 2 * dot * ny;
-            }
-          }
-          if (bIsBouncer) {
-            // Reflect B's velocity off -normal (points from A→B)
-            const dot = b.velocity.x * (-nx) + b.velocity.y * (-ny);
-            if (dot < 0) { // only if moving toward A
-              b.velocity.x -= 2 * dot * (-nx);
-              b.velocity.y -= 2 * dot * (-ny);
-            }
-          }
-        }
-      }
-    }
+    runSeparation(this.enemies, this.gravity.getEnemiesInGravityWell());
   }
 
   /** Render phase transition border pulse */

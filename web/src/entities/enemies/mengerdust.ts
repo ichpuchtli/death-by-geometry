@@ -1,6 +1,6 @@
 import { Enemy } from './enemy';
 import { Vec2 } from '../../core/vector';
-import { Renderer } from '../../renderer/sprite-batch';
+import type { Renderer } from '../../renderer/sprite-batch';
 import { COLORS, ENEMY_SPEED, ENEMY_SCORES, MENGERDUST_HP, MENGERDUST_ABSORB_COUNT, MENGERDUST_OVERLOAD_DURATION } from '../../config';
 
 /** MengerDust — Menger sponge cross-section. Absorbs bullets, then becomes vulnerable. */

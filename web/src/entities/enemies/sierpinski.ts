@@ -1,6 +1,6 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
-import { Renderer } from '../../renderer/sprite-batch';
+import type { Renderer } from '../../renderer/sprite-batch';
 import { EnemyType } from '../../spawner/spawn-patterns';
 import { COLORS, SIERPINSKI_TIER_HP, SIERPINSKI_TIER_RADIUS, SIERPINSKI_TIER_SPEED, SIERPINSKI_TIER_SCORE, SIERPINSKI_TIER_DEPTH } from '../../config';
 
