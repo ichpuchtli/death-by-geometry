@@ -30,7 +30,7 @@ Entirely client-side. WebGL renders everything (bloom, grid distortion, particle
 - **240-400s (Intense):** Ambush + cascade. Mandelbrot miniboss. 40-80 enemies.
 - **400s+ (Chaos):** Maximum spawn rates. Screen constantly full.
 
-Cadence system alternates **burst windows** (2x spawn rates) and **breathers** (trickle only) for tension/release. Player has 5 lives. Weapon auto-upgrades at score milestones.
+Cadence system alternates **burst windows** (2x spawn rates) and **breathers** (trickle only) for tension/release. Player has 5 lives. Weapon auto-upgrades at score milestones — shotgun-style: slow, deliberate cadence (`WEAPON_STAGES` shotDelay ~280–320ms) that ramps the number of parallel pellets (2→6) and cone width rather than fire speed, so shooting rewards aim over spraying a stream.
 
 ---
 

@@ -340,7 +340,7 @@ export class HUD {
     const mins = Math.floor(stats.timeSurvived / 60);
     const secs = Math.floor(stats.timeSurvived % 60);
     const phaseName = PHASE_DISPLAY_NAMES[stats.phaseReached] || stats.phaseReached.toUpperCase();
-    const weaponName = ['Single', 'Fast', 'Dual', 'Fast Dual', 'Triple'][stats.weaponStage] || 'Single';
+    const weaponName = ['Twin', 'Tri Spread', 'Quad Scatter', 'Penta Burst', 'Hex Storm'][stats.weaponStage] || 'Twin';
 
     const statLines = [
       { label: 'TIME', value: `${mins}:${secs.toString().padStart(2, '0')}` },

@@ -1,0 +1,69 @@
+name: "Weapon — slow shotgun-style cadence with parallel pellets"
+tags: [weapon, combat, regression]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  - action: evalCheck
+    description: "Fresh settings, gentle phase"
+    script: |
+      const s = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      s.startingLives = 5;
+      s.startingPhase = 'tutorial';
+      s.fireRateMultiplier = 1;
+      s.aiWingman = false;
+      localStorage.setItem('gg_settings', JSON.stringify(s));
+      return true;
+
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  - action: evalCheck
+    description: "Start a run"
+    script: |
+      window.game.onInteract();
+      return true;
+
+  - action: wait
+    ms: 500
+
+  # Base weapon must be a deliberate, multi-pellet blast — NOT a fast single stream.
+  # shotDelay was 150ms (fast stream); now >=250ms (slow), and it fires a spread of
+  # parallel pellets (offsets on both sides of aim) so each shot is an aimed shotgun blast.
+  - action: assertEval
+    description: "Base weapon: slow cadence + parallel pellet spread (shotgun feel)"
+    script: |
+      const st = window.game.player.getWeaponStage();
+      return st.shotDelay >= 250
+        && st.angleOffsets.length >= 2
+        && Math.max(...st.angleOffsets) > 0
+        && Math.min(...st.angleOffsets) < 0;
+
+  # Firing produces a spread of bullets, not a single-file stream: hold fire briefly and
+  # confirm multiple bullets are airborne together.
+  - action: evalCheck
+    description: "Fire a blast (enable auto-fire)"
+    script: |
+      window.game.input.autoFire = true;
+      return true;
+
+  - action: wait
+    ms: 200
+
+  - action: assertEval
+    description: "A multi-pellet blast is airborne"
+    script: |
+      return window.game.bullets.bullets.filter(b => b.active).length >= 2;
+
+  - action: screenshot
+    name: "75-weapon-shotgun"
+
+  - action: assertNoErrors

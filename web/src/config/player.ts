@@ -26,10 +26,15 @@ export const CROSSHAIR_ALPHA = 0.85;
 export const CROSSHAIR_ROTATION_SPEED = 0.0008; // radians per ms (slow spin)
 
 // --- Weapon progression (score thresholds) ---
+// Shotgun-style: slow, deliberate cadence (shotDelay ~280–320ms, vs the old 90–150ms
+// stream) so you can't sweep a continuous stream across the screen — every trigger pull
+// is a committed blast that must be aimed. Progression ramps the number of parallel
+// pellets (2→6) and widens the cone rather than speeding up fire. `bulletCount` is
+// descriptive; the actual pellets fired are `angleOffsets` (degrees).
 export const WEAPON_STAGES = [
-  { score: 0,      shotDelay: 150, bulletCount: 1, angleOffsets: [0] },
-  { score: 10000,  shotDelay: 120, bulletCount: 1, angleOffsets: [0] },
-  { score: 25000,  shotDelay: 120, bulletCount: 2, angleOffsets: [-3, 3] },
-  { score: 50000,  shotDelay: 90,  bulletCount: 2, angleOffsets: [-3, 3] },
-  { score: 150000, shotDelay: 90,  bulletCount: 3, angleOffsets: [-3, 0, 3] },
+  { score: 0,      shotDelay: 320, bulletCount: 2, angleOffsets: [-4, 4] },
+  { score: 10000,  shotDelay: 310, bulletCount: 3, angleOffsets: [-8, 0, 8] },
+  { score: 25000,  shotDelay: 300, bulletCount: 4, angleOffsets: [-11, -4, 4, 11] },
+  { score: 50000,  shotDelay: 290, bulletCount: 5, angleOffsets: [-14, -7, 0, 7, 14] },
+  { score: 150000, shotDelay: 280, bulletCount: 6, angleOffsets: [-16, -9, -3, 3, 9, 16] },
 ];
