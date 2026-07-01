@@ -24,6 +24,7 @@ import { GravitySystem } from './systems/gravity-system';
 import { BossSystem } from './systems/boss-system';
 import { separateEnemies as runSeparation } from './systems/separation';
 import { Bot } from './ai/bot';
+import { Wingman } from './entities/wingman';
 import { RunStats, computeMedals } from './core/run-stats';
 import { createEnemy } from './spawner/enemy-factory';
 import { BlackHole } from './entities/enemies/blackhole';
@@ -141,6 +142,9 @@ export class Game {
   // AI agent: trained policy that plays the game (watch live). Toggle with `?bot=1` or the B key.
   private bot: Bot | null = null;
   private botEnabled = false;
+
+  // AI wingman: a co-op ally driven by the same trained policy. Toggled via settings (aiWingman).
+  private wingman: Wingman | null = null;
 
   // Boss encounters (Sierpinski + Mandelbrot generic state machines)
   private boss: BossSystem;
@@ -338,6 +342,43 @@ export class Game {
     }
   }
 
+  /**
+   * Create/destroy the AI wingman to match the `aiWingman` setting. Called each playing
+   * frame so toggling the setting (e.g. from the pause menu) takes effect immediately.
+   */
+  private syncWingman(): void {
+    if (gameSettings.aiWingman && !this.wingman) {
+      this.wingman = new Wingman(new Bot());
+      this.wingman.spawnBeside(this.player.position.x, this.player.position.y);
+      this.wingmanBadge(true);
+    } else if (!gameSettings.aiWingman && this.wingman) {
+      this.wingman = null;
+      this.wingmanBadge(false);
+    }
+  }
+
+  /** Small on-screen badge so it's obvious an AI ally is fighting alongside you. */
+  private wingmanBadge(show: boolean): void {
+    if (typeof document === 'undefined') return;
+    let el = document.getElementById('wingman-badge');
+    if (show) {
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'wingman-badge';
+        el.textContent = '🤖 AI WINGMAN';
+        el.style.cssText =
+          'position:fixed;top:44px;left:50%;transform:translateX(-50%);z-index:9999;' +
+          'font:600 13px system-ui,sans-serif;letter-spacing:1px;color:#4ad9ff;' +
+          'background:rgba(0,0,0,0.55);padding:5px 12px;border:1px solid #4ad9ff;border-radius:4px;' +
+          'pointer-events:none;text-shadow:0 0 6px #4ad9ff;';
+        document.body.appendChild(el);
+      }
+      el.style.display = 'block';
+    } else if (el) {
+      el.style.display = 'none';
+    }
+  }
+
   /** Feed the AI agent's decision into the input layer for this frame. */
   private driveBot(): void {
     if (!this.botEnabled || !this.bot) return;
@@ -426,6 +467,9 @@ export class Game {
     this.medalRevealPlayed = false;
     this.supernovaFlashTimer = 0;
     this.boss.reset();
+    // Drop any existing wingman so it re-spawns beside the fresh player (syncWingman recreates it)
+    this.wingman = null;
+    this.wingmanBadge(false);
     this.player.lives = gameSettings.startingLives;
     this.waveManager.spawnRateMultiplier = gameSettings.spawnRateMultiplier;
     if (gameSettings.startingPhase !== 'tutorial') {
@@ -597,6 +641,19 @@ export class Game {
         const b = this.bullets.spawn(this.player.position.x, this.player.position.y, angle);
         if (b) {
           this.lifecycle.spawnBullet(b);
+        }
+      }
+    }
+
+    // AI wingman: an ally that observes + acts from its own position, sharing bullet pool + score
+    this.syncWingman();
+    if (this.wingman) {
+      this.wingman.update(dt, this.enemies, gameSettings.arenaWidth, gameSettings.arenaHeight);
+      const wShots = this.wingman.tryShoot(this.player.getWeaponStage());
+      if (wShots) {
+        for (const angle of wShots) {
+          const b = this.bullets.spawn(this.wingman.position.x, this.wingman.position.y, angle);
+          if (b) this.lifecycle.spawnBullet(b);
         }
       }
     }
@@ -944,6 +1001,8 @@ export class Game {
         this.gravity.clear();
         this.player.respawn();
         this.player.active = true;
+        // Bring the wingman back to the player's side after the screen-clearing respawn
+        if (this.wingman) this.wingman.spawnBeside(this.player.position.x, this.player.position.y);
         this.camera.snapTo(this.player.position);
 
         // Activate recovery window
@@ -998,6 +1057,7 @@ export class Game {
       if (this.state === 'playing') {
         this.bullets.render(this.renderer);
         this.player.render(this.renderer);
+        if (this.wingman) this.wingman.render(this.renderer);
         // Recovery shield ring
         if (this.recoveryActive) {
           this.renderRecoveryShield();

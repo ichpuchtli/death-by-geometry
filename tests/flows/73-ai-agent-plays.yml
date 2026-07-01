@@ -16,6 +16,7 @@ steps:
       s.startingLives = 5;
       s.startingPhase = 'rampUp';
       s.spawnRateMultiplier = 1;
+      s.aiWingman = false; // isolate the takeover-bot test from the wingman flow
       localStorage.setItem('gg_settings', JSON.stringify(s));
       return true;
 

@@ -104,6 +104,20 @@ fitness of a stochastic game, and is trivial to implement in pure TS. A full run
 - The agent respects all normal game settings (arena size, spawn rate, phase, etc.), so
   it's useful for exercising specific scenarios.
 
+### Play beside it (AI wingman)
+
+Turn on **AI Wingman** in the settings panel (or set `gameSettings.aiWingman = true`) to
+spawn a **cyan ally ship that fights alongside you** while *you* keep control of your own
+ship. The wingman (`web/src/entities/wingman.ts`) runs the same trained policy but
+observes and acts from its own position, so it dodges and shoots independently. Its
+bullets share the bullet pool, so its kills count toward your score; it reuses your
+current weapon stage and is a non-colliding helper (it can't be killed). A
+"🤖 AI WINGMAN" badge shows while it's active, and the toggle takes effect immediately —
+even from the pause menu (`Game.syncWingman()` creates/destroys it each frame).
+
+This differs from the takeover bot above: `?bot=1` / **B** replaces *your* input with the
+AI; the wingman is *additive* — a second AI ship next to your human-controlled one.
+
 ### Train / improve it
 
 ```bash
@@ -111,15 +125,37 @@ cd web
 npx tsx scripts/train.ts                       # default: 30 gens, pop 40
 npx tsx scripts/train.ts --gens=60 --pop=56 --elite=8 --secs=35 --eps=3
 npx tsx scripts/eval.ts                         # survival/score vs a do-nothing baseline
+
+# survival-focused long run with a LIVE dashboard (open http://localhost:8787):
+npx tsx scripts/train.ts --live --gens=150 --pop=64 --elite=10 --secs=45 --eps=3 \
+  --survW=10 --scoreW=0.004 --phases=tutorial,rampUp,midGame,intense,chaos
 ```
 
-`train.ts` overwrites `src/ai/trained-policy.json`; reload the game to use the new brain.
-Reward shaping, network shape (`ARCH`), and the phases trained on (`PHASES`) are all near
-the top of `train.ts`.
+`train.ts` overwrites `src/ai/trained-policy.json` **every generation** (a checkpoint, so
+an interrupted run still leaves usable weights); reload the game to use the new brain.
+Reward shaping is now CLI-tunable (`--survW`, `--scoreW`); network shape (`ARCH`) is near
+the top of `train.ts`, and the phases trained on default to all five.
 
 CLI flags: `--gens` generations, `--pop` population size, `--elite` elites kept,
 `--secs` episode length, `--dt` sim timestep (ms), `--eps` episodes averaged per
-candidate, `--sigma` initial exploration std.
+candidate, `--sigma` initial exploration std, `--survW`/`--scoreW` reward weights
+(survival-seconds × `survW` + score × `scoreW`), `--phases` comma-separated phase list.
+
+### Watch it train (live dashboard)
+
+Pass `--live` (optionally `--port=8787`) and `train.ts` starts a zero-dependency HTTP
+server (Node `http`, no framework) that serves `scripts/train-dashboard.html`. Open
+`http://localhost:8787` to watch, in real time:
+
+- **generation + candidate progress bars** and elapsed timer;
+- a **fitness chart** (all-time best / gen best / elite average over generations);
+- **per-phase survival + score** of the current best policy (re-evaluated each generation
+  across every phase);
+- **live heatmaps of the evolving network weights** (one per layer, diverging colormap).
+
+The dashboard polls `/progress` (JSON) every ~600ms. The CEM loop yields to the event
+loop after each candidate (`await setImmediate`) so the server stays responsive during a
+generation. The server keeps serving after training finishes (Ctrl-C to exit).
 
 ### Test
 

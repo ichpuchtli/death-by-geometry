@@ -10,6 +10,13 @@ export const PLAYER_SHIP_COLOR2: [number, number, number] = [0.05, 0.6, 0.05];
 export const PLAYER_SHIP_FILL_COLOR: [number, number, number] = [0.15, 0.8, 0.15];
 export const PLAYER_SHIP_FILL_ALPHA = 0.7;
 
+// --- AI Wingman (co-op ally driven by the trained policy — cyan, to contrast the green player) ---
+export const WINGMAN_SHIP_COLOR: [number, number, number] = [0.25, 0.9, 1.0];
+export const WINGMAN_SHIP_COLOR2: [number, number, number] = [0.1, 0.5, 0.65];
+export const WINGMAN_SHIP_FILL_COLOR: [number, number, number] = [0.2, 0.7, 0.95];
+export const WINGMAN_SHIP_FILL_ALPHA = 0.55;
+export const WINGMAN_SPAWN_OFFSET = 90; // px to the side of the player when it (re)spawns
+
 // --- Crosshair (desktop: at cursor, touch: near player) ---
 export const CROSSHAIR_SIZE = 14;           // distance from center to each chevron
 export const CROSSHAIR_CHEVRON_SIZE = 6;    // size of each individual chevron V

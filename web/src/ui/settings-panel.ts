@@ -53,6 +53,17 @@ const SLIDERS: SliderDef[] = [
   { key: 'resolutionScale', label: 'Resolution Scale', desc: 'Multiplier on device pixel ratio (2.0 = supersampling)', min: 0.25, max: 2.0, step: 0.25, format: v => `${v.toFixed(2)}x` },
 ];
 
+interface CheckboxDef {
+  key: keyof GameSettings;
+  label: string;
+  desc: string;
+}
+
+const CHECKBOXES: CheckboxDef[] = [
+  { key: 'vulnerableDuringSpawn', label: 'Kill During Spawn', desc: 'Enemies can be destroyed during spawn-in animation' },
+  { key: 'aiWingman', label: 'AI Wingman', desc: 'An AI ally (cyan ship) fights beside you. Toggle any time.' },
+];
+
 // Track all panel instances so Reset Defaults can sync them all
 const panelInstances: { panel: HTMLDivElement; valueDisplays: Record<string, HTMLSpanElement> }[] = [];
 
@@ -93,26 +104,27 @@ function buildSettingsPanel(): HTMLDivElement {
     panel.appendChild(row);
   }
 
-  // Vulnerable during spawn checkbox
-  {
+  // Checkboxes (boolean toggles)
+  for (const def of CHECKBOXES) {
     const row = document.createElement('div');
     row.className = 'sp-row sp-checkbox-row';
     const label = document.createElement('label');
     label.className = 'sp-checkbox-label';
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.checked = gameSettings.vulnerableDuringSpawn;
+    cb.dataset.key = def.key;
+    cb.checked = gameSettings[def.key] as boolean;
     cb.addEventListener('change', () => {
-      gameSettings.vulnerableDuringSpawn = cb.checked;
+      (gameSettings as unknown as Record<string, unknown>)[def.key] = cb.checked;
       saveSettings();
       syncAllPanels();
     });
     label.appendChild(cb);
-    label.appendChild(document.createTextNode(' Kill During Spawn'));
+    label.appendChild(document.createTextNode(' ' + def.label));
     row.appendChild(label);
     const desc = document.createElement('div');
     desc.className = 'sp-desc';
-    desc.textContent = 'Enemies can be destroyed during spawn-in animation';
+    desc.textContent = def.desc;
     row.appendChild(desc);
     panel.appendChild(row);
   }
@@ -181,10 +193,11 @@ function syncAllPanels(): void {
     selects.forEach(sel => {
       (sel as HTMLSelectElement).value = gameSettings.startingPhase;
     });
-    // Update checkboxes
+    // Update checkboxes (keyed by data-key so each toggle syncs to its own setting)
     const checkboxes = inst.panel.querySelectorAll('input[type="checkbox"]');
     checkboxes.forEach(cb => {
-      (cb as HTMLInputElement).checked = gameSettings.vulnerableDuringSpawn;
+      const key = (cb as HTMLInputElement).dataset.key as keyof GameSettings | undefined;
+      if (key) (cb as HTMLInputElement).checked = gameSettings[key] as boolean;
     });
     // Update sliders + value displays
     const inputs = inst.panel.querySelectorAll('input[type="range"]');

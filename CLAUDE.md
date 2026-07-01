@@ -90,6 +90,7 @@ web/src/
 ├── entities/
 │   ├── entity.ts               # Base Entity class
 │   ├── player.ts               # Player ship (movement, shooting, weapon progression)
+│   ├── wingman.ts              # AI co-op ally (trained policy drives a second ship beside the player)
 │   ├── bullet.ts               # BulletPool (object pooling) with `trailId` for lifecycle
 │   ├── explosion.ts            # ExplosionPool (line particles)
 │   ├── crosshair.ts            # Aim indicator (chevrons)
@@ -170,7 +171,7 @@ Bloom: ping-pong FBOs, half-res on mobile. Grid: own shader with gravity well un
 - Grid physics: anchor stiffness, damping, max displacement
 - GPU Stress: arena size (800–6400 × 500–4000), grid spacing/substeps/stiffness, bloom passes/threshold/radius
 - Camera: zoom scale (0.5–1.5)
-- Toggle: vulnerable during spawn
+- Toggles: vulnerable during spawn; **AI Wingman** (spawn an AI-controlled ally that fights beside you)
 
 ### AI Agent (self-playing bot)
 
@@ -182,7 +183,8 @@ testing and live demos. Full details in **`docs/AI_AGENT.md`**.
   - This is enabled by two refactors: renderer/GL classes (`Renderer`, `SpringMassGrid`, `Camera`, `AudioManager`, `ExplosionPool`, `HUD`) are imported with **`import type`** everywhere they're used only as types, so the headless import graph never loads a WebGL/GLSL module; and `Player` now depends on an **`InputSource`** interface (implemented by DOM `Input` and headless `ScriptedInput`).
 - **Policy** (`web/src/ai/policy.ts`): a small MLP (`[obs,24,16,4]`) with a pure-TS forward pass — no ML framework. Shared verbatim by trainer and browser; weights serialize to `trained-policy.json` (imported into the bundle).
 - **Observation** (`ai/observation.ts`): egocentric, order-invariant 16-sector "radar" (nearest-enemy proximity + closing speed per sector) + player pos/vel + wall clearances + nearest-enemy vector. **Action** (`ai/action.ts`): move vector + aim vector (fire always on).
-- **Train:** `cd web && npx tsx scripts/train.ts [--gens=30 --pop=40 --elite=8 --secs=25 --dt=33 --eps=2]`. Cross-Entropy Method: sample a population of weight vectors, score each by survival-time + score in the twin, refit the search distribution to the top elites. Writes/checkpoints `src/ai/trained-policy.json` each generation (~30s for a full run). `npx tsx scripts/eval.ts` prints survival/score vs a do-nothing baseline.
+- **Train:** `cd web && npx tsx scripts/train.ts [--gens=30 --pop=40 --elite=8 --secs=25 --dt=33 --eps=2 --survW=10 --scoreW=0.004 --phases=tutorial,rampUp,midGame,intense,chaos]`. Cross-Entropy Method: sample a population of weight vectors, score each by survival-time × `survW` + score × `scoreW` in the twin, refit the search distribution to the top elites. Writes/checkpoints `src/ai/trained-policy.json` each generation. `npx tsx scripts/eval.ts` prints survival/score vs a do-nothing baseline.
+- **Live training dashboard:** add `--live [--port=8787]` and `train.ts` starts a zero-dependency Node `http` server (serves `scripts/train-dashboard.html`) with real-time fitness chart, per-phase survival/score of the current best, generation/candidate progress, and evolving per-layer weight heatmaps. Polls `/progress` JSON ~600ms; CEM loop yields via `setImmediate` per candidate so the server stays responsive. See `docs/AI_AGENT.md`.
 
 ### Game States
 
@@ -243,6 +245,8 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 - Ominous supernova: **Complete** (1.5s destabilize telegraph with visual effects + rising drone audio, then massive 400-particle detonation with screen flash, 300ms hitstop, enhanced BH death audio with metallic ring layer)
 - Pause feature: **Complete** (Press P during gameplay to pause and show config panel; paused state freezes updates but preserves visuals)
 - AI agent (self-playing bot): **Complete** (neuroevolution-trained MLP policy plays live via B key / `?bot=1`. New `web/src/ai/` + `web/src/sim/` + `web/scripts/train.ts`,`eval.ts`. Enabled by: renderer/GL classes imported as `import type` so a headless import graph loads no WebGL/GLSL; `Player` depends on `InputSource` (DOM `Input` + headless `ScriptedInput`); `separateEnemies` extracted to `systems/separation.ts` shared by `Game` + twin. `window.game` exposed for test assertions. See `docs/AI_AGENT.md`. Flow test: `tests/flows/73-ai-agent-plays.yml`.)
+- Live training dashboard: **Complete** (`scripts/train.ts --live [--port=8787]` starts a zero-dependency Node `http` server rendering `scripts/train-dashboard.html`: real-time fitness chart, per-phase survival/score of current best, gen/candidate progress, evolving per-layer weight heatmaps. Reward now CLI-tunable via `--survW`/`--scoreW`; `--phases` selects training phases. CEM loop yields via `setImmediate` per candidate to keep the server responsive.)
+- AI Wingman (co-op ally): **Complete** (`web/src/entities/wingman.ts` — a standalone cyan ship driven by its own `Bot` (same trained policy), observing/acting from its own position. Enabled via the **AI Wingman** settings toggle (`gameSettings.aiWingman`, default off; toggle any time incl. pause menu — `Game.syncWingman()` creates/destroys it each frame). Bullets go into the shared `BulletPool` so kills score for the team; it reuses the player's weapon stage and is a non-colliding helper (can't be killed). Shows a "🤖 AI WINGMAN" badge. Settings panel now supports multiple checkboxes (data-driven `CHECKBOXES` keyed by `data-key`). Flow test: `tests/flows/74-ai-wingman.yml`.)
 - Phase 4 (Scores, Polish & Tuning): **Not started** — leaderboard, debug overlay, perf profiling
 
 ---

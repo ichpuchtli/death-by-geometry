@@ -39,6 +39,7 @@ export interface GameSettings {
   gridDamping: number;            // 1–20 (velocity damping)
   gridMaxDisplacement: number;    // 20–200 (max px displacement from rest)
   vulnerableDuringSpawn: boolean; // false = spawn invulnerability (default), true = can be shot during spawn
+  aiWingman: boolean;             // true = spawn an AI-controlled ally that fights beside the player
   // GPU Stress / Arena
   arenaWidth: number;             // 800–6400 (world width in px)
   arenaHeight: number;            // 500–4000 (world height in px)
@@ -73,6 +74,7 @@ export const DEFAULTS: GameSettings = {
   gridDamping: GRID_SPRING_DAMPING,
   gridMaxDisplacement: GRID_MAX_DISPLACEMENT,
   vulnerableDuringSpawn: false,
+  aiWingman: false,
   arenaWidth: WORLD_WIDTH,
   arenaHeight: WORLD_HEIGHT,
   gridSpacing: GRID_SPACING,

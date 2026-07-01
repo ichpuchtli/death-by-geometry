@@ -1,0 +1,87 @@
+name: "AI Wingman — co-op ally fights beside the player"
+tags: [ai, wingman, regression]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Enable the AI wingman. Gentle tutorial phase so the idle (headless) human player
+  # survives long enough for a stable assertion; the wingman is what fights.
+  - action: evalCheck
+    description: "Enable AI wingman via settings"
+    script: |
+      const s = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      s.aiWingman = true;
+      s.startingLives = 5;
+      s.startingPhase = 'tutorial';
+      s.spawnRateMultiplier = 1;
+      localStorage.setItem('gg_settings', JSON.stringify(s));
+      return true;
+
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Start the game (the human player, not the takeover bot) — press Space / click
+  - action: evalCheck
+    description: "Start a run"
+    script: |
+      window.game.onInteract();
+      return true;
+
+  # Let the scene populate
+  - action: wait
+    ms: 1500
+
+  # The wingman badge should be visible
+  - action: assertVisible
+    selector: "#wingman-badge"
+
+  # The wingman should exist, be active, and sit at its own position (not on top of the player)
+  - action: assertEval
+    description: "Wingman is spawned and active beside the player"
+    script: |
+      const g = window.game;
+      const w = g.wingman;
+      if (!w || !w.active) return false;
+      const dx = w.position.x - g.player.position.x;
+      const dy = w.position.y - g.player.position.y;
+      return (dx * dx + dy * dy) > 1; // occupies a distinct point
+
+  # Confirm the wingman is actually being driven — its position changes over time
+  - action: evalCheck
+    description: "Snapshot wingman position"
+    script: |
+      window.__wx = window.game.wingman.position.x;
+      window.__wy = window.game.wingman.position.y;
+      return true;
+
+  - action: wait
+    ms: 2500
+
+  - action: assertEval
+    description: "Wingman moved (AI is controlling it)"
+    script: |
+      const w = window.game.wingman;
+      const dx = w.position.x - window.__wx;
+      const dy = w.position.y - window.__wy;
+      return (dx * dx + dy * dy) > 4;
+
+  # The wingman is firing into the shared bullet pool. The headless human player never
+  # shoots (no mouse input), so any active bullet must be the wingman's — proving it fights.
+  - action: assertEval
+    description: "Wingman is firing (active bullets exist though the human is idle)"
+    script: |
+      const g = window.game;
+      return g.state === 'playing' && g.bullets.bullets.some(b => b.active);
+
+  - action: screenshot
+    name: "74-ai-wingman"
+
+  - action: assertNoErrors
