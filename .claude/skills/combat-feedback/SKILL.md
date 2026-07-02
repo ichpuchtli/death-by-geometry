@@ -16,11 +16,10 @@ Freezes gameplay simulation (enemies, bullets, spawner) while visuals keep runni
 
 ## Weapon Recoil / Muzzle Feedback
 
-Every player trigger pull produces weighty feedback (owned by `Game.update()` when `player.tryShoot()` returns shots):
+Every player trigger pull produces subtle, player-local feedback — **no camera shake** (an earlier camera-punch version was too jarring at the ~3/s cadence). Owned by `Game.update()` when `player.tryShoot()` returns shots:
 - **Audio:** `audio.playShoot(shots.length)` — procedural shotgun blast, beefier with more pellets (see audio-system skill).
-- **Ship recoil:** `player.kickRecoil(pellets)` displaces the ship backward along the **aim** vector and springs it back over `PLAYER_RECOIL_DECAY` (100ms). Kick distance = `PLAYER_RECOIL_BASE` (6px) + `PLAYER_RECOIL_PER_PELLET` (1.6) × (pellets−2). Applied in `Player.render()` via a decaying `recoilTimer` fraction (does not move the collision position, only the drawn ship).
-- **Muzzle flash:** a bright cyan-white 3-line burst blooms forward from the barrel while recoil is active; length = `PLAYER_MUZZLE_FLASH_LENGTH` (22px) + `PLAYER_MUZZLE_FLASH_PER_PELLET` (3) × (pellets−2), scaled by the recoil fraction. Rendered in the player's normal-blend pass; bloom makes it glow.
-- **Camera punch:** `camera.shake(SHOOT_SHAKE_BASE + SHOOT_SHAKE_PER_PELLET × (pellets−2), 0.08)` — a short kick that grows with pellet count.
+- **Ship recoil:** `player.kickRecoil(pellets)` nudges the ship backward along the **aim** vector and springs it back over `PLAYER_RECOIL_DECAY` (90ms). Kick distance = `PLAYER_RECOIL_BASE` (2.5px) + `PLAYER_RECOIL_PER_PELLET` (0.6) × (pellets−2). Applied in `Player.render()` via a decaying `recoilTimer` fraction (does not move the collision position, only the drawn ship).
+- **Muzzle flash:** a small cyan-white 3-line burst blooms forward from the barrel while recoil is active; length = `PLAYER_MUZZLE_FLASH_LENGTH` (12px) + `PLAYER_MUZZLE_FLASH_PER_PELLET` (1.5) × (pellets−2), scaled by the recoil fraction. Rendered in the player's normal-blend pass; bloom makes it glow.
 
 Only the player fires these cues; the AI wingman shares the bullet pool but is intentionally silent/recoil-free.
 

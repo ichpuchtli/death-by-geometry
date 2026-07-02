@@ -39,8 +39,6 @@ import {
   SCREEN_SHAKE_SMALL,
   SCREEN_SHAKE_LARGE,
   SCREEN_SHAKE_DEATH,
-  SHOOT_SHAKE_BASE,
-  SHOOT_SHAKE_PER_PELLET,
   ARENA_BORDER_COLOR,
   ARENA_BORDER_CORNER_COLOR,
   ARENA_BORDER_ALPHA,
@@ -645,11 +643,9 @@ export class Game {
           this.lifecycle.spawnBullet(b);
         }
       }
-      // Impact feedback: procedural blast (beefier with more pellets), ship recoil, camera punch.
+      // Impact feedback: procedural blast (beefier with more pellets) + a subtle ship recoil.
       this.audio.playShoot(shots.length);
       this.player.kickRecoil(shots.length);
-      const extra = Math.max(0, shots.length - 2);
-      this.camera.shake(SHOOT_SHAKE_BASE + extra * SHOOT_SHAKE_PER_PELLET, 0.08);
     }
 
     // AI wingman: an ally that observes + acts from its own position, sharing bullet pool + score
