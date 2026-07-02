@@ -1,5 +1,6 @@
 import { Game } from './game';
 import type { Gallery as GalleryType } from './gallery';
+import type { ThreatLab as ThreatLabType } from './threat-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -10,7 +11,8 @@ const hudCanvas = document.getElementById('hud') as HTMLCanvasElement;
 
 // Design Lab — Specimen Gallery: a standalone visual catalog of every ship/enemy/effect,
 // for screenshot-based visual review. Boots instead of the game when `?gallery=1` is set.
-if (new URLSearchParams(location.search).has('gallery')) {
+const bootParams = new URLSearchParams(location.search);
+if (bootParams.has('gallery')) {
   gameCanvas.style.cursor = 'default';
   import('./gallery').then(({ Gallery }) => {
     const gallery = new Gallery(gameCanvas);
@@ -24,6 +26,21 @@ if (new URLSearchParams(location.search).has('gallery')) {
       requestAnimationFrame(galleryLoop);
     }
     requestAnimationFrame(galleryLoop);
+  });
+} else if (bootParams.has('threat')) {
+  // Threat Lab — playable BlackHole threat-preset A/B arena (`?threat=1`)
+  import('./threat-lab').then(({ ThreatLab }) => {
+    const lab = new ThreatLab(gameCanvas);
+    (window as unknown as { threatLab: ThreatLabType }).threatLab = lab;
+    let last = performance.now();
+    function labLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(labLoop);
+    }
+    requestAnimationFrame(labLoop);
   });
 } else {
   bootGame();

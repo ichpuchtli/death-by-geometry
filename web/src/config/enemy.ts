@@ -115,6 +115,7 @@ export const SUPERNOVA_PARTICLE_COUNT = 400;
 export const SUPERNOVA_GRID_IMPULSE = 2500;
 export const SUPERNOVA_HITSTOP = 300;
 export const SUPERNOVA_FLASH_DURATION = 200; // ms
+export const SUPERNOVA_DESTABILIZE_MS = 1500; // warning window between destabilize and detonation
 
 // --- Circle (BlackHole supernova ejecta) ---
 export const CIRCLE_EJECT_SPEED_MIN = 0.35;       // px/ms min ejection speed

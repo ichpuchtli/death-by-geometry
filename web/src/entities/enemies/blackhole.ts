@@ -1,7 +1,7 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
 import type { Renderer } from '../../renderer/sprite-batch';
-import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_PALETTE } from '../../config';
+import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS } from '../../config';
 import { gameSettings } from '../../settings';
 
 export type BlackHoleVisualMode = 'dense' | 'haze' | 'corona' | 'molten';
@@ -42,6 +42,8 @@ export class BlackHole extends Enemy {
   overloaded = false;
   destabilizing = false;
   destabilizeTimer = 0;
+  /** Warning window (ms) between destabilize start and overload — tunable per-instance (Threat Lab presets). */
+  destabilizeDuration = SUPERNOVA_DESTABILIZE_MS;
 
   override hp = BLACKHOLE_HP;
   override maxHp = BLACKHOLE_HP;
@@ -161,7 +163,7 @@ export class BlackHole extends Enemy {
     // Destabilize countdown → overload
     if (this.destabilizing && !this.overloaded) {
       this.destabilizeTimer += dt;
-      if (this.destabilizeTimer >= 1500) {
+      if (this.destabilizeTimer >= this.destabilizeDuration) {
         this.overloaded = true;
       }
     }
@@ -601,7 +603,7 @@ export class BlackHole extends Enemy {
 
   /** Destabilize telegraph: pulsing, color shift, discharge arcs, warning ring */
   private renderDestabilize(renderer: Renderer): void {
-    const t = this.destabilizeTimer / 1500; // 0→1 over 1.5s
+    const t = Math.min(1, this.destabilizeTimer / this.destabilizeDuration); // 0→1 over the warning window
     const px = this.position.x;
     const py = this.position.y;
     const baseR = this.collisionRadius;

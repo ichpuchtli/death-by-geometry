@@ -1,0 +1,68 @@
+name: "Threat Lab — playable BlackHole threat presets with detonation variants"
+tags: [threat, blackhole, visual, regression]
+steps:
+  - action: launch
+    url: "/?threat=1"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 1200
+
+  - action: assertEval
+    description: "Threat Lab booted with 4 presets and an active BlackHole"
+    script: |
+      const lab = window.threatLab;
+      if (!lab) return false;
+      return lab.presets.length >= 4 && lab.bh && lab.bh.active;
+
+  - action: assertVisible
+    selector: "#threat-lab-overlay"
+
+  - action: screenshot
+    name: "77-threat-baseline"
+
+  # Switch to CATACLYSM (shortest warning) and force-feed to critical
+  - action: evalCheck
+    description: "Apply CATACLYSM preset and feed the BlackHole to critical mass"
+    script: |
+      const lab = window.threatLab;
+      lab.applyPreset(2);
+      lab.forceFeed();
+      return lab.bh.destabilizing === true;
+
+  # 350ms warning + detonation should have happened well within 1.5s
+  - action: wait
+    ms: 1500
+
+  - action: assertEval
+    description: "Detonation fired and emitted the chaos payload (circles + shards)"
+    script: |
+      const lab = window.threatLab;
+      const circles = lab.enemies.filter(e => e.active && e.family === 'circle').length;
+      return lab.detonationCount >= 1 && circles >= 10;
+
+  - action: screenshot
+    name: "77-threat-detonation"
+
+  # SINGULARITY: gravity strong enough to capture tracking rhombuses
+  - action: evalCheck
+    description: "Apply SINGULARITY preset"
+    script: |
+      window.threatLab.applyPreset(3);
+      return window.threatLab.preset.enemyPull >= 20;
+
+  # Let rhombuses spawn, track the player, and get dragged into the hole
+  - action: wait
+    ms: 12000
+
+  - action: assertEval
+    description: "SINGULARITY gravity captured tracking rhombuses (absorbed mass grew)"
+    script: |
+      const lab = window.threatLab;
+      const bh = lab.bh;
+      return (bh && bh.absorbedCount >= 1) || lab.detonationCount >= 2;
+
+  - action: screenshot
+    name: "77-threat-singularity"
+
+  - action: assertNoErrors

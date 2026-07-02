@@ -25,6 +25,18 @@ Use when working on sound effects, music, audio mixing, the ElevenLabs pipeline,
 
 - **Shoot:** `playShoot(pellets)` — procedural shotgun blast fired by `Game` each trigger pull (player only; the wingman is silent to avoid doubling). Three layers: a sine punch (220→48 Hz), a bandpassed noise crack (~1900→center scaled), and a short square-wave snap transient. `pellets` (2–6, = `shots.length`) is normalized `t=(pellets-2)/4`; higher `t` lowers pitch/center-freq and lengthens/loudens the blast, so a 6-pellet Hex Storm sounds beefier than a 2-pellet Twin. Short (~0.11–0.17s) and modest gain for the ~3/s cadence. Paired with ship recoil + camera punch (see combat-feedback skill).
 
+## Supernova / BlackHole SFX
+
+- `playBlackHoleDeath(absorbed)` — production detonation: sub-boom (80→20 Hz), bandpassed noise burst, descending tone-cluster tail, metallic ring layer. Scales with `absorbed/12` intensity.
+- `playSupernovaWarning(durationMs = 1500)` — rising sub-drone (30→50 Hz) + high whine; duration now **parameterized** to match `BlackHole.destabilizeDuration` (Threat Lab presets use 350–1500ms windows).
+- `playSupernovaVariant(variant, absorbed)` — detonation A/B variants for the Threat Lab (`?threat=1`); `SupernovaSoundVariant = 'classic' | 'subdrop' | 'doom' | 'quake'` exported from `core/audio.ts`:
+  - **classic** — delegates to `playBlackHoleDeath`
+  - **subdrop** — cinematic bass drop: kick transient (150→40 Hz) into a *saturated* 55→16 Hz sub with ~3s decay + bright air-crack noise. Saturation (tanh WaveShaper via `makeSaturator(amount)`) adds harmonics so the sub reads on laptop speakers.
+  - **doom** — distorted chaos: crushed square sub (42→22 Hz through lowpass + hard saturation), long crushed noise wall, 3 detuned sawtooth screams diving 800→90 Hz.
+  - **quake** — double-hit thunder: noise crack + 90→30 Hz thump, then a 350ms-delayed deeper aftershock (saturated 45→14 Hz) with a 6 Hz-tremolo rumble tail.
+- Private helpers: `makeSaturator(amount)` (soft-clip WaveShaper) and `makeNoiseSource(lenSec)`.
+- Whichever variant the user picks should replace/augment `playBlackHoleDeath` in the real detonation path (`GravitySystem`).
+
 ## Event SFX
 
 - **Phase transition:** `playPhaseTransition()` — rising sawtooth sweep + bass impact hit

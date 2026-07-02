@@ -109,6 +109,16 @@ Visual sandbox (press `D` from menu). 4 BH variants in 2x2 layout:
 - Circles are gravity-immune — they scatter and remain free after overload (don't get re-absorbed by other BHs)
 - `GameState` includes `'design_lab'`. `DesignLab` class in `design-lab.ts`.
 
+## Threat Lab (`?threat=1`)
+
+Playable BlackHole **threat tuning** arena (`web/src/threat-lab.ts`) — separate from the visual Design Lab. Boots instead of the game; real player ship + rhombus trickle tracking the player vs. one BlackHole. Used to A/B the *feel* dimensions the user flagged as non-threatening.
+- **Presets** (`THREAT_PRESETS`, keys 1-4): CURRENT (production baseline), DREADNOUGHT (HP 20, pull 14×2.5, 700ms warning, subdrop sound), CATACLYSM (350ms warning, 24 circles + 8 shards, 3 shockwave rings, doom sound), SINGULARITY (radius 700, pull 24×3 — captures tracking rhombuses within ~480px, quake sound).
+- Each preset bundles: `hp`, `maxAbsorb`, `attractRadius`, `enemyPull` + `corePullMult` (extra pull inside 40% of radius — the "inescapable core"), `playerPull`, `bulletBendMult`, `destabilizeMs`, `circlesPerMass` + `shardCount` payload, `particleMult`/`shockwaveRings`/`flashMs`/`shakeIntensity`, `sound` variant.
+- **Capture math:** gravity force = `enemyPull / dist` px/ms; Rhombus tracking speed is 0.15 px/ms, so capture radius ≈ `enemyPull × corePullMult / 0.15` px. Production pull 3 → captures only <20px (why it feels weak).
+- Keys: **E** feed to critical, **Q** detonate now, **A** cycle sound variant (independent of preset), **R** reset. `window.threatLab` exposed (`applyPreset(i)`, `forceFeed()`, `forceDetonate()`, `detonationCount`).
+- Engine support added: `BlackHole.destabilizeDuration` instance field (default `SUPERNOVA_DESTABILIZE_MS` = 1500 in `config/enemy.ts`) — warning window is now per-instance tunable. Flow test: `tests/flows/77-threat-lab.yml`.
+- **Chosen preset values should be ported into `GravitySystem`/config once the user picks** — the lab's gravity/detonation loop is intentionally lab-local so experiments don't alter the real game.
+
 ## Specimen Gallery (`?gallery=1`)
 
 Separate from the BlackHole Design Lab: a standalone **visual catalog** (`web/src/gallery.ts`) that boots instead of the game (via a `?gallery=1` branch in `index.ts`) and renders **every wired entity in one labeled grid** for screenshot-based visual review.

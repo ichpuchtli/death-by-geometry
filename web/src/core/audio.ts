@@ -1,5 +1,8 @@
 import { SFX_NAMES, SFXName, GENERATED_SFX, MASTER_VOLUME, SFX_VOLUME, MUSIC_VOLUME } from '../config';
 
+/** Supernova detonation sound variants — A/B tested in the Threat Lab (`?threat=1`). */
+export type SupernovaSoundVariant = 'classic' | 'subdrop' | 'doom' | 'quake';
+
 // ============================================================
 // AudioManager — SFX + Procedural Music
 // ============================================================
@@ -812,39 +815,260 @@ export class AudioManager {
     ring.stop(now + 2.7);
   }
 
-  /** Supernova warning: rising sub-bass drone + high whine (1.5s) */
-  playSupernovaWarning(): void {
+  /** Supernova warning: rising sub-bass drone + high whine. Duration matches the destabilize window. */
+  playSupernovaWarning(durationMs: number = 1500): void {
     if (!this._initialized || !this.ctx || !this.sfxGain) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
+    const dur = Math.max(0.2, durationMs / 1000);
 
-    // 1. Sub-bass drone: 30Hz rising to 50Hz over 1.5s
+    // 1. Sub-bass drone: 30Hz rising to 50Hz over the warning window
     const drone = ctx.createOscillator();
     drone.type = 'sine';
     drone.frequency.setValueAtTime(30, now);
-    drone.frequency.linearRampToValueAtTime(50, now + 1.5);
+    drone.frequency.linearRampToValueAtTime(50, now + dur);
     const droneGain = ctx.createGain();
     droneGain.gain.setValueAtTime(0.1, now);
-    droneGain.gain.linearRampToValueAtTime(0.5, now + 1.2);
-    droneGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+    droneGain.gain.linearRampToValueAtTime(0.5, now + dur * 0.8);
+    droneGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
     drone.connect(droneGain);
     droneGain.connect(this.sfxGain);
     drone.start(now);
-    drone.stop(now + 1.6);
+    drone.stop(now + dur + 0.1);
 
     // 2. High whine: 3kHz rising to 5kHz
     const whine = ctx.createOscillator();
     whine.type = 'sine';
     whine.frequency.setValueAtTime(3000, now);
-    whine.frequency.exponentialRampToValueAtTime(5000, now + 1.5);
+    whine.frequency.exponentialRampToValueAtTime(5000, now + dur);
     const whineGain = ctx.createGain();
     whineGain.gain.setValueAtTime(0.02, now);
-    whineGain.gain.linearRampToValueAtTime(0.12, now + 1.3);
-    whineGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+    whineGain.gain.linearRampToValueAtTime(0.12, now + dur * 0.87);
+    whineGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
     whine.connect(whineGain);
     whineGain.connect(this.sfxGain);
     whine.start(now);
-    whine.stop(now + 1.6);
+    whine.stop(now + dur + 0.1);
+  }
+
+  /** Soft-clip waveshaper for adding harmonic saturation — makes sub-bass audible on small speakers. */
+  private makeSaturator(amount: number): WaveShaperNode {
+    const ctx = this.ctx!;
+    const shaper = ctx.createWaveShaper();
+    const n = 256;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      curve[i] = Math.tanh(x * amount) / Math.tanh(amount);
+    }
+    shaper.curve = curve;
+    return shaper;
+  }
+
+  private makeNoiseSource(lenSec: number): AudioBufferSourceNode {
+    const ctx = this.ctx!;
+    const buf = ctx.createBuffer(1, (ctx.sampleRate * lenSec) | 0, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    return src;
+  }
+
+  /**
+   * Supernova detonation sound variants (Threat Lab A/B testing):
+   * - 'classic'  — current production sound (playBlackHoleDeath)
+   * - 'subdrop'  — cinematic bass drop: saturated 55→16Hz sub with a kick transient, long clean decay
+   * - 'doom'     — distorted chaos: crushed square sub + heavy noise wall + detuned scream cluster
+   * - 'quake'    — double-hit thunder: sharp crack, then a delayed deeper aftershock with tremolo rumble
+   */
+  playSupernovaVariant(variant: SupernovaSoundVariant, absorbed: number): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    switch (variant) {
+      case 'classic': this.playBlackHoleDeath(absorbed); break;
+      case 'subdrop': this.playSupernovaSubdrop(absorbed); break;
+      case 'doom': this.playSupernovaDoom(absorbed); break;
+      case 'quake': this.playSupernovaQuake(absorbed); break;
+    }
+  }
+
+  private playSupernovaSubdrop(absorbed: number): void {
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+    const intensity = Math.min(absorbed / 12, 1);
+
+    // Kick transient: fast 150→40Hz punch so the drop has an attack edge
+    const kick = ctx.createOscillator();
+    kick.type = 'sine';
+    kick.frequency.setValueAtTime(150, now);
+    kick.frequency.exponentialRampToValueAtTime(40, now + 0.12);
+    const kickGain = ctx.createGain();
+    kickGain.gain.setValueAtTime(0.9, now);
+    kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    kick.connect(kickGain);
+    kickGain.connect(this.sfxGain!);
+    kick.start(now);
+    kick.stop(now + 0.2);
+
+    // The drop: saturated sub sine 55→16Hz, long decay. Saturation adds harmonics
+    // so the sub reads as WEIGHT even on laptop speakers.
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(55, now + 0.02);
+    sub.frequency.exponentialRampToValueAtTime(16, now + 1.4);
+    const sat = this.makeSaturator(3.5);
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(1.0 + intensity * 0.2, now + 0.02);
+    subGain.gain.setValueAtTime(1.0 + intensity * 0.2, now + 0.6);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 3.0 + intensity);
+    sub.connect(sat);
+    sat.connect(subGain);
+    subGain.connect(this.sfxGain!);
+    sub.start(now + 0.02);
+    sub.stop(now + 3.2 + intensity);
+
+    // Air crack: brief bright noise so the low end feels like it displaced something
+    const crack = this.makeNoiseSource(0.35);
+    const crackHP = ctx.createBiquadFilter();
+    crackHP.type = 'highpass';
+    crackHP.frequency.value = 900;
+    const crackGain = ctx.createGain();
+    crackGain.gain.setValueAtTime(0.5, now);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    crack.connect(crackHP);
+    crackHP.connect(crackGain);
+    crackGain.connect(this.sfxGain!);
+    crack.start(now);
+  }
+
+  private playSupernovaDoom(absorbed: number): void {
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+    const intensity = Math.min(absorbed / 12, 1);
+
+    // Crushed square sub: 42→22Hz through lowpass + hard saturation = distorted engine-of-hell bass
+    const sub = ctx.createOscillator();
+    sub.type = 'square';
+    sub.frequency.setValueAtTime(42, now);
+    sub.frequency.exponentialRampToValueAtTime(22, now + 2.0);
+    const subLP = ctx.createBiquadFilter();
+    subLP.type = 'lowpass';
+    subLP.frequency.setValueAtTime(320, now);
+    subLP.frequency.exponentialRampToValueAtTime(70, now + 2.5);
+    const sat = this.makeSaturator(6);
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0.9 + intensity * 0.2, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 3.5 + intensity);
+    sub.connect(subLP);
+    subLP.connect(sat);
+    sat.connect(subGain);
+    subGain.connect(this.sfxGain!);
+    sub.start(now);
+    sub.stop(now + 3.7 + intensity);
+
+    // Noise wall: long crushed lowpassed noise — chaos bed
+    const wall = this.makeNoiseSource(2.2);
+    const wallLP = ctx.createBiquadFilter();
+    wallLP.type = 'lowpass';
+    wallLP.frequency.setValueAtTime(1400, now);
+    wallLP.frequency.exponentialRampToValueAtTime(120, now + 2.2);
+    const wallSat = this.makeSaturator(4);
+    const wallGain = ctx.createGain();
+    wallGain.gain.setValueAtTime(0.7 + intensity * 0.2, now);
+    wallGain.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+    wall.connect(wallLP);
+    wallLP.connect(wallSat);
+    wallSat.connect(wallGain);
+    wallGain.connect(this.sfxGain!);
+    wall.start(now);
+
+    // Detuned scream cluster: 3 sawtooths diving 800→90Hz, slightly detuned = dissonant wail
+    for (let i = 0; i < 3; i++) {
+      const scream = ctx.createOscillator();
+      scream.type = 'sawtooth';
+      scream.frequency.setValueAtTime(800 * (1 + i * 0.013), now);
+      scream.frequency.exponentialRampToValueAtTime(90, now + 1.6);
+      const sGain = ctx.createGain();
+      sGain.gain.setValueAtTime(0.09, now);
+      sGain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+      scream.connect(sGain);
+      sGain.connect(this.sfxGain!);
+      scream.start(now + i * 0.015);
+      scream.stop(now + 2.0);
+    }
+  }
+
+  private playSupernovaQuake(absorbed: number): void {
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+    const intensity = Math.min(absorbed / 12, 1);
+
+    // Hit 1 — the crack: bright noise snap + fast 90→30Hz thump
+    const crack = this.makeNoiseSource(0.25);
+    const crackBP = ctx.createBiquadFilter();
+    crackBP.type = 'bandpass';
+    crackBP.frequency.value = 2400;
+    crackBP.Q.value = 0.8;
+    const crackGain = ctx.createGain();
+    crackGain.gain.setValueAtTime(0.65, now);
+    crackGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    crack.connect(crackBP);
+    crackBP.connect(crackGain);
+    crackGain.connect(this.sfxGain!);
+    crack.start(now);
+
+    const thump = ctx.createOscillator();
+    thump.type = 'sine';
+    thump.frequency.setValueAtTime(90, now);
+    thump.frequency.exponentialRampToValueAtTime(30, now + 0.25);
+    const thumpGain = ctx.createGain();
+    thumpGain.gain.setValueAtTime(0.8, now);
+    thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    thump.connect(thumpGain);
+    thumpGain.connect(this.sfxGain!);
+    thump.start(now);
+    thump.stop(now + 0.4);
+
+    // Hit 2 (350ms later) — the aftershock: deeper, bigger, saturated 45→14Hz
+    const t2 = now + 0.35;
+    const shock = ctx.createOscillator();
+    shock.type = 'sine';
+    shock.frequency.setValueAtTime(45, t2);
+    shock.frequency.exponentialRampToValueAtTime(14, t2 + 1.8);
+    const sat = this.makeSaturator(3);
+    const shockGain = ctx.createGain();
+    shockGain.gain.setValueAtTime(1.1 + intensity * 0.2, t2);
+    shockGain.gain.exponentialRampToValueAtTime(0.001, t2 + 3.2 + intensity);
+    shock.connect(sat);
+    sat.connect(shockGain);
+    shockGain.connect(this.sfxGain!);
+    shock.start(t2);
+    shock.stop(t2 + 3.4 + intensity);
+
+    // Rumble tail with 6Hz tremolo — ground still shaking
+    const rumble = this.makeNoiseSource(3.0);
+    const rumbleLP = ctx.createBiquadFilter();
+    rumbleLP.type = 'lowpass';
+    rumbleLP.frequency.value = 140;
+    const trem = ctx.createGain();
+    const lfo = ctx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 6;
+    const lfoDepth = ctx.createGain();
+    lfoDepth.gain.value = 0.3;
+    lfo.connect(lfoDepth);
+    lfoDepth.connect(trem.gain);
+    const rumbleGain = ctx.createGain();
+    rumbleGain.gain.setValueAtTime(0.6, t2);
+    rumbleGain.gain.exponentialRampToValueAtTime(0.001, t2 + 3.0);
+    trem.gain.setValueAtTime(0.7, t2);
+    rumble.connect(rumbleLP);
+    rumbleLP.connect(trem);
+    trem.connect(rumbleGain);
+    rumbleGain.connect(this.sfxGain!);
+    rumble.start(t2);
+    lfo.start(t2);
+    lfo.stop(t2 + 3.2);
   }
 
   /** Gravitational collapse — building low rumble + rising tension (~500ms) */
