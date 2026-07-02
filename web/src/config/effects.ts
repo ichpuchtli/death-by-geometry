@@ -7,6 +7,14 @@ export const EXPLOSION_DURATION_LARGE = 2.5;
 export const EXPLOSION_DURATION_DEATH = 5.0;
 export const EXPLOSION_POOL_SIZE = 60;
 
+// --- Directional death shatter (bullet momentum transfer) ---
+// When a bullet kills a unit, fragments fan FORWARD along the bullet's travel direction —
+// nothing flies back toward the shooter. Cone is the half-angle of the fan; side damping
+// is the fragment speed at the cone edge relative to dead-ahead.
+export const DEATH_FRAGMENT_CONE = 1.35;         // rad (±77°) — back hemisphere stays empty
+export const DEATH_FRAGMENT_SIDE_DAMPING = 0.45; // edge fragments move at 45% of forward speed
+export const DEATH_FRAGMENT_FORWARD_BOOST = 1.4; // overall speed-up vs radial (momentum carried in)
+
 // --- Camera ---
 export const CAMERA_LERP_SPEED = 0.08;
 export const SCREEN_SHAKE_SMALL = 5;

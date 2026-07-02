@@ -6,7 +6,15 @@ import { BULLET_COLLISION_RADIUS_ENEMY } from '../config';
 import { gameSettings } from '../settings';
 
 export interface CollisionResult {
-  killedEnemies: { enemy: Enemy; position: Vec2; color: [number, number, number]; scoreValue: number }[];
+  killedEnemies: {
+    enemy: Enemy;
+    position: Vec2;
+    color: [number, number, number];
+    scoreValue: number;
+    /** Impact direction (rad): the killing bullet's travel direction (or the enemy's own
+     *  momentum on contact kills). Death fragments fan forward along it. Undefined → radial. */
+    impactAngle?: number;
+  }[];
   playerHit: boolean;
 }
 
@@ -52,6 +60,8 @@ export function checkCollisions(
             position: e.position.clone(),
             color: e.color,
             scoreValue: e.scoreValue,
+            // Fragments inherit the bullet's momentum — shatter away from the shooter
+            impactAngle: Math.atan2(b.velocity.y, b.velocity.x),
           });
         }
         break;
@@ -70,11 +80,14 @@ export function checkCollisions(
         // Miniboss survives player collision — player dies, boss lives
         if (!e.isMiniboss) {
           e.active = false;
+          const speed2 = e.velocity.x * e.velocity.x + e.velocity.y * e.velocity.y;
           result.killedEnemies.push({
             enemy: e,
             position: e.position.clone(),
             color: e.color,
             scoreValue: 0, // no score for enemies that kill you
+            // Contact kill: fragments carry the enemy's own momentum through the player
+            impactAngle: speed2 > 0.0001 ? Math.atan2(e.velocity.y, e.velocity.x) : undefined,
           });
         }
         break;

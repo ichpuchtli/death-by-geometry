@@ -1,0 +1,65 @@
+name: "Directional shatter — kill fragments conserve bullet momentum"
+tags: [shatter, combat, regression]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  - action: wait
+    ms: 500
+
+  # Directional spawn: with direction=0 (east), every fragment must fly east-ish —
+  # ±77° cone means dir.x > 0 for ALL particles (nothing returns toward the shooter)
+  - action: assertEval
+    description: "Directional explosion confines all fragments to the forward cone"
+    script: |
+      const g = window.game;
+      g.explosions.spawn(9999, 9999, [1, 0, 0], 60, 1.0, 1, 0);
+      const e = g.explosions.explosions.find(x => x.active && x.position.x === 9999);
+      if (!e || e.particles.length !== 60) return false;
+      const allForward = e.particles.every(p => p.dir.x > 0);
+      // Forward fragments must also be faster than edge fragments on average
+      const fwd = e.particles.filter(p => Math.abs(Math.atan2(p.dir.y, p.dir.x)) < 0.3);
+      const edge = e.particles.filter(p => Math.abs(Math.atan2(p.dir.y, p.dir.x)) > 1.1);
+      const mag = ps => ps.reduce((s, p) => s + Math.hypot(p.dir.x, p.dir.y), 0) / Math.max(1, ps.length);
+      const momentumGradient = fwd.length === 0 || edge.length === 0 || mag(fwd) > mag(edge);
+      e.active = false;
+      return allForward && momentumGradient;
+
+  # Radial spawn (no direction) must still scatter both ways — regression guard
+  - action: assertEval
+    description: "Radial explosion still scatters in all directions"
+    script: |
+      const g = window.game;
+      g.explosions.spawn(9999, 9999, [1, 0, 0], 60, 1.0, 1);
+      const e = g.explosions.explosions.find(x => x.active && x.position.x === 9999);
+      if (!e) return false;
+      const left = e.particles.some(p => p.dir.x < 0);
+      const right = e.particles.some(p => p.dir.x > 0);
+      e.active = false;
+      return left && right;
+
+  # Live gameplay: auto-fire into the tutorial wave and screenshot the shatters
+  - action: keyPress
+    key: "f"
+    duration: 100
+
+  - action: mouseMove
+    x: 900
+    y: 300
+
+  - action: wait
+    ms: 6000
+
+  - action: screenshot
+    name: "79-directional-shatter"
+
+  - action: assertNoErrors

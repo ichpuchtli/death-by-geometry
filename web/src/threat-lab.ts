@@ -494,7 +494,7 @@ export class ThreatLab {
           }
         } else if (e.hit()) {
           e.active = false;
-          this.explosions.spawn(e.position.x, e.position.y, e.color, 12, 0.5);
+          this.explosions.spawn(e.position.x, e.position.y, e.color, 12, 0.5, 1, b.angle);
         }
         break;
       }

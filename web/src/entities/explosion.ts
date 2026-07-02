@@ -1,6 +1,11 @@
 import { Vec2 } from '../core/vector';
 import type { Renderer } from '../renderer/sprite-batch';
-import { EXPLOSION_POOL_SIZE } from '../config';
+import {
+  EXPLOSION_POOL_SIZE,
+  DEATH_FRAGMENT_CONE,
+  DEATH_FRAGMENT_SIDE_DAMPING,
+  DEATH_FRAGMENT_FORWARD_BOOST,
+} from '../config';
 
 interface Particle {
   dir: Vec2;
@@ -15,7 +20,7 @@ export class Explosion {
   duration = 1; // seconds
   speed = 1;
 
-  init(x: number, y: number, color: [number, number, number], count: number, duration: number, speed: number = 1): void {
+  init(x: number, y: number, color: [number, number, number], count: number, duration: number, speed: number = 1, direction?: number): void {
     this.position.set(x, y);
     this.color = color;
     this.duration = duration;
@@ -29,12 +34,27 @@ export class Explosion {
     }
     // Reinitialize directions
     for (let i = 0; i < count; i++) {
-      const r = Vec2.random();
-      // Add some variance
-      this.particles[i].dir.set(
-        (r.x + (Math.random() - 0.5)) * (0.5 + Math.random()),
-        (r.y + (Math.random() - 0.5)) * (0.5 + Math.random()),
-      );
+      if (direction === undefined) {
+        // Radial burst (stored-energy detonation)
+        const r = Vec2.random();
+        this.particles[i].dir.set(
+          (r.x + (Math.random() - 0.5)) * (0.5 + Math.random()),
+          (r.y + (Math.random() - 0.5)) * (0.5 + Math.random()),
+        );
+      } else {
+        // Momentum-conserving shatter: fragments fan forward along the impact
+        // direction. Triangular spread concentrates mass near the axis, speed
+        // falls off toward the cone edge, and the back hemisphere gets nothing.
+        const spread = (Math.random() + Math.random() - 1) * DEATH_FRAGMENT_CONE;
+        const align = Math.cos(spread); // 1 dead-ahead → ~0.22 at the cone edge
+        const mag = (0.5 + Math.random())
+          * (DEATH_FRAGMENT_SIDE_DAMPING + (1 - DEATH_FRAGMENT_SIDE_DAMPING) * align)
+          * DEATH_FRAGMENT_FORWARD_BOOST;
+        this.particles[i].dir.set(
+          Math.cos(direction + spread) * mag,
+          Math.sin(direction + spread) * mag,
+        );
+      }
     }
     this.particles.length = count;
   }
@@ -123,10 +143,11 @@ export class ExplosionPool {
     }
   }
 
-  spawn(x: number, y: number, color: [number, number, number], count: number, duration: number, speed: number = 1): void {
+  /** `direction` (rad, optional): impact direction — fragments fan forward instead of radially */
+  spawn(x: number, y: number, color: [number, number, number], count: number, duration: number, speed: number = 1, direction?: number): void {
     for (const e of this.explosions) {
       if (!e.active) {
-        e.init(x, y, color, count, duration, speed);
+        e.init(x, y, color, count, duration, speed, direction);
         return;
       }
     }

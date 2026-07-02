@@ -23,9 +23,18 @@ Every player trigger pull produces subtle, player-local feedback — **no camera
 
 Only the player fires these cues; the AI wingman shares the bullet pool but is intentionally silent/recoil-free.
 
+## Directional Death Shatter (bullet momentum)
+
+Kill fragments **conserve the killing bullet's momentum**: `collision.ts` records `impactAngle` (bullet travel direction) on each `killedEnemies` entry; contact kills use the enemy's own velocity instead. `Explosion.init()` accepts an optional `direction` — when set, fragments fan **forward** in a triangular-distribution cone (`DEATH_FRAGMENT_CONE` 1.35 rad ≈ ±77°) with speed falling to `DEATH_FRAGMENT_SIDE_DAMPING` (0.45) at the edge and an overall `DEATH_FRAGMENT_FORWARD_BOOST` (1.4). **Nothing flies back toward the shooter.** Config in `config/effects.ts`.
+
+- Directional: regular unit kills (default family, pinwheel, sierpinski T1/T2), Threat Lab bullet kills.
+- Radial (stored-energy detonations dwarf bullet momentum): Mandelbrot, BlackHole, Sierpinski T0 boss, supernovae, player death.
+- Kill-signature rays follow the same forward fan on bullet kills (`spawnKillSignature(..., direction)`).
+- Flow test: `tests/flows/79-directional-shatter.yml` (property-checks the cone + speed gradient on live particle data).
+
 ## Kill Signatures
 
-Per-enemy-family death VFX rendered in additive blend pass (`KillEffect` array in `CombatSystem`; family read from `enemy.family`):
+Per-enemy-family death VFX rendered in additive blend pass (`KillEffect` array in `CombatSystem`; family read from `enemy.family`). On bullet kills the ray angles fan forward along the impact direction instead of the full circle (bosses stay radial):
 - **Rhombus:** crystal burst with narrow rays + white tips
 - **Square:** chunky rotating fragment outlines
 - **Pinwheel:** spark spiral with rotating particles + bright tips

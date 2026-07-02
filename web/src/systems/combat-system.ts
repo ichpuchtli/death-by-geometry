@@ -17,6 +17,7 @@ import { Vec2 } from '../core/vector';
 import { EnemyType } from '../spawner/spawn-patterns';
 import {
   EXPLOSION_PARTICLE_COUNT_SMALL,
+  DEATH_FRAGMENT_CONE,
   EXPLOSION_PARTICLE_COUNT_LARGE,
   EXPLOSION_PARTICLE_COUNT_DEATH,
   EXPLOSION_DURATION_DEFAULT,
@@ -128,8 +129,12 @@ export class CombatSystem {
         kill.enemy.parent.onMinionDeath();
       }
 
+      // Impact direction: bullet momentum drives the shatter for regular units.
+      // Boss/BlackHole deaths stay radial — their stored energy dwarfs a bullet.
+      const dir = kill.impactAngle;
+
       // Kill signature
-      this.spawnKillSignature(kill.position.x, kill.position.y, kill.color, family, isEliteKill);
+      this.spawnKillSignature(kill.position.x, kill.position.y, kill.color, family, isEliteKill, dir);
       if (family === 'mandelbrot') {
         this.deps.audio.playMinibossDeath();
       } else {
@@ -214,11 +219,11 @@ export class CombatSystem {
           } else if (sTier === 1) {
             this.deps.explosions.spawn(
               kill.position.x, kill.position.y, kill.color,
-              this.mobile ? 40 : 80, EXPLOSION_DURATION_DEFAULT,
+              this.mobile ? 40 : 80, EXPLOSION_DURATION_DEFAULT, 1, dir,
             );
             this.deps.explosions.spawn(
               kill.position.x, kill.position.y, [1, 0.9, 0.3],
-              this.mobile ? 20 : 40, EXPLOSION_DURATION_DEFAULT * 0.7,
+              this.mobile ? 20 : 40, EXPLOSION_DURATION_DEFAULT * 0.7, 1, dir,
             );
             this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 500, 220);
             this.deps.camera.shake(SCREEN_SHAKE_LARGE);
@@ -226,7 +231,7 @@ export class CombatSystem {
           } else {
             this.deps.explosions.spawn(
               kill.position.x, kill.position.y, kill.color,
-              this.mobile ? 25 : 50, EXPLOSION_DURATION_DEFAULT * 0.8,
+              this.mobile ? 25 : 50, EXPLOSION_DURATION_DEFAULT * 0.8, 1, dir,
             );
             this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 350, 150);
           }
@@ -235,7 +240,7 @@ export class CombatSystem {
         case 'pinwheel': {
           this.deps.explosions.spawn(
             kill.position.x, kill.position.y, kill.color,
-            this.mobile ? 30 : 60, EXPLOSION_DURATION_DEFAULT * 0.8, 1.3,
+            this.mobile ? 30 : 60, EXPLOSION_DURATION_DEFAULT * 0.8, 1.3, dir,
           );
           this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 350, 180);
           break;
@@ -244,7 +249,7 @@ export class CombatSystem {
           this.deps.explosions.spawn(
             kill.position.x, kill.position.y, kill.color,
             this.mobile ? Math.floor(EXPLOSION_PARTICLE_COUNT_SMALL * 0.6) : EXPLOSION_PARTICLE_COUNT_SMALL,
-            EXPLOSION_DURATION_DEFAULT,
+            EXPLOSION_DURATION_DEFAULT, 1, dir,
           );
           this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 400, 200);
           break;
@@ -442,34 +447,40 @@ export class CombatSystem {
 
   private spawnKillSignature(
     x: number, y: number, color: [number, number, number],
-    family: string, isElite = false,
+    family: string, isElite = false, direction?: number,
   ): void {
     if (family === 'rhombus' || family === 'pinwheel' || family === 'sierpinski' || family === 'mandelbrot') {
-      const angles: number[] = [];
       const baseCount = family === 'pinwheel' ? 8 : KILL_SIG_RAY_COUNT;
       const count = isElite ? Math.floor(baseCount * 1.5) : baseCount;
-      const baseAngle = Math.random() * Math.PI * 2;
-      for (let i = 0; i < count; i++) {
-        angles.push(baseAngle + (i / count) * Math.PI * 2);
-      }
+      // Bullet kills: rays fan forward with the fragments (momentum). Bosses stay radial.
+      const fan = direction !== undefined && family !== 'mandelbrot';
+      const rayAngles = (phaseOffset: number): number[] => {
+        const angles: number[] = [];
+        for (let i = 0; i < count; i++) {
+          if (fan) {
+            const t = count === 1 ? 0.5 : i / (count - 1);
+            angles.push(direction! + (t - 0.5) * 2 * DEATH_FRAGMENT_CONE + phaseOffset * 0.5 + (Math.random() - 0.5) * 0.12);
+          } else {
+            angles.push(phaseOffset + (i / count) * Math.PI * 2);
+          }
+        }
+        return angles;
+      };
+      const baseAngle = fan ? 0 : Math.random() * Math.PI * 2;
       this.killEffects.push({
         x, y,
         color: isElite ? [1, 1, 0.7] : color,
         family,
         elapsed: 0,
         duration: isElite ? KILL_SIG_DURATION * 1.3 : KILL_SIG_DURATION,
-        angles,
+        angles: rayAngles(baseAngle),
       });
       if (isElite) {
-        const outerAngles: number[] = [];
-        for (let i = 0; i < count; i++) {
-          outerAngles.push(baseAngle + Math.PI / count + (i / count) * Math.PI * 2);
-        }
         this.killEffects.push({
           x, y, color, family,
           elapsed: 0,
           duration: KILL_SIG_DURATION * 1.5,
-          angles: outerAngles,
+          angles: rayAngles(baseAngle + Math.PI / count),
         });
       }
     }
