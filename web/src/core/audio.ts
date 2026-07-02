@@ -94,6 +94,68 @@ export class AudioManager {
     await Promise.all(promises);
   }
 
+  /**
+   * Procedural shotgun blast for the player's weapon. `pellets` is how many parallel
+   * bullets went out this trigger pull (2–6). More pellets → a lower, beefier, wider
+   * boom; fewer → a tight snappy crack. Short (~0.12s) and modest volume so the ~3/s
+   * cadence never fatigues.
+   */
+  playShoot(pellets: number): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const t = Math.max(0, Math.min(1, (pellets - 2) / 4)); // 2→0 .. 6→1
+    const dur = 0.11 + t * 0.06;
+
+    // 1. Punch — sine thump that drops in pitch; deeper with more pellets
+    const thump = ctx.createOscillator();
+    thump.type = 'sine';
+    const startF = 220 - t * 70; // 220 → 150 Hz
+    thump.frequency.setValueAtTime(startF, now);
+    thump.frequency.exponentialRampToValueAtTime(48, now + dur);
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.26 + t * 0.14, now);
+    tg.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.03);
+    thump.connect(tg);
+    tg.connect(this.sfxGain);
+    thump.start(now);
+    thump.stop(now + dur + 0.06);
+
+    // 2. Crack — bandpassed noise burst; center drops (beefier) with more pellets
+    const nlen = dur;
+    const nbuf = ctx.createBuffer(1, (ctx.sampleRate * nlen) | 0, ctx.sampleRate);
+    const nd = nbuf.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = nbuf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    const cf = 1900 - t * 950; // 1900 → 950 Hz
+    bp.frequency.setValueAtTime(cf, now);
+    bp.frequency.exponentialRampToValueAtTime(cf * 0.4, now + nlen);
+    bp.Q.value = 1 + t * 1.5;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.16 + t * 0.1, now);
+    ng.gain.exponentialRampToValueAtTime(0.001, now + nlen);
+    noise.connect(bp);
+    bp.connect(ng);
+    ng.connect(this.sfxGain);
+    noise.start(now);
+
+    // 3. Snap transient — a tiny high click for the attack edge
+    const click = ctx.createOscillator();
+    click.type = 'square';
+    click.frequency.setValueAtTime(520 - t * 120, now);
+    click.frequency.exponentialRampToValueAtTime(180, now + 0.03);
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.09, now);
+    cg.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    click.connect(cg);
+    cg.connect(this.sfxGain);
+    click.start(now);
+    click.stop(now + 0.05);
+  }
+
   /** Play the game over transition sound */
   playGameOver(): void {
     if (!this._initialized || !this.ctx || !this.sfxGain) return;

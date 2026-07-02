@@ -21,6 +21,10 @@ Use when working on sound effects, music, audio mixing, the ElevenLabs pipeline,
 - **Sierpinski:** layered fractal tones (3 descending triangle waves at 880/660/440 Hz)
 - **BlackHole:** existing procedural explosion (`playBlackHoleDeath`)
 
+## Weapon SFX
+
+- **Shoot:** `playShoot(pellets)` — procedural shotgun blast fired by `Game` each trigger pull (player only; the wingman is silent to avoid doubling). Three layers: a sine punch (220→48 Hz), a bandpassed noise crack (~1900→center scaled), and a short square-wave snap transient. `pellets` (2–6, = `shots.length`) is normalized `t=(pellets-2)/4`; higher `t` lowers pitch/center-freq and lengthens/loudens the blast, so a 6-pellet Hex Storm sounds beefier than a 2-pellet Twin. Short (~0.11–0.17s) and modest gain for the ~3/s cadence. Paired with ship recoil + camera punch (see combat-feedback skill).
+
 ## Event SFX
 
 - **Phase transition:** `playPhaseTransition()` — rising sawtooth sweep + bass impact hit

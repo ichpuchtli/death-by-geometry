@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Korma Drumsticks — Interactive Recipe</title>
+  <style>
+    :root {
+      --bg: #fff8f0;
+      --spice: #d35400;
+      --cream: #fdebd0;
+      --sauce: #c1762e;
+      --dark: #3e2723;
+      --accent: #27ae60;
+      --pan: #2c3e50;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    header {
+      text-align: center;
+      padding: 1.5rem 1rem 0.5rem;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      margin: 0;
+      color: var(--spice);
+    }
+
+    p.subtitle {
+      margin: 0.3rem 0 0;
+      font-size: 1.05rem;
+      opacity: 0.8;
+    }
+
+    .stage {
+      text-align: center;
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 1rem 0 0.5rem;
+      min-height: 2rem;
+      color: var(--spice);
+    }
+
+    .kitchen {
+      position: relative;
+      width: min(90vw, 420px);
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+    }
+
+    .counter {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 60%, #fff 0%, var(--cream) 70%);
+      border-radius: 50%;
+      box-shadow: inset 0 0 40px rgba(211, 84, 0, 0.12);
+    }
+
+    .pan {
+      position: absolute;
+      width: 70%;
+      height: 70%;
+      left: 15%;
+      top: 18%;
+      background: radial-gradient(circle at 45% 40%, #4a5a6a 0%, var(--pan) 60%);
+      border-radius: 50%;
+      box-shadow:
+        0 20px 40px rgba(0,0,0,0.25),
+        inset 0 8px 20px rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+
+    .pan::after {
+      content: "";
+      position: absolute;
+      width: 28%;
+      height: 14%;
+      background: linear-gradient(90deg, #1a252f, #2c3e50);
+      right: -22%;
+      top: 43%;
+      border-radius: 0 12px 12px 0;
+      transform: rotate(8deg);
+    }
+
+    .sauce {
+      position: absolute;
+      width: 84%;
+      height: 84%;
+      left: 8%;
+      top: 8%;
+      background: var(--sauce);
+      border-radius: 50%;
+      opacity: 0;
+      transform: scale(0.85);
+      transition: all 0.6s ease;
+      box-shadow: inset 0 -20px 30px rgba(100, 50, 10, 0.3);
+    }
+
+    .sauce.bubbling {
+      animation: bubble 2s infinite ease-in-out;
+    }
+
+    @keyframes bubble {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    .bubble {
+      position: absolute;
+      background: rgba(255,255,255,0.35);
+      border-radius: 50%;
+      opacity: 0;
+    }
+
+    .drumstick {
+      position: absolute;
+      width: 22%;
+      height: 38%;
+      font-size: clamp(2rem, 8vw, 4rem);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 5;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+    }
+
+    .drumstick.seared {
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25)) brightness(0.85) sepia(0.3);
+    }
+
+    .ingredient {
+      position: absolute;
+      font-size: clamp(1.4rem, 5vw, 2.4rem);
+      transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    .herb {
+      position: absolute;
+      font-size: 1.2rem;
+      opacity: 0;
+      transition: opacity 0.5s;
+      z-index: 7;
+    }
+
+    .steam {
+      position: absolute;
+      width: 14%;
+      height: 22%;
+      background: radial-gradient(ellipse at center, rgba(255,255,255,0.55) 0%, transparent 70%);
+      border-radius: 50%;
+      opacity: 0;
+      z-index: 8;
+      pointer-events: none;
+    }
+
+    .steam.rise {
+      animation: rise 2.2s infinite ease-in;
+    }
+
+    @keyframes rise {
+      0% { transform: translateY(0) scaleX(1); opacity: 0; }
+      20% { opacity: 0.6; }
+      100% { transform: translateY(-90px) scaleX(1.6); opacity: 0; }
+    }
+
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      margin: 1rem 0;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      padding: 0.75rem 1.4rem;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+
+    button:active { transform: scale(0.96); }
+
+    .btn-primary {
+      background: var(--spice);
+      color: white;
+      box-shadow: 0 6px 0 #a04000;
+    }
+
+    .btn-primary:hover { box-shadow: 0 8px 0 #a04000; transform: translateY(-2px); }
+
+    .btn-secondary {
+      background: var(--cream);
+      color: var(--dark);
+      box-shadow: 0 4px 0 #e6cbb0;
+    }
+
+    .btn-secondary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: 0 4px 0 #e6cbb0;
+    }
+
+    .progress {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 1rem;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ddd;
+      transition: background 0.3s;
+    }
+
+    .dot.active { background: var(--spice); }
+    .dot.done { background: var(--accent); }
+
+    .recipe-card {
+      background: white;
+      width: min(90vw, 560px);
+      border-radius: 18px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    }
+
+    .recipe-card h2 {
+      margin: 0 0 0.6rem;
+      font-size: 1.2rem;
+      color: var(--spice);
+    }
+
+    .recipe-card ul {
+      margin: 0 0 0.8rem;
+      padding-left: 1.2rem;
+      line-height: 1.6;
+    }
+
+    .recipe-card li.done { text-decoration: line-through; opacity: 0.5; }
+
+    .tip {
+      background: var(--cream);
+      border-left: 4px solid var(--spice);
+      padding: 0.75rem 1rem;
+      border-radius: 0 10px 10px 0;
+      font-size: 0.95rem;
+    }
+
+    .floating-emoji {
+      position: fixed;
+      font-size: 1.8rem;
+      pointer-events: none;
+      animation: floatUp 1.2s ease-out forwards;
+      z-index: 100;
+    }
+
+    @keyframes floatUp {
+      0% { transform: translateY(0) scale(0.6); opacity: 1; }
+      100% { transform: translateY(-80px) scale(1.2); opacity: 0; }
+    }
+
+    .timer {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: var(--spice);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🍗 Quick Korma Drumsticks</h1>
+    <p class="subtitle">Click <strong>Cook Next Step</strong> and watch dinner come together.</p>
+  </header>
+
+  <div class="progress" id="progress"></div>
+  <div class="stage" id="stage">Ready to cook?</div>
+
+  <div class="kitchen" id="kitchen">
+    <div class="counter"></div>
+    <div class="pan">
+      <div class="sauce" id="sauce"></div>
+    </div>
+
+    <!-- Drumsticks start off-pan -->
+    <div class="drumstick" id="d1" style="left: -18%; top: 10%; transform: rotate(-30deg);">🍗</div>
+    <div class="drumstick" id="d2" style="left: 48%; top: -22%; transform: rotate(10deg);">🍗</div>
+    <div class="drumstick" id="d3" style="left: 108%; top: 30%; transform: rotate(50deg);">🍗</div>
+
+    <!-- Ingredients -->
+    <div class="ingredient" id="onion" style="left: 20%; top: 108%; transform: scale(0);">🧅</div>
+    <div class="ingredient" id="garlic" style="left: 45%; top: 115%; transform: scale(0);">🧄</div>
+    <div class="ingredient" id="ginger" style="left: 70%; top: 108%; transform: scale(0);">🫚</div>
+    <div class="ingredient" id="korma" style="left: 50%; top: -28%; transform: scale(0);">🥡</div>
+    <div class="ingredient" id="coconut" style="left: -22%; top: 70%; transform: scale(0);">🥥</div>
+    <div class="ingredient" id="spinach" style="left: 108%; top: 65%; transform: scale(0);">🥬</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn-primary" id="nextBtn" onclick="nextStep()">Cook Next Step</button>
+    <button class="btn-secondary" id="resetBtn" onclick="reset()">Start Over</button>
+  </div>
+
+  <div class="recipe-card">
+    <h2>Shopping List</h2>
+    <ul id="ingredientList">
+      <li id="li-drumsticks">Chicken drumsticks</li>
+      <li id="li-onion">1 onion</li>
+      <li id="li-garlic">1 garlic clove</li>
+      <li id="li-ginger">Knob of ginger</li>
+      <li id="li-korma">Korma packet sauce mix</li>
+      <li id="li-coconut">Coconut milk or water</li>
+      <li id="li-spinach">Spinach or peas (optional)</li>
+      <li>Salt, pepper, oil</li>
+    </ul>
+    <div class="tip" id="tip">Tip: Score the drumsticks so the sauce can get in.</div>
+  </div>
+
+  <script>
+    const steps = [
+      {
+        title: "1. Score & season",
+        action: () => {
+          drumsticks.forEach((d, i) => {
+            d.style.left = [12, 40, 66][i] + "%";
+            d.style.top = [12, 6, 12][i] + "%";
+            d.style.transform = `rotate(${[-20, 0, 20][i]}deg) scale(1.1)`;
+          });
+          showFloating("🔪", 50, 60);
+        },
+        tip: "Slash the skin and season with salt and pepper.",
+        mark: ["li-drumsticks"]
+      },
+      {
+        title: "2. Sear the drumsticks",
+        action: () => {
+          drumsticks.forEach((d, i) => {
+            d.classList.add("seared");
+            d.style.left = [22, 40, 58][i] + "%";
+            d.style.top = [30, 26, 30][i] + "%";
+            d.style.transform = `rotate(${[-35, 0, 35][i]}deg)`;
+          });
+          showFloating("🔥", 50, 55);
+          addBubbles(6);
+        },
+        tip: "Brown them 3–4 minutes each side in a hot pan.",
+        mark: []
+      },
+      {
+        title: "3. Soften the aromatics",
+        action: () => {
+          showIngredient("onion", 30, 42);
+          showIngredient("garlic", 45, 48);
+          showIngredient("ginger", 60, 44);
+          showFloating("🧅", 45, 55);
+        },
+        tip: "Fry onion, garlic and ginger until soft and fragrant.",
+        mark: ["li-onion", "li-garlic", "li-ginger"]
+      },
+      {
+        title: "4. Add korma sauce",
+        action: () => {
+          showIngredient("korma", 45, 40);
+          setTimeout(() => {
+            sauce.style.opacity = "1";
+            sauce.style.transform = "scale(1)";
+            sauce.classList.add("bubbling");
+          }, 300);
+          showFloating("🥘", 50, 55);
+        },
+        tip: "Pour in the packet plus coconut milk (or water).",
+        mark: ["li-korma", "li-coconut"]
+      },
+      {
+        title: "5. Simmer gently",
+        action: () => {
+          drumsticks.forEach((d, i) => {
+            d.style.transition = "all 1s ease";
+            d.style.top = [36, 32, 36][i] + "%";
+          });
+          addSteam();
+          showFloating("⏱️", 50, 50);
+          startTimer();
+        },
+        tip: "Cover and simmer 25–30 min, turning once, until tender.",
+        mark: []
+      },
+      {
+        title: "6. Finish & serve",
+        action: () => {
+          showIngredient("spinach", 40, 38);
+          drumsticks.forEach(d => d.style.transform += " scale(1.05)");
+          confetti();
+          showFloating("🍛", 50, 50);
+        },
+        tip: "Stir in spinach or peas. Serve with rice or naan.",
+        mark: ["li-spinach"]
+      }
+    ];
+
+    let current = -1;
+    const drumsticks = ["d1", "d2", "d3"].map(id => document.getElementById(id));
+    const sauce = document.getElementById("sauce");
+    const stage = document.getElementById("stage");
+    const tipBox = document.getElementById("tip");
+    const nextBtn = document.getElementById("nextBtn");
+    const progress = document.getElementById("progress");
+
+    steps.forEach(() => {
+      const dot = document.createElement("div");
+      dot.className = "dot";
+      progress.appendChild(dot);
+    });
+    const dots = [...progress.children];
+
+    function showIngredient(id, left, top) {
+      const el = document.getElementById(id);
+      el.style.left = left + "%";
+      el.style.top = top + "%";
+      el.style.transform = "scale(1)";
+      setTimeout(() => {
+        el.style.opacity = "0";
+        el.style.transform = "scale(0.5)";
+      }, 900);
+    }
+
+    function addBubbles(count) {
+      for (let i = 0; i < count; i++) {
+        const b = document.createElement("div");
+        b.className = "bubble";
+        const size = 6 + Math.random() * 14;
+        b.style.width = size + "px";
+        b.style.height = size + "px";
+        b.style.left = (20 + Math.random() * 60) + "%";
+        b.style.top = (20 + Math.random() * 60) + "%";
+        sauce.appendChild(b);
+        setTimeout(() => {
+          b.style.opacity = "0.7";
+          b.style.transform = `translate(${(Math.random()-0.5)*30}px, -${20+Math.random()*30}px)`;
+          b.style.transition = "all 0.8s ease";
+        }, 50);
+        setTimeout(() => {
+          b.style.opacity = "0";
+        }, 700);
+        setTimeout(() => b.remove(), 1600);
+      }
+    }
+
+    function addSteam() {
+      for (let i = 0; i < 4; i++) {
+        const s = document.createElement("div");
+        s.className = "steam rise";
+        s.style.left = (25 + i * 18) + "%";
+        s.style.top = "18%";
+        s.style.animationDelay = (i * 0.4) + "s";
+        document.querySelector(".kitchen").appendChild(s);
+      }
+    }
+
+    function startTimer() {
+      let sec = 25 * 60;
+      const t = document.createElement("div");
+      t.className = "timer";
+      t.textContent = "25:00";
+      tipBox.appendChild(t);
+      const interval = setInterval(() => {
+        sec--;
+        const m = Math.floor(sec / 60).toString().padStart(2, "0");
+        const s = (sec % 60).toString().padStart(2, "0");
+        t.textContent = `${m}:${s}`;
+        if (sec <= 0) clearInterval(interval);
+      }, 1000);
+    }
+
+    function showFloating(emoji, xPercent, yPercent) {
+      const el = document.createElement("div");
+      el.className = "floating-emoji";
+      el.textContent = emoji;
+      const rect = document.getElementById("kitchen").getBoundingClientRect();
+      el.style.left = (rect.left + rect.width * (xPercent / 100)) + "px";
+      el.style.top = (rect.top + rect.height * (yPercent / 100)) + "px";
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1200);
+    }
+
+    function confetti() {
+      for (let i = 0; i < 30; i++) {
+        const c = document.createElement("div");
+        c.className = "floating-emoji";
+        c.textContent = ["🍛", "✨", "🌿", "🍗", "🎉"][Math.floor(Math.random() * 5)];
+        const rect = document.getElementById("kitchen").getBoundingClientRect();
+        c.style.left = (rect.left + rect.width * (0.2 + Math.random() * 0.6)) + "px";
+        c.style.top = (rect.top + rect.height * 0.4) + "px";
+        c.style.animationDuration = (1 + Math.random()) + "s";
+        document.body.appendChild(c);
+        setTimeout(() => c.remove(), 2000);
+      }
+    }
+
+    function updateDots() {
+      dots.forEach((dot, i) => {
+        dot.className = "dot" + (i === current ? " active" : i < current ? " done" : "");
+      });
+    }
+
+    function nextStep() {
+      if (current >= steps.length - 1) return;
+      current++;
+      const step = steps[current];
+      stage.textContent = step.title;
+      tipBox.innerHTML = step.tip;
+      step.action();
+      step.mark.forEach(id => document.getElementById(id)?.classList.add("done"));
+      updateDots();
+      if (current === steps.length - 1) {
+        nextBtn.textContent = "Enjoy your curry! 🍛";
+        nextBtn.disabled = true;
+      }
+    }
+
+    function reset() {
+      current = -1;
+      stage.textContent = "Ready to cook?";
+      tipBox.innerHTML = "Tip: Score the drumsticks so the sauce can get in.";
+      nextBtn.disabled = false;
+      nextBtn.textContent = "Cook Next Step";
+      sauce.style.opacity = "0";
+      sauce.style.transform = "scale(0.85)";
+      sauce.classList.remove("bubbling");
+      sauce.innerHTML = "";
+      document.querySelectorAll(".steam").forEach(el => el.remove());
+      document.querySelectorAll(".floating-emoji").forEach(el => el.remove());
+      document.querySelectorAll(".recipe-card li").forEach(li => li.classList.remove("done"));
+
+      const positions = [
+        { left: "-18%", top: "10%", rotate: -30 },
+        { left: "48%", top: "-22%", rotate: 10 },
+        { left: "108%", top: "30%", rotate: 50 }
+      ];
+      drumsticks.forEach((d, i) => {
+        d.classList.remove("seared");
+        d.style.transition = "all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)";
+        d.style.left = positions[i].left;
+        d.style.top = positions[i].top;
+        d.style.transform = `rotate(${positions[i].rotate}deg)`;
+      });
+
+      const resetPositions = {
+        onion: { left: "20%", top: "108%" },
+        garlic: { left: "45%", top: "115%" },
+        ginger: { left: "70%", top: "108%" },
+        korma: { left: "50%", top: "-28%" },
+        coconut: { left: "-22%", top: "70%" },
+        spinach: { left: "108%", top: "65%" }
+      };
+      for (const [id, pos] of Object.entries(resetPositions)) {
+        const el = document.getElementById(id);
+        el.style.left = pos.left;
+        el.style.top = pos.top;
+        el.style.opacity = "1";
+        el.style.transform = "scale(0)";
+      }
+      updateDots();
+    }
+
+    updateDots();
+  </script>
+</body>
+</html>

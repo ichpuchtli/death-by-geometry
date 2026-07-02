@@ -63,6 +63,12 @@ steps:
     script: |
       return window.game.bullets.bullets.filter(b => b.active).length >= 2;
 
+  # Each blast kicks the ship (recoil) — proving impact feedback fired without errors.
+  - action: assertEval
+    description: "Firing armed the recoil kick"
+    script: |
+      return window.game.player.recoilMax > 0;
+
   - action: screenshot
     name: "75-weapon-shotgun"
 

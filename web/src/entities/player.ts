@@ -13,6 +13,11 @@ import {
   PLAYER_SHIP_COLOR2,
   PLAYER_SHIP_FILL_COLOR,
   PLAYER_SHIP_FILL_ALPHA,
+  PLAYER_RECOIL_BASE,
+  PLAYER_RECOIL_PER_PELLET,
+  PLAYER_RECOIL_DECAY,
+  PLAYER_MUZZLE_FLASH_LENGTH,
+  PLAYER_MUZZLE_FLASH_PER_PELLET,
   WEAPON_STAGES,
 } from '../config';
 import { gameSettings } from '../settings';
@@ -50,6 +55,10 @@ export class Player extends Entity {
   fireRateOverride = 1; // multiplied with gameSettings.fireRateMultiplier
   private slowTimer = 0;
   private slowFactor = 1;
+  // Recoil: set by kickRecoil() when a blast fires, decays over PLAYER_RECOIL_DECAY ms.
+  private recoilTimer = 0;
+  private recoilMax = 0;
+  private recoilFlashLen = 0;
 
   constructor(private input: InputSource) {
     super();
@@ -132,6 +141,17 @@ export class Player extends Entity {
     // Shooting
     this.shooting = this.input.isMouseDown();
     if (this.shotTimer > 0) this.shotTimer -= dt;
+
+    // Recoil spring-back
+    if (this.recoilTimer > 0) this.recoilTimer -= dt;
+  }
+
+  /** Kick the ship backward + arm the muzzle flash; scales with pellet count. */
+  kickRecoil(pellets: number): void {
+    const extra = Math.max(0, pellets - 2);
+    this.recoilMax = PLAYER_RECOIL_BASE + extra * PLAYER_RECOIL_PER_PELLET;
+    this.recoilFlashLen = PLAYER_MUZZLE_FLASH_LENGTH + extra * PLAYER_MUZZLE_FLASH_PER_PELLET;
+    this.recoilTimer = PLAYER_RECOIL_DECAY;
   }
 
   /** Check if ready to fire, and reset shot timer. Returns aim angles to fire at. */
@@ -156,8 +176,28 @@ export class Player extends Entity {
     const s = PLAYER_SHIP_SCALE;
     const cos = Math.cos(this.facingAngle);
     const sin = Math.sin(this.facingAngle);
-    const px = this.position.x;
-    const py = this.position.y;
+
+    // Recoil: displace the whole ship backward along the aim vector, springing back.
+    const recoilFrac = this.recoilTimer > 0 ? this.recoilTimer / PLAYER_RECOIL_DECAY : 0;
+    const recoil = this.recoilMax * recoilFrac;
+    const aimCos = Math.cos(this.aimAngle);
+    const aimSin = Math.sin(this.aimAngle);
+    const px = this.position.x - aimCos * recoil;
+    const py = this.position.y - aimSin * recoil;
+
+    // Muzzle flash: a bright forward burst that blooms out of the barrel on each shot.
+    if (recoilFrac > 0) {
+      const mx = px + aimCos * s * 1.4;
+      const my = py + aimSin * s * 1.4;
+      const len = this.recoilFlashLen * recoilFrac;
+      const perpCos = -aimSin, perpSin = aimCos;
+      const spread = len * 0.5;
+      const tipX = mx + aimCos * len, tipY = my + aimSin * len;
+      // Central spike + two diverging sparks — bright cyan-white, picked up by bloom.
+      renderer.drawLine(mx, my, tipX, tipY, 1.0, 1.0, 0.9);
+      renderer.drawLine(mx, my, tipX + perpCos * spread, tipY + perpSin * spread, 0.7, 1.0, 0.8);
+      renderer.drawLine(mx, my, tipX - perpCos * spread, tipY - perpSin * spread, 0.7, 1.0, 0.8);
+    }
 
     // Transform local vertices to world space
     const wx: number[] = [];

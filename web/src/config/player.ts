@@ -17,6 +17,18 @@ export const WINGMAN_SHIP_FILL_COLOR: [number, number, number] = [0.2, 0.7, 0.95
 export const WINGMAN_SHIP_FILL_ALPHA = 0.55;
 export const WINGMAN_SPAWN_OFFSET = 90; // px to the side of the player when it (re)spawns
 
+// --- Weapon recoil / muzzle feedback (makes each shotgun blast feel weighty) ---
+// The ship kicks backward along the aim vector and springs back; a bright muzzle
+// flash blooms at the barrel. Both scale with the number of pellets in the blast so
+// a 6-pellet Hex Storm feels heavier than the 2-pellet Twin.
+export const PLAYER_RECOIL_BASE = 6;        // px kick for a 2-pellet shot
+export const PLAYER_RECOIL_PER_PELLET = 1.6; // extra px per pellet beyond 2
+export const PLAYER_RECOIL_DECAY = 100;     // ms to spring back to rest
+export const PLAYER_MUZZLE_FLASH_LENGTH = 22; // px length of the flash burst
+export const PLAYER_MUZZLE_FLASH_PER_PELLET = 3; // extra px per pellet beyond 2
+export const SHOOT_SHAKE_BASE = 1.2;        // camera shake intensity for a 2-pellet shot
+export const SHOOT_SHAKE_PER_PELLET = 0.5;  // extra shake per pellet beyond 2
+
 // --- Crosshair (desktop: at cursor, touch: near player) ---
 export const CROSSHAIR_SIZE = 14;           // distance from center to each chevron
 export const CROSSHAIR_CHEVRON_SIZE = 6;    // size of each individual chevron V
