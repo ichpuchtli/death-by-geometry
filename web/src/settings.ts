@@ -27,9 +27,9 @@ export interface GameSettings {
   bloomIntensity: number;         // 0.5–4.0
   trailLength: number;            // 2–30
   // BlackHole gravity tuning
-  bhAttractRadius: number;        // 50–600 (px, how far gravity reaches)
-  bhEnemyPull: number;            // 0.1–5.0 (px/ms², enemy pull strength)
-  bhPlayerPull: number;           // 0.0–5.0 (px/ms², player pull strength)
+  bhAttractRadius: number;        // 50–900 (px, how far gravity reaches)
+  bhEnemyPull: number;            // 1–40 (force = pull/dist px/ms; core multiplier applies inside BH_CORE_RADIUS_FRACTION)
+  bhPlayerPull: number;           // 0–15 (px/ms², player pull strength)
   bhGridMassBase: number;         // 0–800 (grid well depth at 0 absorbed)
   bhGridMassPerAbsorb: number;    // 0–100 (additional grid depth per absorbed enemy)
   bhGridRadiusMultiplier: number; // 0.5–5.0 (grid well radius as multiple of attract radius)
@@ -63,9 +63,11 @@ export const DEFAULTS: GameSettings = {
   maxEnemies: MOBILE_MAX_ENEMIES,
   bloomIntensity: BLOOM_INTENSITY,
   trailLength: TRAIL_LENGTH_ENEMY,
-  bhAttractRadius: 450,
-  bhEnemyPull: 4.0,
-  bhPlayerPull: 5.0,
+  // Threat Lab port: SINGULARITY-class gravity (with the core multiplier in config,
+  // pull 24 → 60 inside 400px, capturing tracking rhombuses)
+  bhAttractRadius: 500,
+  bhEnemyPull: 24,
+  bhPlayerPull: 9,
   bhGridMassBase: 600,
   bhGridMassPerAbsorb: 40,
   bhGridRadiusMultiplier: 3.0,
@@ -96,6 +98,13 @@ export function loadSettings(): void {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      // Migration: gravity was rescaled (pull 0.1–5 → 1–40) when the Threat Lab tuning
+      // was ported. Saved values from the old scale would silently undo the rebalance.
+      if (typeof parsed.bhEnemyPull === 'number' && parsed.bhEnemyPull <= 5) {
+        delete parsed.bhEnemyPull;
+        delete parsed.bhPlayerPull;
+        delete parsed.bhAttractRadius;
+      }
       for (const key of Object.keys(DEFAULTS) as (keyof GameSettings)[]) {
         if (key in parsed) {
           (gameSettings as unknown as Record<string, unknown>)[key] = parsed[key];

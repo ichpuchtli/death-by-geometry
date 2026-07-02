@@ -1,0 +1,66 @@
+name: "Ported supernova — overloaded BlackHole detonates with chaos payload in real game"
+tags: [blackhole, supernova, regression]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Intense phase (BlackHoles in spawn pools), slow enemies + no player pull so the
+  # idle test player survives, high spawn rate so a BlackHole appears quickly
+  - action: evalCheck
+    description: "Configure settings for supernova testing"
+    script: |
+      const settings = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      settings.startingPhase = 'intense';
+      settings.startingLives = 99;
+      settings.spawnRateMultiplier = 3;
+      settings.maxEnemies = 200;
+      settings.enemySpeedMultiplier = 0.1;
+      settings.bhPlayerPull = 0;
+      localStorage.setItem('gg_settings', JSON.stringify(settings));
+      return true;
+
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  # Poll until a BlackHole spawns (3x spawn rate, intense pools), then force-feed it
+  # to critical mass via the real absorb path
+  - action: waitForEval
+    timeout: 45000
+    description: "Feed a BlackHole to MAX_ABSORB — destabilize must start"
+    script: |
+      const g = window.game;
+      const bh = g.enemies.find(e => e.family === 'blackhole' && e.active && !e.isSpawning);
+      if (!bh) return false;
+      window.__bh = bh;
+      while (bh.absorbedCount < 12) bh.absorbEnemy();
+      return bh.destabilizing === true;
+
+  # 350ms fuse — detonation must fire even with no bullets touching it
+  # (regression: the old code only detonated inside the absorb branch)
+  - action: wait
+    ms: 1200
+
+  - action: assertEval
+    description: "BlackHole detonated on its own and ejected circles"
+    script: |
+      const g = window.game;
+      const circles = g.enemies.filter(e => e.active && e.family === 'circle').length;
+      return window.__bh.active === false && circles >= 10;
+
+  - action: screenshot
+    name: "78-supernova-chaos"
+
+  - action: assertNoErrors

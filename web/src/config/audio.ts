@@ -12,3 +12,5 @@ export const GENERATED_SFX: Record<string, string> = {
 export const MASTER_VOLUME = 0.5;
 export const SFX_VOLUME = 0.6;
 export const MUSIC_VOLUME = 0.35;
+// Detonation sound used by the real supernova path (A/B tested in the Threat Lab, user picked 'subdrop')
+export const SUPERNOVA_SOUND_VARIANT: 'classic' | 'subdrop' | 'doom' | 'quake' = 'subdrop';

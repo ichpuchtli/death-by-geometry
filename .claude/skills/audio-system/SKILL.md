@@ -29,13 +29,14 @@ Use when working on sound effects, music, audio mixing, the ElevenLabs pipeline,
 
 - `playBlackHoleDeath(absorbed)` — production detonation: sub-boom (80→20 Hz), bandpassed noise burst, descending tone-cluster tail, metallic ring layer. Scales with `absorbed/12` intensity.
 - `playSupernovaWarning(durationMs = 1500)` — rising sub-drone (30→50 Hz) + high whine; duration now **parameterized** to match `BlackHole.destabilizeDuration` (Threat Lab presets use 350–1500ms windows).
-- `playSupernovaVariant(variant, absorbed)` — detonation A/B variants for the Threat Lab (`?threat=1`); `SupernovaSoundVariant = 'classic' | 'subdrop' | 'doom' | 'quake'` exported from `core/audio.ts`:
+- `setBlackHoleStress(level)` — **continuous wobbling sub-bass stress loop** (two detuned sines beating 1→4 Hz + LFO tremolo 3→9 Hz, gain `level²·0.32`, pitch 32→44 Hz). Level = most-fed BH's `absorbedCount/MAX_ABSORB` (1 while destabilizing), fed each frame by `GravitySystem.update()` (and the Threat Lab). Silent at 0; params smoothed with `setTargetAtTime`. Zeroed on `gravity.clear()` and game over. This is the pre-warning "you can hear how unstable it is" signal; sequencing is **stress wobble → 350ms warning → subdrop burst**.
+- `playSupernovaVariant(variant, absorbed)` — detonation variants; **production uses `SUPERNOVA_SOUND_VARIANT = 'subdrop'`** (`config/audio.ts`), called by `GravitySystem.detonate()`. `SupernovaSoundVariant = 'classic' | 'subdrop' | 'doom' | 'quake'` exported from `core/audio.ts`:
   - **classic** — delegates to `playBlackHoleDeath`
   - **subdrop** — cinematic bass drop: kick transient (150→40 Hz) into a *saturated* 55→16 Hz sub with ~3s decay + bright air-crack noise. Saturation (tanh WaveShaper via `makeSaturator(amount)`) adds harmonics so the sub reads on laptop speakers.
   - **doom** — distorted chaos: crushed square sub (42→22 Hz through lowpass + hard saturation), long crushed noise wall, 3 detuned sawtooth screams diving 800→90 Hz.
   - **quake** — double-hit thunder: noise crack + 90→30 Hz thump, then a 350ms-delayed deeper aftershock (saturated 45→14 Hz) with a 6 Hz-tremolo rumble tail.
 - Private helpers: `makeSaturator(amount)` (soft-clip WaveShaper) and `makeNoiseSource(lenSec)`.
-- Whichever variant the user picks should replace/augment `playBlackHoleDeath` in the real detonation path (`GravitySystem`).
+- `playBlackHoleDeath` remains the kill-by-gunfire sound (via `playKillSignature('blackhole')`); the supernova path uses the subdrop variant.
 
 ## Event SFX
 

@@ -49,9 +49,11 @@ Separation behavior is likewise data-driven: `separationWeight` (0 = immovable, 
 ## BlackHole Mechanics
 
 - Spawns anywhere in arena (not at edges). `spawnAnywhere()` method.
-- Stationary. Pulls player + absorbs nearby enemies. Overload explosion spawns Circles.
-- HP=8 (takes twice as many bullets as original). Hard cap: 4 active.
-- Gravity settings (runtime-tunable): `bhAttractRadius` 400, `bhEnemyPull` 3.0, `bhPlayerPull` 4.0, `bhGridMassBase` 500, `bhGridRadiusMultiplier` 3.0
+- Stationary. Pulls player + absorbs nearby enemies. Overload explosion spawns Circles + Shards.
+- HP=12. Hard cap: 4 active.
+- Gravity settings (runtime-tunable, **Threat Lab port 2026-07**): `bhAttractRadius` 500, `bhEnemyPull` 24, `bhPlayerPull` 9, `bhGridMassBase` 600, `bhGridRadiusMultiplier` 3.0. Force = `pull / dist` px/ms. **Inescapable core:** inside `BH_CORE_RADIUS_FRACTION` (0.8) of the attract radius, pull is multiplied by `BH_CORE_PULL_MULT` (2.5) → effective pull 60 inside 400px, which beats Rhombus tracking speed (0.15 px/ms) — tracking enemies are captured anywhere within ~400px. Settings loader migrates old saved gravity values (`bhEnemyPull <= 5` → reset to new defaults).
+- **Supernova (chaos-bomb tuning):** warning window `SUPERNOVA_DESTABILIZE_MS` = 350ms (per-instance `destabilizeDuration`); payload = absorbed × `CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER` (3) Circles + `SUPERNOVA_SHARD_COUNT` (8) Shards; 1000 particles, 3 staggered shockwave rings (`GravitySystem.renderEffects()`, additive pass), 450ms flash, 'subdrop' detonation sound. **Detonation is checked every frame in `applyAttraction`** — previously it only ran inside the absorb branch, which is unreachable at full mass, so an unshot overloaded BH never blew (latent bug, fixed).
+- **Stress wobble:** `GravitySystem.update(dt)` feeds `audio.setBlackHoleStress(level)` with the most-fed BH's `absorbedCount/MAX_ABSORB` (1 while destabilizing) — a continuous wobbling sub-bass loop that audibly builds as the well approaches critical.
 - **Circle gravity immunity:** Circles have `gravityImmune = true` — immune to BlackHole gravitational pull AND absorption. Scatter freely after overload explosion.
 - **Visual modes:** `visualMode` property on `BlackHole` class:
   - `'radiant_collapse'` (default) — Grid Wars inspired. White-hot singularity point with many flickering radiating lines. Rays grow longer/more numerous with absorbed mass. No blob body.
@@ -112,12 +114,12 @@ Visual sandbox (press `D` from menu). 4 BH variants in 2x2 layout:
 ## Threat Lab (`?threat=1`)
 
 Playable BlackHole **threat tuning** arena (`web/src/threat-lab.ts`) — separate from the visual Design Lab. Boots instead of the game; real player ship + rhombus trickle tracking the player vs. one BlackHole. Used to A/B the *feel* dimensions the user flagged as non-threatening.
-- **Presets** (`THREAT_PRESETS`, keys 1-4): CURRENT (production baseline), DREADNOUGHT (HP 20, pull 14×2.5, 700ms warning, subdrop sound), CATACLYSM (350ms warning, 24 circles + 8 shards, 3 shockwave rings, doom sound), SINGULARITY (radius 700, pull 24×3 — captures tracking rhombuses within ~480px, quake sound).
+- **Presets** (`THREAT_PRESETS`, keys 1-4): PRODUCTION (the shipped tuning — SINGULARITY gravity at 400px capture + CATACLYSM payload + subdrop, kept in sync with config), DREADNOUGHT (HP 20, 700ms warning), CATACLYSM (350ms warning, doom sound), SINGULARITY (radius 700, quake sound). Presets carry `coreRadiusFrac` (0.8 production, 0.4 others).
 - Each preset bundles: `hp`, `maxAbsorb`, `attractRadius`, `enemyPull` + `corePullMult` (extra pull inside 40% of radius — the "inescapable core"), `playerPull`, `bulletBendMult`, `destabilizeMs`, `circlesPerMass` + `shardCount` payload, `particleMult`/`shockwaveRings`/`flashMs`/`shakeIntensity`, `sound` variant.
 - **Capture math:** gravity force = `enemyPull / dist` px/ms; Rhombus tracking speed is 0.15 px/ms, so capture radius ≈ `enemyPull × corePullMult / 0.15` px. Production pull 3 → captures only <20px (why it feels weak).
 - Keys: **E** feed to critical, **Q** detonate now, **A** cycle sound variant (independent of preset), **R** reset. `window.threatLab` exposed (`applyPreset(i)`, `forceFeed()`, `forceDetonate()`, `detonationCount`).
 - Engine support added: `BlackHole.destabilizeDuration` instance field (default `SUPERNOVA_DESTABILIZE_MS` = 1500 in `config/enemy.ts`) — warning window is now per-instance tunable. Flow test: `tests/flows/77-threat-lab.yml`.
-- **Chosen preset values should be ported into `GravitySystem`/config once the user picks** — the lab's gravity/detonation loop is intentionally lab-local so experiments don't alter the real game.
+- **The user's picks were ported 2026-07** (SINGULARITY gravity tuned to 400px capture, CATACLYSM payload, subdrop sound, stress-wobble → short warning → burst audio sequencing). The lab remains the harness for future tuning; keep preset 1 in sync with production config.
 
 ## Specimen Gallery (`?gallery=1`)
 

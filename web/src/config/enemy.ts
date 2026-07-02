@@ -84,7 +84,7 @@ export const MANDELBROT_SPAWN_INTERVAL = 5.0; // seconds
 export const MANDELBROT_BUD_REGROW_TIME = 3.0; // seconds
 
 // --- BlackHole ---
-export const BLACKHOLE_HP = 8;
+export const BLACKHOLE_HP = 12;
 
 // --- BlackHole Visual Palette (design lab variants) ---
 export const BLACKHOLE_PALETTE = {
@@ -111,18 +111,28 @@ export const BLACKHOLE_PALETTE = {
 export const BLACKHOLE_PLAYER_PULL_STRENGTH = 0.4; // px/ms² force on player
 
 // --- Supernova (BlackHole overload detonation) ---
-export const SUPERNOVA_PARTICLE_COUNT = 400;
+// "Chaos bomb" tuning (Threat Lab CATACLYSM payload + SINGULARITY gravity, user-picked)
+export const SUPERNOVA_PARTICLE_COUNT = 1000;
 export const SUPERNOVA_GRID_IMPULSE = 2500;
 export const SUPERNOVA_HITSTOP = 300;
-export const SUPERNOVA_FLASH_DURATION = 200; // ms
-export const SUPERNOVA_DESTABILIZE_MS = 1500; // warning window between destabilize and detonation
+export const SUPERNOVA_FLASH_DURATION = 450; // ms
+export const SUPERNOVA_DESTABILIZE_MS = 350; // warning window between destabilize and detonation (short fuse — the stress wobble telegraphs earlier)
+export const SUPERNOVA_SHARD_COUNT = 8;      // shards ejected alongside circles
+export const SUPERNOVA_SHOCKWAVE_RINGS = 3;  // expanding ring visuals on detonation
+
+// --- BlackHole gravity core ---
+// Inside BH_CORE_RADIUS_FRACTION of the attract radius, pull is multiplied by BH_CORE_PULL_MULT.
+// With defaults (radius 500, pull 24, core 0.8×2.5 → pull 60 inside 400px) a tracking Rhombus
+// (speed 0.15 px/ms) is captured anywhere within ~400px — gravity beats tracking.
+export const BH_CORE_RADIUS_FRACTION = 0.8;
+export const BH_CORE_PULL_MULT = 2.5;
 
 // --- Circle (BlackHole supernova ejecta) ---
 export const CIRCLE_EJECT_SPEED_MIN = 0.35;       // px/ms min ejection speed
 export const CIRCLE_EJECT_SPEED_MAX = 0.85;       // px/ms max ejection speed
 export const CIRCLE_EJECT_DECAY = 0.0022;          // fraction lost per ms (~80% gone in 730ms)
 export const CIRCLE_FLOCK_PULL = 0.0008;           // elastic spring: speed px/ms = pull * distPx
-export const CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER = 2; // circles emitted = absorbedCount * this
+export const CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER = 3; // circles emitted = absorbedCount * this
 export const BLACKHOLE_LENSING_BASE = 1.5;
 export const BLACKHOLE_LENSING_PER_ABSORB = 0.35;
 

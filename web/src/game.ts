@@ -670,6 +670,9 @@ export class Game {
     // BlackHole attraction — pull nearby non-blackhole enemies toward black holes
     this.gravity.applyAttraction(dt);
 
+    // Shockwave ring effects + BlackHole stress-wobble audio level
+    this.gravity.update(dt);
+
     // Update circle flock centroids (shared Vec2 refs held by each CircleEnemy)
     this.gravity.updateFlocks();
 
@@ -992,6 +995,7 @@ export class Game {
         this.state = 'gameover';
         this.gameOverTime = 0;
         this.gameCanvas.style.cursor = 'default';
+        this.audio.setBlackHoleStress(0);
         this.audio.playGameOver();
         this.hud.drawGameOver(this.runStats, this.gameOverMedals, 0);
         if (!this.mobile) showDesktopSettings();
@@ -1113,6 +1117,7 @@ export class Game {
     this.lifecycle.trailSystem.render(this.renderer);
     this.explosions.render(this.renderer);
     this.combat.render(this.renderer);
+    this.gravity.renderEffects(this.renderer);
     // setBlendMode('normal') flushes additive batch and restores blend func
     this.renderer.setBlendMode('normal');
     this.renderer.end();

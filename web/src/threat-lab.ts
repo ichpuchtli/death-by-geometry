@@ -43,8 +43,10 @@ export interface ThreatPreset {
   /** Gravity on enemies: force px/ms = enemyPull / dist. Rhombus tracking speed is 0.15 px/ms,
    *  so the capture radius (where gravity beats tracking) ≈ enemyPull / 0.15 px. */
   enemyPull: number;
-  /** Extra pull multiplier inside the inner 40% of the attract radius — the inescapable core */
+  /** Extra pull multiplier inside the core — the inescapable zone */
   corePullMult: number;
+  /** Core extent as a fraction of the attract radius */
+  coreRadiusFrac: number;
   playerPull: number;
   bulletBendMult: number;
   /** Warning window (ms) between destabilize and detonation */
@@ -60,37 +62,39 @@ export interface ThreatPreset {
   sound: SupernovaSoundVariant;
 }
 
+// NOTE: particleMult scales SUPERNOVA_PARTICLE_COUNT (now 1000 after the port) and
+// bulletBendMult scales BULLET_GRAVITY_STRENGTH (now 0.45). Preset 1 IS production.
 export const THREAT_PRESETS: ThreatPreset[] = [
   {
-    name: '1 · CURRENT', tagline: 'production baseline',
-    hp: 8, maxAbsorb: 12, attractRadius: 400,
-    enemyPull: 3, corePullMult: 1, playerPull: 4, bulletBendMult: 1,
-    destabilizeMs: 1500, circlesPerMass: 2, shardCount: 0,
-    particleMult: 1, shockwaveRings: 0, flashMs: 200, shakeIntensity: 0.8,
-    sound: 'classic',
+    name: '1 · PRODUCTION', tagline: 'shipped tuning — SINGULARITY gravity + CATACLYSM payload + subdrop',
+    hp: 12, maxAbsorb: 12, attractRadius: 500,
+    enemyPull: 24, corePullMult: 2.5, coreRadiusFrac: 0.8, playerPull: 9, bulletBendMult: 1,
+    destabilizeMs: 350, circlesPerMass: 3, shardCount: 8,
+    particleMult: 1, shockwaveRings: 3, flashMs: 450, shakeIntensity: 1.6,
+    sound: 'subdrop',
   },
   {
     name: '2 · DREADNOUGHT', tagline: 'tank — soaks bullets, drags you in, short fuse',
     hp: 20, maxAbsorb: 10, attractRadius: 500,
-    enemyPull: 14, corePullMult: 2.5, playerPull: 7, bulletBendMult: 2,
+    enemyPull: 14, corePullMult: 2.5, coreRadiusFrac: 0.4, playerPull: 7, bulletBendMult: 1,
     destabilizeMs: 700, circlesPerMass: 3, shardCount: 4,
-    particleMult: 1.6, shockwaveRings: 1, flashMs: 300, shakeIntensity: 1.2,
+    particleMult: 0.65, shockwaveRings: 1, flashMs: 300, shakeIntensity: 1.2,
     sound: 'subdrop',
   },
   {
     name: '3 · CATACLYSM', tagline: 'chaos bomb — almost no warning, screen-filling payload',
     hp: 14, maxAbsorb: 8, attractRadius: 450,
-    enemyPull: 10, corePullMult: 2, playerPull: 6, bulletBendMult: 2,
+    enemyPull: 10, corePullMult: 2, coreRadiusFrac: 0.4, playerPull: 6, bulletBendMult: 1,
     destabilizeMs: 350, circlesPerMass: 3, shardCount: 8,
-    particleMult: 2.5, shockwaveRings: 3, flashMs: 450, shakeIntensity: 1.6,
+    particleMult: 1, shockwaveRings: 3, flashMs: 450, shakeIntensity: 1.6,
     sound: 'doom',
   },
   {
     name: '4 · SINGULARITY', tagline: 'gravity monster — rhombuses spiral in from across the arena',
     hp: 12, maxAbsorb: 12, attractRadius: 700,
-    enemyPull: 24, corePullMult: 3, playerPull: 9, bulletBendMult: 3,
+    enemyPull: 24, corePullMult: 3, coreRadiusFrac: 0.4, playerPull: 9, bulletBendMult: 1,
     destabilizeMs: 1000, circlesPerMass: 2, shardCount: 4,
-    particleMult: 1.5, shockwaveRings: 2, flashMs: 300, shakeIntensity: 1.3,
+    particleMult: 0.6, shockwaveRings: 2, flashMs: 300, shakeIntensity: 1.3,
     sound: 'quake',
   },
 ];
@@ -364,6 +368,11 @@ export class ThreatLab {
       this.grid.applyGravityWell(bh.position.x, bh.position.y, mass, p.attractRadius * gameSettings.bhGridRadiusMultiplier);
     }
 
+    // Stress wobble: audible instability of the well as it feeds
+    const activeBh = bh && bh.active && !bh.isSpawning ? bh : null;
+    const stress = activeBh ? (activeBh.destabilizing ? 1 : activeBh.absorbedCount / p.maxAbsorb) : 0;
+    this.audio.setBlackHoleStress(stress);
+
     this.explosions.update(dt);
     this.grid.update(dt);
     this.camera.follow(this.player.position);
@@ -401,7 +410,7 @@ export class ThreatLab {
     if (!bh || !bh.active || bh.isSpawning) return;
     const p = this.preset;
     const attractR2 = p.attractRadius * p.attractRadius;
-    const coreR = p.attractRadius * 0.4;
+    const coreR = p.attractRadius * p.coreRadiusFrac;
     const absorbR2 = (bh.collisionRadius + 10) * (bh.collisionRadius + 10);
 
     for (const e of this.enemies) {
@@ -452,7 +461,7 @@ export class ThreatLab {
     const dist2 = dx * dx + dy * dy;
     if (dist2 >= p.attractRadius * p.attractRadius || dist2 <= 1) return;
     const dist = Math.sqrt(dist2);
-    const core = dist < p.attractRadius * 0.4 ? p.corePullMult : 1;
+    const core = dist < p.attractRadius * p.coreRadiusFrac ? p.corePullMult : 1;
     const force = p.playerPull * core * (1 + bh.absorbedCount * 0.08) * dt / dist;
     this.player.position.x += dx / dist * force;
     this.player.position.y += dy / dist * force;
@@ -603,7 +612,7 @@ export class ThreatLab {
       const p = this.preset;
       this.renderer.drawCircle(bh.position.x, bh.position.y, p.attractRadius, [0.3, 0.5, 1], 64, 0.08);
       if (p.corePullMult > 1) {
-        this.renderer.drawCircle(bh.position.x, bh.position.y, p.attractRadius * 0.4, [1, 0.4, 0.2], 48, 0.1);
+        this.renderer.drawCircle(bh.position.x, bh.position.y, p.attractRadius * p.coreRadiusFrac, [1, 0.4, 0.2], 48, 0.1);
       }
     }
 
@@ -646,7 +655,12 @@ export class ThreatLab {
   // ============================================================
   private rebuildOverlay(): void {
     const p = this.preset;
-    const captureR = Math.round(p.enemyPull * p.corePullMult / 0.15);
+    // Capture = farthest distance where pull/dist beats rhombus tracking speed (0.15 px/ms),
+    // evaluated piecewise for the boosted core zone and the outer band
+    const coreExt = p.attractRadius * p.coreRadiusFrac;
+    const coreCapture = Math.min(coreExt, p.enemyPull * p.corePullMult / 0.15);
+    const outerCapture = Math.min(p.attractRadius, p.enemyPull / 0.15);
+    const captureR = Math.round(Math.max(coreCapture, outerCapture > coreExt ? outerCapture : 0));
     const soundLabel = this.soundOverride ? `${this.soundOverride} (override)` : p.sound;
     this.overlay.innerHTML = '';
     const title = document.createElement('div');

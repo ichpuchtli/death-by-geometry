@@ -851,6 +851,59 @@ export class AudioManager {
     whine.stop(now + dur + 0.1);
   }
 
+  // --- BlackHole stress loop: two detuned subs beating + LFO tremolo, level-driven ---
+  private stressOsc1: OscillatorNode | null = null;
+  private stressOsc2: OscillatorNode | null = null;
+  private stressLfo: OscillatorNode | null = null;
+  private stressGain: GainNode | null = null;
+  private stressTrem: GainNode | null = null;
+
+  /**
+   * Continuous wobbling low-bass loop signalling how unstable the most-fed BlackHole is.
+   * `level` 0-1 (absorbedCount / MAX_ABSORB; 1 while destabilizing). At 0 it is silent.
+   * The wobble (beat frequency between two detuned subs + tremolo rate) speeds up and the
+   * pitch/volume rise as the well approaches critical — you can HEAR the stress build.
+   */
+  setBlackHoleStress(level: number): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const v = Math.min(1, Math.max(0, level));
+
+    if (!this.stressGain) {
+      this.stressGain = ctx.createGain();
+      this.stressGain.gain.value = 0;
+      this.stressTrem = ctx.createGain();
+      this.stressTrem.gain.value = 0.7;
+      this.stressOsc1 = ctx.createOscillator();
+      this.stressOsc1.type = 'sine';
+      this.stressOsc1.frequency.value = 32;
+      this.stressOsc2 = ctx.createOscillator();
+      this.stressOsc2.type = 'sine';
+      this.stressOsc2.frequency.value = 33;
+      this.stressLfo = ctx.createOscillator();
+      this.stressLfo.type = 'sine';
+      this.stressLfo.frequency.value = 3;
+      const lfoDepth = ctx.createGain();
+      lfoDepth.gain.value = 0.3;
+      this.stressLfo.connect(lfoDepth);
+      lfoDepth.connect(this.stressTrem.gain);
+      this.stressOsc1.connect(this.stressTrem);
+      this.stressOsc2.connect(this.stressTrem);
+      this.stressTrem.connect(this.stressGain);
+      this.stressGain.connect(this.sfxGain);
+      this.stressOsc1.start(t);
+      this.stressOsc2.start(t);
+      this.stressLfo.start(t);
+    }
+
+    // Smooth all params to avoid zipper noise; wobble beat 1→4 Hz, tremolo 3→9 Hz
+    this.stressGain.gain.setTargetAtTime(v * v * 0.32, t, 0.12);
+    this.stressOsc1!.frequency.setTargetAtTime(32 + v * 12, t, 0.25);
+    this.stressOsc2!.frequency.setTargetAtTime(33 + v * 15, t, 0.25);
+    this.stressLfo!.frequency.setTargetAtTime(3 + v * 6, t, 0.25);
+  }
+
   /** Soft-clip waveshaper for adding harmonic saturation — makes sub-bass audible on small speakers. */
   private makeSaturator(amount: number): WaveShaperNode {
     const ctx = this.ctx!;

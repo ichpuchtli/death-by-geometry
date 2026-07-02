@@ -30,9 +30,9 @@ const SLIDERS: SliderDef[] = [
   { key: 'trailLength', label: 'Trail Length', desc: 'Length of motion trails behind entities', min: 2, max: 30, step: 1, format: v => `${v}` },
   { key: 'zoomScale', label: 'Zoom', desc: 'Camera zoom (lower = see more arena)', min: 0.5, max: 1.5, step: 0.05, format: v => `${v.toFixed(2)}x` },
   // BlackHole gravity
-  { key: 'bhAttractRadius', label: 'BH Pull Radius', desc: 'How far BlackHole gravity reaches (px)', min: 50, max: 600, step: 10, format: v => `${v}px` },
-  { key: 'bhEnemyPull', label: 'BH Enemy Pull', desc: 'Strength of pull on nearby enemies', min: 0.1, max: 5.0, step: 0.1, format: v => v.toFixed(1) },
-  { key: 'bhPlayerPull', label: 'BH Player Pull', desc: 'Strength of pull on the player', min: 0.0, max: 5.0, step: 0.1, format: v => v.toFixed(1) },
+  { key: 'bhAttractRadius', label: 'BH Pull Radius', desc: 'How far BlackHole gravity reaches (px)', min: 50, max: 900, step: 10, format: v => `${v}px` },
+  { key: 'bhEnemyPull', label: 'BH Enemy Pull', desc: 'Pull on enemies (force = pull/dist; core zone multiplies it)', min: 1, max: 40, step: 0.5, format: v => v.toFixed(1) },
+  { key: 'bhPlayerPull', label: 'BH Player Pull', desc: 'Strength of pull on the player', min: 0.0, max: 15.0, step: 0.5, format: v => v.toFixed(1) },
   { key: 'bhGridMassBase', label: 'BH Grid Depth', desc: 'Grid warping depth at 0 absorbed enemies', min: 0, max: 800, step: 10, format: v => `${v}` },
   { key: 'bhGridMassPerAbsorb', label: 'BH Grid/Absorb', desc: 'Additional grid depth per absorbed enemy', min: 0, max: 100, step: 5, format: v => `${v}` },
   { key: 'bhGridRadiusMultiplier', label: 'BH Grid Radius', desc: 'Grid warp radius as multiple of pull radius', min: 0.5, max: 5.0, step: 0.1, format: v => `${v.toFixed(1)}x` },
