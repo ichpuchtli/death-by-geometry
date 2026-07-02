@@ -54,6 +54,7 @@ web/src/
 ├── index.ts                    # Entry point
 ├── game.ts                     # Main game loop, state machine, orchestrator
 ├── design-lab.ts               # BlackHole visual sandbox (press D from menu)
+├── gallery.ts                  # Specimen Gallery — visual catalog of every entity/component (?gallery=1)
 ├── config.ts                   # ALL compile-time constants
 ├── settings.ts                 # Runtime-tunable settings (localStorage)
 ├── glsl.d.ts                   # GLSL import declarations
@@ -192,6 +193,8 @@ testing and live demos. Full details in **`docs/AI_AGENT.md`**.
 
 Controls: WASD move, mouse aim, click/hold shoot, F auto-fire, M mute, P pause (shows config), D design lab, Space restart, **B toggle AI agent** (also `?bot=1` URL auto-starts it).
 
+**Specimen Gallery** (`?gallery=1`): a standalone visual catalog (`web/src/gallery.ts`) that boots instead of the game and renders every ship, enemy (all states/variants/tiers), BlackHole visual mode, looping spawn animation, projectile, effect, and UI component in a single labeled grid — built for screenshot-based visual review (of both humans and AI models). Auto-fits the whole roster into one frame; `window.gallery` is exposed. Toggles: Space pause, G reactive grid, B bloom, S starfield, L labels. Flow test: `tests/flows/76-gallery.yml`.
+
 ---
 
 ## Build & Run
@@ -248,6 +251,7 @@ Full development history: **`docs/DEVELOPMENT_HISTORY.md`**
 - Live training dashboard: **Complete** (`scripts/train.ts --live [--port=8787]` starts a zero-dependency Node `http` server rendering `scripts/train-dashboard.html`: real-time fitness chart, per-phase survival/score of current best, gen/candidate progress, evolving per-layer weight heatmaps. Reward now CLI-tunable via `--survW`/`--scoreW`; `--phases` selects training phases. CEM loop yields via `setImmediate` per candidate to keep the server responsive.)
 - AI Wingman (co-op ally): **Complete** (`web/src/entities/wingman.ts` — a standalone cyan ship driven by its own `Bot` (same trained policy), observing/acting from its own position. Enabled via the **AI Wingman** settings toggle (`gameSettings.aiWingman`, default off; toggle any time incl. pause menu — `Game.syncWingman()` creates/destroys it each frame). Bullets go into the shared `BulletPool` so kills score for the team; it reuses the player's weapon stage and is a non-colliding helper (can't be killed). Shows a "🤖 AI WINGMAN" badge. Settings panel now supports multiple checkboxes (data-driven `CHECKBOXES` keyed by `data-key`). Flow test: `tests/flows/74-ai-wingman.yml`.)
 - Weapon shoot feedback: **Complete** (Player firing has its own procedural shotgun blast — `AudioManager.playShoot(pellets)`, 3 layers, subtly beefier/lower as parallel pellets rise 2→6 — plus a **subtle, player-local** visual recoil: the ship nudges back along the aim vector and springs over 90ms, and a small muzzle flash blooms from the barrel. Deliberately **no camera shake** (the initial version punched the camera and felt jarring at the ~3/s cadence). Driven from `Game.update()` when `player.tryShoot()` returns shots. Config in `config/player.ts`: `PLAYER_RECOIL_BASE/PER_PELLET/DECAY`, `PLAYER_MUZZLE_FLASH_LENGTH/PER_PELLET`. Wingman fires silently (no sound/recoil) to avoid doubling. Flow test extends `tests/flows/75-weapon-shotgun.yml`.)
+- Specimen Gallery: **Complete** (`web/src/gallery.ts` — standalone visual catalog booted via `?gallery=1`, bypassing `Game` from `index.ts`. Instantiates every wired ship/enemy/child/boss/BlackHole-variant plus projectiles, explosions, crosshair, trail, and looping spawn animations, laid out in a labeled auto-fit grid for screenshot-based visual review. Reuses the real render pipeline: `Renderer` + `BloomPass` + `SpringMassGrid` + `TrailSystem` + `Starfield`. Enemies animate in place (updated then re-pinned to their cell). HTML label overlay (`#gallery-labels`). `window.gallery` exposed with `paused`/`gridOn`/`bloomOn`/`starfieldOn`/`labelsOn` toggles (Space/G/B/S/L). Flow test: `tests/flows/76-gallery.yml`.)
 - Phase 4 (Scores, Polish & Tuning): **Not started** — leaderboard, debug overlay, perf profiling
 
 ---

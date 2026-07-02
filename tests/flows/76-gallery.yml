@@ -1,0 +1,46 @@
+name: "Design Lab — specimen gallery renders every unit/enemy/component"
+tags: [gallery, visual, regression]
+steps:
+  - action: launch
+    url: "/?gallery=1"
+    waitFor: "canvas#game"
+
+  # Let specimens animate + labels render
+  - action: wait
+    ms: 1500
+
+  - action: assertEval
+    description: "Gallery booted with categories + specimens"
+    script: |
+      const g = window.gallery;
+      if (!g) return false;
+      const cats = g.categories;
+      const total = cats.reduce((n, c) => n + c.items.length, 0);
+      return Array.isArray(cats) && cats.length >= 6 && total >= 25;
+
+  - action: assertVisible
+    selector: "#gallery-labels"
+
+  - action: assertEval
+    description: "Category headers + specimen labels are in the DOM"
+    script: |
+      return document.querySelectorAll('#gallery-labels div').length >= 30;
+
+  - action: screenshot
+    name: "76-gallery-overview"
+
+  # Toggle bloom off to compare raw shapes
+  - action: evalCheck
+    description: "Disable bloom + pause for a deterministic frame"
+    script: |
+      window.gallery.bloomOn = false;
+      window.gallery.paused = true;
+      return true;
+
+  - action: wait
+    ms: 300
+
+  - action: screenshot
+    name: "76-gallery-nobloom"
+
+  - action: assertNoErrors

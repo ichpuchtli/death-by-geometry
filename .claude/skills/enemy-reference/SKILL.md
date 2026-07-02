@@ -108,3 +108,11 @@ Visual sandbox (press `D` from menu). 4 BH variants in 2x2 layout:
 - **Overload aftermath:** When BH reaches MAX_ABSORB (12), it explodes, spawns Circles radially, massive explosion + grid impulse + camera shake. BH respawns at same position after 3s delay.
 - Circles are gravity-immune — they scatter and remain free after overload (don't get re-absorbed by other BHs)
 - `GameState` includes `'design_lab'`. `DesignLab` class in `design-lab.ts`.
+
+## Specimen Gallery (`?gallery=1`)
+
+Separate from the BlackHole Design Lab: a standalone **visual catalog** (`web/src/gallery.ts`) that boots instead of the game (via a `?gallery=1` branch in `index.ts`) and renders **every wired entity in one labeled grid** for screenshot-based visual review.
+- Covers: player (idle + firing recoil/muzzle-flash), wingman; Rhombus/Pinwheel (+elite); Circle (r10/r16), Shard, MiniMandel; Sierpinski T0/T1/T2 (+elite), Mandelbrot; all 4 BlackHole `visualMode`s + a fed (7/12) + a destabilizing telegraph; looping spawn warp-ins; bullets, crosshair, kill/nova explosions, and a trail.
+- Enemies animate in place: each frame calls the real `update()` then re-pins `position` to its cell so it stays put while rotation/pulse/swirl advance. BlackHole/Mandelbrot need `update()` for their animation.
+- Reuses the real pipeline (`Renderer`/`BloomPass`/`SpringMassGrid`/`TrailSystem`/`Starfield`) so specimens look exactly as in-game. Auto-fit zoom packs the whole roster into one frame; HTML overlay `#gallery-labels` draws headers + labels. `window.gallery` exposes `paused`/`gridOn`/`bloomOn`/`starfieldOn`/`labelsOn` (keys Space/G/B/S/L).
+- **When adding or restyling an enemy/effect, add it here too** so the catalog stays complete. Flow test: `tests/flows/76-gallery.yml`.
