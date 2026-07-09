@@ -16,10 +16,11 @@ import { BlackHole } from './entities/enemies/blackhole';
 import { Rhombus } from './entities/enemies/rhombus';
 import { Vec2 } from './core/vector';
 import { gameSettings } from './settings';
-import { TRAIL_LENGTH_ENEMY } from './config';
+import { TRAIL_LENGTH_ENEMY, BH_CORE_RADIUS_FRACTION, BH_CORE_PULL_MULT } from './config';
 
-const RHOMBUS_SPAWN_INTERVAL = 850; // ms
-const MAX_RHOMBUSES = 22;
+const RHOMBUS_SPAWN_INTERVAL = 420; // ms
+const MAX_RHOMBUSES = 34;
+const WAVE_COUNT = 16;
 
 /** Convert an RGB triplet (0..1) to an HSL hue in degrees. */
 function rgbToHue(r: number, g: number, b: number): number {
@@ -119,7 +120,10 @@ export class ParticleLab {
     document.body.appendChild(this.overlay);
 
     window.addEventListener('resize', () => this.onResize());
-    window.addEventListener('keydown', (e) => this.onKeyDown(e.code));
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') e.preventDefault();
+      this.onKeyDown(e.code);
+    });
     const initAudio = (): void => { if (!this.audio.initialized) this.audio.init().catch(() => {}); };
     canvas.addEventListener('pointerdown', initAudio);
     window.addEventListener('keydown', initAudio);
@@ -153,6 +157,10 @@ export class ParticleLab {
     this.bh = bh;
     this.grid.applyImpulse(0, 0, -800, 350);
 
+    // Seed a ring of enemies at the well's rim so there's something interacting
+    // with the hole the instant the lab opens.
+    this.spawnWave();
+
     this.rebuildOverlay();
   }
 
@@ -172,6 +180,7 @@ export class ParticleLab {
       case 'KeyD': this.field.streak = Math.min(6, +(this.field.streak + 0.3).toFixed(2)); break;
       case 'KeyG': this.gridOn = !this.gridOn; break;
       case 'KeyB': this.bloomOn = !this.bloomOn; break;
+      case 'Space': this.spawnWave(); break;
       case 'KeyR': this.reset(); break;
       default: return;
     }
@@ -297,21 +306,26 @@ export class ParticleLab {
     this.field.spawnBurst(rx, ry, behind, 0.7, 2, 2.2 + moved * 0.3, 190, 0.55);
   }
 
-  private spawnRhombus(): void {
-    const hw = gameSettings.arenaWidth / 2;
-    const hh = gameSettings.arenaHeight / 2;
-    const side = Math.floor(Math.random() * 4);
-    const pos = new Vec2(
-      side === 0 ? -hw + 20 : side === 1 ? hw - 20 : (Math.random() * 2 - 1) * hw,
-      side === 2 ? -hh + 20 : side === 3 ? hh - 20 : (Math.random() * 2 - 1) * hh,
-    );
+  /** Spawn a rhombus somewhere on the BlackHole's gravity-well rim so it immediately
+   *  falls/spirals in — the whole point is watching the interaction. */
+  private spawnRhombus(angle = Math.random() * Math.PI * 2, radiusFrac = 0.55 + Math.random() * 0.4): void {
+    const cx = this.bh ? this.bh.position.x : 0;
+    const cy = this.bh ? this.bh.position.y : 0;
+    const r = BlackHole.ATTRACT_RADIUS * radiusFrac;
     const e = new Rhombus();
-    e.position.copyFrom(pos);
+    e.position.set(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r);
     e.active = true;
-    e.spawnTimer = 0.5;
-    e.spawnDuration = 0.5;
+    e.spawnTimer = 0.35;
+    e.spawnDuration = 0.35;
     e.trailId = this.trails.register(e.color, TRAIL_LENGTH_ENEMY);
     this.enemies.push(e);
+  }
+
+  /** Drop a full ring of rhombuses around the well at once — watch them spiral in together. */
+  private spawnWave(): void {
+    for (let i = 0; i < WAVE_COUNT; i++) {
+      this.spawnRhombus((i / WAVE_COUNT) * Math.PI * 2, 0.72);
+    }
   }
 
   /** (B) Enemy gravity with an optional tangential swirl so rhombuses spiral in. */
@@ -320,6 +334,7 @@ export class ParticleLab {
     if (!bh || !bh.active || bh.isSpawning) return;
     const attractR = BlackHole.ATTRACT_RADIUS;
     const attractR2 = attractR * attractR;
+    const coreR = attractR * BH_CORE_RADIUS_FRACTION;
     const absorbR2 = (bh.collisionRadius + 10) * (bh.collisionRadius + 10);
 
     for (const e of this.enemies) {
@@ -338,7 +353,10 @@ export class ParticleLab {
 
       if (dist2 < attractR2 && dist2 > 1) {
         const dist = Math.sqrt(dist2);
-        const force = BlackHole.GRAVITY_STRENGTH * dt / dist;
+        // Inescapable core (matches production): pull ×mult inside coreR so trackers
+        // get captured instead of escaping toward the player.
+        const pull = dist < coreR ? BlackHole.GRAVITY_STRENGTH * BH_CORE_PULL_MULT : BlackHole.GRAVITY_STRENGTH;
+        const force = pull * dt / dist;
         const nx = dx / dist;
         const ny = dy / dist;
         e.position.x += nx * force;
@@ -376,7 +394,8 @@ export class ParticleLab {
     const attractR = BlackHole.ATTRACT_RADIUS;
     if (dist2 >= attractR * attractR || dist2 <= 1) return;
     const dist = Math.sqrt(dist2);
-    const force = gameSettings.bhPlayerPull * (1 + bh.absorbedCount * 0.08) * dt / dist;
+    const core = dist < attractR * BH_CORE_RADIUS_FRACTION ? BH_CORE_PULL_MULT : 1;
+    const force = gameSettings.bhPlayerPull * core * (1 + bh.absorbedCount * 0.08) * dt / dist;
     this.player.position.x += dx / dist * force;
     this.player.position.y += dy / dist * force;
   }
@@ -502,7 +521,7 @@ export class ParticleLab {
       `gravity swirl ${this.gravitySwirl.toFixed(2)} (Z/X) · streak ${this.field.streak.toFixed(1)} (E/D)`;
     const keys = document.createElement('div');
     keys.style.color = '#6f78c8';
-    keys.textContent = 'G grid · B bloom · R reset · WASD move · mouse aim · click/hold shoot';
+    keys.textContent = 'SPACE spawn enemy wave · G grid · B bloom · R reset · WASD move · mouse aim · click/hold shoot';
     this.overlay.append(title, effects, tune, keys, this.statusLine);
   }
 
