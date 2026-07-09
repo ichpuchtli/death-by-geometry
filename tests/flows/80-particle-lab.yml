@@ -1,0 +1,95 @@
+name: "Particle Lab — ambient dust field, swirl-on-gravity, thruster wake, impact sparklets"
+tags: [particles, visual, regression]
+steps:
+  - action: launch
+    url: "/?particles=1"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 1000
+
+  - action: assertEval
+    description: "Particle Lab booted with a seeded dust field and an active BlackHole"
+    script: |
+      const lab = window.particleLab;
+      if (!lab) return false;
+      return lab.bh && lab.bh.active && lab.field.count > 100;
+
+  - action: assertVisible
+    selector: "#particle-lab-overlay"
+
+  - action: screenshot
+    name: "80-particle-baseline"
+
+  # Burst injection is the shared path for thruster wake (C) + impact sparklets (D):
+  # spawning a burst must add live transient motes to the field.
+  - action: assertEval
+    description: "spawnBurst injects transient motes into the field"
+    script: |
+      const lab = window.particleLab;
+      const before = lab.field.count;
+      lab.field.spawnBurst(0, 0, 0, 1.0, 12, 3, 40, 0.6);
+      return lab.field.count >= before + 8;
+
+  # Move around + hold fire so the live thruster wake + sparklets actually run
+  - action: keyPress
+    key: "d"
+    duration: 700
+  - action: mouseMove
+    x: 700
+    y: 300
+  - action: mouseDown
+  - action: keyPress
+    key: "w"
+    duration: 700
+  - action: mouseUp
+
+  # (B) Swirl-on-gravity is visibly whipping rhombuses around the hole — screenshot it
+  - action: screenshot
+    name: "80-particle-gravity-swirl"
+
+  # Capture check: with swirl the trackers ORBIT rather than fall in (the whole point),
+  # so to deterministically prove the gravity path absorbs, move the player far away and
+  # drop the live rhombuses just outside the absorb radius with swirl zeroed — pure radial
+  # pull drags them straight into the hole.
+  - action: evalCheck
+    description: "Stage rhombuses at the edge of the hole for pure radial infall"
+    script: |
+      const lab = window.particleLab;
+      lab.gravitySwirl = 0;
+      lab.player.position.set(-1400, 0);
+      let staged = 0;
+      for (const e of lab.enemies) {
+        if (e.active && e.family === 'rhombus') {
+          e.isSpawning = false;
+          e.spawnTimer = 0;
+          e.position.set(48, 0);
+          staged++;
+        }
+      }
+      return staged >= 1;
+
+  - action: waitForEval
+    description: "Radial gravity captures tracking rhombuses"
+    timeout: 15000
+    script: |
+      return window.particleLab.bh.absorbedCount >= 1;
+
+  # Toggle each effect off — render must stay stable (no crash) with everything disabled
+  - action: evalCheck
+    description: "Disable all four effects"
+    script: |
+      const lab = window.particleLab;
+      lab.dustOn = false;
+      lab.swirlOn = false;
+      lab.thrusterOn = false;
+      lab.sparkletsOn = false;
+      return lab.dustOn === false;
+
+  - action: wait
+    ms: 600
+
+  - action: screenshot
+    name: "80-particle-effects-off"
+
+  - action: assertNoErrors

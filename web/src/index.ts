@@ -1,6 +1,7 @@
 import { Game } from './game';
 import type { Gallery as GalleryType } from './gallery';
 import type { ThreatLab as ThreatLabType } from './threat-lab';
+import type { ParticleLab as ParticleLabType } from './particle-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -41,6 +42,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(labLoop);
     }
     requestAnimationFrame(labLoop);
+  });
+} else if (bootParams.has('particles')) {
+  // Particle Lab — cosmic-dust aesthetic + companion particle effects (`?particles=1`)
+  import('./particle-lab').then(({ ParticleLab }) => {
+    const lab = new ParticleLab(gameCanvas);
+    (window as unknown as { particleLab: ParticleLabType }).particleLab = lab;
+    let last = performance.now();
+    function particleLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(particleLoop);
+    }
+    requestAnimationFrame(particleLoop);
   });
 } else {
   bootGame();

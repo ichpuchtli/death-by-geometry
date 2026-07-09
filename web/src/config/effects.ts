@@ -15,6 +15,18 @@ export const DEATH_FRAGMENT_CONE = 1.35;         // rad (±77°) — back hemisp
 export const DEATH_FRAGMENT_SIDE_DAMPING = 0.45; // edge fragments move at 45% of forward speed
 export const DEATH_FRAGMENT_FORWARD_BOOST = 1.4; // overall speed-up vs radial (momentum carried in)
 
+// --- Ambient particle field (cosmic dust) ---
+// A field of additive motes drifting through world space, pulled + swirled around
+// attractors (BlackHoles) into glowing accretion disks. Tunables are live-editable
+// in the Particle Lab (?particles=1); these are the defaults / starting points.
+export const PARTICLE_FIELD_DENSITY = 520;       // ambient motes across the view
+export const PARTICLE_FIELD_DRAG = 0.985;        // per-frame velocity retention (frame-normalized)
+export const PARTICLE_FIELD_MAX_SPEED = 9.5;     // px/frame speed cap
+export const PARTICLE_FIELD_SWIRL = 0.55;        // tangential force as a fraction of radial pull (the "orbit" knob)
+export const PARTICLE_FIELD_STREAK = 2.4;        // velocity-stretch multiplier for the streak tail
+export const PARTICLE_FIELD_SOFTENING = 850;     // distance² softening so the core pull stays finite
+export const PARTICLE_FIELD_MAX_TRANSIENT = 420; // cap on live burst motes (thruster wake + impact sparks)
+
 // --- Camera ---
 export const CAMERA_LERP_SPEED = 0.08;
 export const SCREEN_SHAKE_SMALL = 5;
