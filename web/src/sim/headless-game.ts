@@ -12,7 +12,7 @@ import { separateEnemies } from '../systems/separation';
 import { RunStats } from '../core/run-stats';
 import { DIFFICULTY_PHASES } from '../config';
 import { gameSettings } from '../settings';
-import { stubGrid, stubCamera, stubAudio, stubExplosions, stubHud } from './stubs';
+import { stubGrid, stubCamera, stubAudio, stubExplosions, stubField, stubDebris, stubHud } from './stubs';
 import { ScriptedInput } from './scripted-input';
 import type { Action } from '../ai/action';
 
@@ -48,11 +48,13 @@ export class HeadlessGame {
     const camera = stubCamera();
     const audio = stubAudio();
     const explosions = stubExplosions();
+    const field = stubField();
+    const debris = stubDebris();
     const hud = stubHud();
 
     this.combat = new CombatSystem(false, {
       player: this.player, runStats: this.runStats, enemies: this.enemies,
-      lifecycle: this.lifecycle, audio, explosions, grid, camera,
+      lifecycle: this.lifecycle, audio, explosions, field, debris, grid, camera,
       onMinibossDefeated: () => this.boss.onMandelbrotDefeated(),
       onSierpinskiBossDefeated: () => this.boss.onSierpinskiDefeated(),
     });

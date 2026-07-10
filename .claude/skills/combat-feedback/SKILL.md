@@ -32,6 +32,10 @@ Kill fragments **conserve the killing bullet's momentum**: `collision.ts` record
 - Kill-signature rays follow the same forward fan on bullet kills (`spawnKillSignature(..., direction)`).
 - Flow test: `tests/flows/79-directional-shatter.yml` (property-checks the cone + speed gradient on live particle data).
 
+## Geometry Shatter (solid-object death)
+
+`CombatSystem.emitShatter()` breaks a killed polygonal unit along its **own wireframe edges** into rigid tumbling shards (`DebrisField`, `web/src/renderer/debris-field.ts`) that carry the impact momentum, plus a colour-tinted spark puff (`field.spawnBurst`). For shatter-eligible families (default/rhombus, pinwheel, Sierpinski T1/T2 — guarded by `getWorldPoints().length >= 3`, so ring units like circles fall through to their normal burst) the generic `Explosion` particle **cloud is cut to a small flash** — the shards + the directional kill-signature rays are the debris now. Bosses/BlackHole/supernova stay fully radial. `Game` owns `debris` + updates/renders it (additive pass); `SHATTER_*` config in `config/effects.ts`. Headless twin passes a no-op `stubDebris`/`stubField`. Flow test: `tests/flows/82-game-particles.yml`. Also demoed in the Particle Lab (`?particles=1`).
+
 ## Kill Signatures
 
 Per-enemy-family death VFX rendered in additive blend pass (`KillEffect` array in `CombatSystem`; family read from `enemy.family`). On bullet kills the ray angles fan forward along the impact direction instead of the full circle (bosses stay radial):

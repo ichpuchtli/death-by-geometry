@@ -1,5 +1,7 @@
 import type { Renderer } from '../renderer/sprite-batch';
 import type { SpringMassGrid } from '../renderer/grid';
+import type { ParticleField } from '../renderer/particle-field';
+import type { DebrisField } from '../renderer/debris-field';
 import type { Camera } from '../core/camera';
 import type { AudioManager } from '../core/audio';
 import { Player } from '../entities/player';
@@ -42,6 +44,7 @@ import {
   MINIBOSS_HEAT_ON_DEATH,
   MINIBOSS_HITSTOP_DEATH,
   DIFFICULTY_PHASES,
+  SHATTER_IMPACT_SPEED,
 } from '../config';
 
 interface KillEffect {
@@ -68,10 +71,26 @@ export interface CombatSystemDeps {
   lifecycle: LifecycleSystem;
   audio: AudioManager;
   explosions: ExplosionPool;
+  field: ParticleField;
+  debris: DebrisField;
   grid: SpringMassGrid;
   camera: Camera;
   onMinibossDefeated: () => void;
   onSierpinskiBossDefeated: () => void;
+}
+
+/** RGB triplet (0..1) → HSL hue in degrees, for tinting impact sparklets by unit colour. */
+function rgbToHue(r: number, g: number, b: number): number {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  if (d === 0) return 0;
+  let h: number;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  return h < 0 ? h + 360 : h;
 }
 
 export class CombatSystem {
@@ -217,9 +236,11 @@ export class CombatSystem {
             maxHitstop = Math.max(maxHitstop, HITSTOP_SIERPINSKI * 2);
             this.deps.onSierpinskiBossDefeated();
           } else if (sTier === 1) {
+            const shattered = this.emitShatter(kill.enemy, kill.position.x, kill.position.y, kill.color, dir);
             this.deps.explosions.spawn(
               kill.position.x, kill.position.y, kill.color,
-              this.mobile ? 40 : 80, EXPLOSION_DURATION_DEFAULT, 1, dir,
+              shattered ? (this.mobile ? 8 : 16) : (this.mobile ? 40 : 80),
+              EXPLOSION_DURATION_DEFAULT, 1, dir,
             );
             this.deps.explosions.spawn(
               kill.position.x, kill.position.y, [1, 0.9, 0.3],
@@ -229,26 +250,35 @@ export class CombatSystem {
             this.deps.camera.shake(SCREEN_SHAKE_LARGE);
             maxHitstop = Math.max(maxHitstop, HITSTOP_SIERPINSKI);
           } else {
+            const shattered = this.emitShatter(kill.enemy, kill.position.x, kill.position.y, kill.color, dir);
             this.deps.explosions.spawn(
               kill.position.x, kill.position.y, kill.color,
-              this.mobile ? 25 : 50, EXPLOSION_DURATION_DEFAULT * 0.8, 1, dir,
+              shattered ? (this.mobile ? 6 : 12) : (this.mobile ? 25 : 50),
+              EXPLOSION_DURATION_DEFAULT * 0.8, 1, dir,
             );
             this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 350, 150);
           }
           break;
         }
         case 'pinwheel': {
+          const shattered = this.emitShatter(kill.enemy, kill.position.x, kill.position.y, kill.color, dir);
           this.deps.explosions.spawn(
             kill.position.x, kill.position.y, kill.color,
-            this.mobile ? 30 : 60, EXPLOSION_DURATION_DEFAULT * 0.8, 1.3, dir,
+            shattered ? (this.mobile ? 5 : 10) : (this.mobile ? 30 : 60),
+            EXPLOSION_DURATION_DEFAULT * 0.8, 1.3, dir,
           );
           this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 350, 180);
           break;
         }
         default: {
+          // Regular units break into their own geometry (shards) — the "box" particle
+          // cloud is replaced by a flash + the tumbling edges. Ring units keep the cloud.
+          const shattered = this.emitShatter(kill.enemy, kill.position.x, kill.position.y, kill.color, dir);
           this.deps.explosions.spawn(
             kill.position.x, kill.position.y, kill.color,
-            this.mobile ? Math.floor(EXPLOSION_PARTICLE_COUNT_SMALL * 0.6) : EXPLOSION_PARTICLE_COUNT_SMALL,
+            shattered
+              ? (this.mobile ? 4 : 8)
+              : (this.mobile ? Math.floor(EXPLOSION_PARTICLE_COUNT_SMALL * 0.6) : EXPLOSION_PARTICLE_COUNT_SMALL),
             EXPLOSION_DURATION_DEFAULT, 1, dir,
           );
           this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 400, 200);
@@ -443,6 +473,25 @@ export class CombatSystem {
 
   clearPendingSpawns(): void {
     this.pendingSpawns = [];
+  }
+
+  /**
+   * Break a killed polygonal unit along its own wireframe edges into tumbling geometry
+   * shards, plus a small forward spark puff. Returns true when the unit had geometry to
+   * shatter (rhombus/pinwheel/shard/…) so the caller can drop the generic particle cloud;
+   * false for ring units (circles) that have no edges — those keep their normal burst.
+   */
+  private emitShatter(
+    enemy: Enemy, x: number, y: number, color: [number, number, number], dir: number | undefined,
+  ): boolean {
+    const pts = enemy.getWorldPoints();
+    if (pts.length < 3) return false;
+    const moving = enemy.velocity.x * enemy.velocity.x + enemy.velocity.y * enemy.velocity.y > 0.0001;
+    const angle = dir ?? (moving ? Math.atan2(enemy.velocity.y, enemy.velocity.x) : 0);
+    this.deps.debris.shatter(pts, x, y, color, angle, SHATTER_IMPACT_SPEED);
+    const hue = rgbToHue(color[0], color[1], color[2]);
+    this.deps.field.spawnBurst(x, y, angle, 1.1, this.mobile ? 4 : 7, 4.0, hue, 0.4);
+    return true;
   }
 
   private spawnKillSignature(

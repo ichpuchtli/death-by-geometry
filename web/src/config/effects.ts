@@ -44,6 +44,15 @@ export const SHATTER_POOL_SIZE = 900;        // shard pool cap (edges * subdiv *
 // hole in its final moments before it's swallowed. Driven per-vertex by Renderer.setWarp.
 export const DEATH_WARP_STRETCH = 0.55;      // radial inward tidal displacement at full intensity
 export const DEATH_WARP_TWIST = 2.2;         // radians of frame-drag swirl at full intensity, at the core
+export const DEATH_WARP_REACH_MIN = 150;     // px — minimum influence radius around a hole
+export const DEATH_WARP_REACH_MULT = 3.5;    // influence radius = max(min, hole.collisionRadius * this)
+
+// --- Live-game particle wiring (ported from the Particle Lab) ---
+export const PARTICLE_FIELD_GAME_DENSITY = 420;        // ambient dust motes (desktop)
+export const PARTICLE_FIELD_GAME_DENSITY_MOBILE = 120; // fewer on mobile for perf
+export const PARTICLE_FIELD_DUST_PULL = 2000;          // BlackHole strength as seen by the dust field
+export const GRAVITY_ENEMY_SWIRL = 0.35;               // subtle tangential term so enemies spiral into holes
+export const SHATTER_IMPACT_SPEED = 0.3;               // px/ms momentum handed to geometry shards on a kill
 
 // --- Camera ---
 export const CAMERA_LERP_SPEED = 0.08;

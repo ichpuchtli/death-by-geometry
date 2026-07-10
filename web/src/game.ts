@@ -9,6 +9,8 @@ import { BulletPool } from './entities/bullet';
 import { Enemy } from './entities/enemies/enemy';
 import { ExplosionPool } from './entities/explosion';
 import { AimIndicator } from './entities/crosshair';
+import { ParticleField, FieldAttractor } from './renderer/particle-field';
+import { DebrisField } from './renderer/debris-field';
 import { HUD } from './ui/hud';
 import { VirtualJoystickRenderer } from './ui/virtual-joystick';
 import { renderOffscreenIndicators } from './ui/offscreen-indicators';
@@ -59,6 +61,13 @@ import {
   MedalDef,
   SUPERNOVA_HITSTOP,
   SUPERNOVA_FLASH_DURATION,
+  DEATH_WARP_STRETCH,
+  DEATH_WARP_TWIST,
+  DEATH_WARP_REACH_MIN,
+  DEATH_WARP_REACH_MULT,
+  PARTICLE_FIELD_GAME_DENSITY,
+  PARTICLE_FIELD_GAME_DENSITY_MOBILE,
+  PARTICLE_FIELD_DUST_PULL,
 } from './config';
 import { gameSettings } from './settings';
 import { showDesktopSettings, hideDesktopSettings } from './ui/settings-panel';
@@ -82,6 +91,10 @@ export class Game {
   private bullets: BulletPool;
   private enemies: Enemy[] = [];
   private explosions: ExplosionPool;
+  private field: ParticleField;       // ambient cosmic dust + thruster wake / impact sparklets
+  private debris: DebrisField;        // geometry shatter — killed units break into their own edges
+  private prevPlayerX = 0;            // for the thruster wake delta
+  private prevPlayerY = 0;
   private aimIndicator: AimIndicator;
   private hud: HUD;
   private joystickRenderer: VirtualJoystickRenderer;
@@ -182,6 +195,9 @@ export class Game {
     this.player = new Player(this.input);
     this.bullets = new BulletPool();
     this.explosions = new ExplosionPool();
+    this.field = new ParticleField();
+    this.field.density = this.mobile ? PARTICLE_FIELD_GAME_DENSITY_MOBILE : PARTICLE_FIELD_GAME_DENSITY;
+    this.debris = new DebrisField();
     this.combat = new CombatSystem(this.mobile, {
       player: this.player,
       runStats: this.runStats,
@@ -189,6 +205,8 @@ export class Game {
       lifecycle: this.lifecycle,
       audio: this.audio,
       explosions: this.explosions,
+      field: this.field,
+      debris: this.debris,
       grid: this.grid,
       camera: this.camera,
       onMinibossDefeated: () => this.boss.onMandelbrotDefeated(),
@@ -447,6 +465,10 @@ export class Game {
     this.enemies.length = 0;
     this.gravity.clear();
     this.explosions.clear();
+    this.debris.clear();
+    this.field.reseed();
+    this.prevPlayerX = this.player.position.x;
+    this.prevPlayerY = this.player.position.y;
     this.lifecycle.clear();
     this.combat.clear();
     this.waveManager.reset();
@@ -534,6 +556,7 @@ export class Game {
 
     // Keep explosions animating
     this.explosions.update(dt);
+    this.debris.update(dt);
 
     // Gentle idle rotation for enemies (no movement)
     for (const e of this.enemies) {
@@ -619,6 +642,7 @@ export class Game {
     if (this.hitstopTimer > 0) {
       this.hitstopTimer -= dt;
       this.explosions.update(dt);
+      this.debris.update(dt);
       this.gravity.updateGravityWells();
       this.grid.update(dt);
       this.audio.setMusicIntensity(this.computeIntensity());
@@ -757,6 +781,9 @@ export class Game {
     // Camera
     this.camera.follow(this.player.position);
 
+    // Ambient dust field + thruster wake + debris shards
+    this.updateParticles(dt);
+
     // --- Heat system update ---
     this.updateHeat(dt);
 
@@ -773,6 +800,54 @@ export class Game {
 
     // Music intensity
     this.audio.setMusicIntensity(this.computeIntensity());
+  }
+
+  /**
+   * Advance the ambient dust field (reacting to BlackHole life-stages), the thruster wake,
+   * and the geometry-shatter debris. Ported from the Particle Lab.
+   */
+  private updateParticles(dt: number): void {
+    // (C) Thruster wake — dust kicked out behind the ship as it moves
+    const dx = this.player.position.x - this.prevPlayerX;
+    const dy = this.player.position.y - this.prevPlayerY;
+    const moved = Math.hypot(dx, dy);
+    if (moved > 0.5) {
+      const behind = Math.atan2(-dy, -dx);
+      const rx = this.player.position.x - (dx / moved) * 14;
+      const ry = this.player.position.y - (dy / moved) * 14;
+      this.field.spawnBurst(rx, ry, behind, 0.7, this.mobile ? 1 : 2, 2.2 + moved * 0.3, 190, 0.5);
+    }
+    this.prevPlayerX = this.player.position.x;
+    this.prevPlayerY = this.player.position.y;
+
+    // (A) Ambient dust: attractors from active BlackHoles, with life-stage heat coupling —
+    // pull ramps with swallowed mass, heat (hue bias) spikes to near-white while destabilizing.
+    const attractors: FieldAttractor[] = [];
+    let destabilizing = false;
+    for (const e of this.enemies) {
+      if (!e.active || e.isSpawning || !(e instanceof BlackHole)) continue;
+      const inst = e.absorbedCount / BlackHole.MAX_ABSORB;
+      let heat = inst * 0.5;
+      if (e.destabilizing && !e.overloaded) {
+        heat = 0.8 + 0.2 * Math.min(1, e.destabilizeTimer / e.destabilizeDuration);
+        destabilizing = true;
+      }
+      attractors.push({
+        x: e.position.x,
+        y: e.position.y,
+        strength: PARTICLE_FIELD_DUST_PULL * (1 + inst * 1.2),
+        radius: BlackHole.ATTRACT_RADIUS * 1.7,
+        heat,
+      });
+    }
+    this.field.brightness = destabilizing ? 1.4 : 1;
+    this.field.update(dt, attractors, {
+      cx: this.camera.renderX,
+      cy: this.camera.renderY,
+      halfW: this.renderer.width / 2,
+      halfH: this.renderer.height / 2,
+    });
+    this.debris.update(dt);
   }
 
   /** Update combat feedback timers (banners, telegraphs, border pulse, supernova flash) */
@@ -963,6 +1038,7 @@ export class Game {
 
     // Update explosions (at slowed rate)
     this.explosions.update(gameDt);
+    this.debris.update(gameDt);
     this.grid.update(gameDt);
     this.camera.updateShake(gameDt);
 
@@ -1060,7 +1136,7 @@ export class Game {
     if (this.state === 'playing' || this.state === 'death_slowmo') {
       // Render spawn telegraphs (behind entities)
       this.spawn.renderTelegraphs(this.renderer);
-      for (const e of this.enemies) e.render(this.renderer);
+      this.renderEnemiesWarped();
       if (this.state === 'playing') {
         this.bullets.render(this.renderer);
         this.player.render(this.renderer);
@@ -1112,9 +1188,11 @@ export class Game {
       for (const e of this.enemies) e.renderGlow(this.renderer, t);
     }
 
-    // 4. Switch to additive blend for trails, explosions, glow, kill signatures
+    // 4. Switch to additive blend for dust, trails, debris, explosions, glow, kill signatures
     this.renderer.setBlendMode('additive');
+    this.field.render(this.renderer);
     this.lifecycle.trailSystem.render(this.renderer);
+    this.debris.render(this.renderer);
     this.explosions.render(this.renderer);
     this.combat.render(this.renderer);
     this.gravity.renderEffects(this.renderer);
@@ -1161,6 +1239,36 @@ export class Game {
         this.joystickRenderer.render(this.input);
       }
     }
+  }
+
+  /**
+   * Render enemies, applying the tidal death warp (spaghettification) to any unit whose
+   * geometry has drifted inside a BlackHole's reach — it stretches + twists toward the hole
+   * in its final moments. The holes themselves render clean.
+   */
+  private renderEnemiesWarped(): void {
+    const holes: BlackHole[] = [];
+    for (const e of this.enemies) {
+      if (e.active && !e.isSpawning && e instanceof BlackHole) holes.push(e);
+    }
+    for (const e of this.enemies) {
+      let warped = false;
+      if (holes.length && e.active && !e.isSpawning && !(e instanceof BlackHole)) {
+        for (const h of holes) {
+          const reach = Math.max(DEATH_WARP_REACH_MIN, h.collisionRadius * DEATH_WARP_REACH_MULT);
+          const dx = h.position.x - e.position.x;
+          const dy = h.position.y - e.position.y;
+          if (dx * dx + dy * dy < reach * reach) {
+            this.renderer.setWarp(h.position.x, h.position.y, 1, DEATH_WARP_STRETCH, DEATH_WARP_TWIST, reach);
+            warped = true;
+            break;
+          }
+        }
+      }
+      if (!warped) this.renderer.clearWarp();
+      e.render(this.renderer);
+    }
+    this.renderer.clearWarp();
   }
 
   /** Render recovery shield ring around player */

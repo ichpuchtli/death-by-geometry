@@ -2,6 +2,8 @@ import type { SpringMassGrid } from '../renderer/grid';
 import type { Camera } from '../core/camera';
 import type { AudioManager } from '../core/audio';
 import type { ExplosionPool } from '../entities/explosion';
+import type { ParticleField } from '../renderer/particle-field';
+import type { DebrisField } from '../renderer/debris-field';
 import type { HUD } from '../ui/hud';
 
 /**
@@ -22,4 +24,6 @@ export const stubGrid = (): SpringMassGrid => noopStub<SpringMassGrid>();
 export const stubCamera = (): Camera => noopStub<Camera>();
 export const stubAudio = (): AudioManager => noopStub<AudioManager>();
 export const stubExplosions = (): ExplosionPool => noopStub<ExplosionPool>();
+export const stubField = (): ParticleField => noopStub<ParticleField>();
+export const stubDebris = (): DebrisField => noopStub<DebrisField>();
 export const stubHud = (): HUD => noopStub<HUD>();

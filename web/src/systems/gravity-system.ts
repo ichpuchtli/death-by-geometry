@@ -26,6 +26,7 @@ import {
   CIRCLE_EJECT_SPEED_MIN,
   CIRCLE_EJECT_SPEED_MAX,
   CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER,
+  GRAVITY_ENEMY_SWIRL,
 } from '../config';
 import type { Renderer } from '../renderer/sprite-batch';
 
@@ -148,8 +149,16 @@ export class GravitySystem {
           const dist = Math.sqrt(dist2);
           const pull = dist < coreR ? BlackHole.GRAVITY_STRENGTH * BH_CORE_PULL_MULT : BlackHole.GRAVITY_STRENGTH;
           const force = pull * dt / dist;
-          e.position.x += dx / dist * force;
-          e.position.y += dy / dist * force;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          e.position.x += nx * force;
+          e.position.y += ny * force;
+          // Subtle tangential swirl → enemies spiral into the hole instead of falling straight
+          if (GRAVITY_ENEMY_SWIRL > 0) {
+            const tang = force * GRAVITY_ENEMY_SWIRL;
+            e.position.x += -ny * tang;
+            e.position.y += nx * tang;
+          }
         }
       }
 

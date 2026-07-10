@@ -1,0 +1,54 @@
+name: "In-game particle effects — ambient dust, geometry shatter, death warp"
+tags: [regression, particles, blackhole]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+  - action: wait
+    ms: 300
+
+  # Intense phase + high spawn so BlackHoles (dust attractors + warp) and kills happen fast
+  - action: evalCheck
+    description: "Configure settings for a busy run"
+    script: |
+      const s = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      s.startingPhase = 'intense';
+      s.startingLives = 99;
+      s.spawnRateMultiplier = 4;
+      s.maxEnemies = 200;
+      localStorage.setItem('gg_settings', JSON.stringify(s));
+      return true;
+
+  # Reload with the AI bot auto-playing (auto-fires + moves, so kills happen deterministically)
+  - action: launch
+    url: "/?bot=1"
+    waitFor: "canvas#game"
+  - action: waitForEval
+    description: "Bot-driven run is playing"
+    timeout: 8000
+    script: |
+      return window.game.state === 'playing';
+
+  # Renderer exposes the tidal-warp hook used for spaghettification
+  - action: assertEval
+    description: "Renderer has the setWarp/clearWarp tidal-warp API"
+    script: |
+      return typeof window.game.renderer.setWarp === 'function';
+
+  # (A) Ambient dust field seeds itself once the run is live
+  - action: waitForEval
+    description: "Ambient dust field is seeded"
+    timeout: 8000
+    script: |
+      return window.game.field.count > 100;
+
+  # (C) Geometry shatter — kills emit tumbling edge fragments into the debris pool
+  - action: waitForEval
+    description: "Kills produce geometry-shatter debris"
+    timeout: 12000
+    script: |
+      return window.game.debris.count >= 1;
+
+  - action: screenshot
+    name: "82-game-particles"
+  - action: assertNoErrors
