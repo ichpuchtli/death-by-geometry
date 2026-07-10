@@ -77,8 +77,12 @@ export class SpawnSystem {
         if (eliteCount >= MAX_CONCURRENT_ELITES) elite = false;
       }
       const enemy = createEnemy(req.type, req.position, elite);
-      // If ambush spawn, use longer spawn animation
-      if (req.isAmbush) { enemy.spawnDuration = enemy.spawnTimer = SPAWN_DURATION_AMBUSH; }
+      // If ambush spawn, use longer spawn animation (never shorten an enemy that already
+      // has a longer warp-in, e.g. BlackHoles).
+      if (req.isAmbush) {
+        const d = Math.max(enemy.spawnDuration, SPAWN_DURATION_AMBUSH);
+        enemy.spawnDuration = enemy.spawnTimer = d;
+      }
       // Push enemies that spawn too close to the player to the edge
       const dx = enemy.position.x - player.position.x;
       const dy = enemy.position.y - player.position.y;

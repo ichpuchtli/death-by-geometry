@@ -1,0 +1,48 @@
+name: "BlackHole longer harmless spawn-in"
+tags: [regression, blackhole]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+  - action: wait
+    ms: 300
+
+  # Intense phase + high spawn rate so a BlackHole appears quickly
+  - action: evalCheck
+    description: "Configure settings so BlackHoles spawn fast"
+    script: |
+      const s = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      s.startingPhase = 'intense';
+      s.startingLives = 99;
+      s.spawnRateMultiplier = 4;
+      s.maxEnemies = 200;
+      localStorage.setItem('gg_settings', JSON.stringify(s));
+      return true;
+
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+  - action: wait
+    ms: 300
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  # Wait for a BlackHole to appear
+  - action: waitForEval
+    description: "A BlackHole spawns"
+    timeout: 22000
+    script: |
+      return window.game.enemies.some(e => e.active && e.family === 'blackhole');
+
+  # It must get the long (>=3s) warp-in, and a spawning hole can't damage/pull the player
+  - action: assertEval
+    description: "BlackHoles get a long harmless warp-in (>=3s)"
+    script: |
+      const bh = window.game.enemies.find(e => e.active && e.family === 'blackhole');
+      return bh && bh.spawnDuration >= 3;
+
+  - action: screenshot
+    name: "81-blackhole-spawn-grace"
+  - action: assertNoErrors

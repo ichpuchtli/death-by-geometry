@@ -1,7 +1,7 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
 import type { Renderer } from '../../renderer/sprite-batch';
-import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS } from '../../config';
+import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS, SPAWN_DURATION_BLACKHOLE } from '../../config';
 import { gameSettings } from '../../settings';
 
 export type BlackHoleVisualMode = 'dense' | 'haze' | 'corona' | 'molten';
@@ -90,6 +90,8 @@ export class BlackHole extends Enemy {
     this.scoreValue = ENEMY_SCORES.blackhole;
     this.collisionRadius = 30;
     this.shapePoints = [];
+    // Long, harmless warp-in so a hole never materializes lethally on top of the player.
+    this.spawnDuration = this.spawnTimer = SPAWN_DURATION_BLACKHOLE;
 
     // Initialize shared state
     for (let i = 0; i < 28; i++) this.pushSwirlParticle(i % 4);
@@ -256,21 +258,8 @@ export class BlackHole extends Enemy {
     // Bright inner ring edge
     renderer.drawCircle(px, py, ringR - bandWidth * 0.3, [1, 1, 1], 48, 0.3 + instability * 0.1);
 
-    // Orbit particles as larger filled dots
-    const [odr, odg, odb] = P.orbitDot;
-    for (const hp of this.horizonParticles) {
-      const r = ringR * hp.orbitR;
-      const hpx = px + Math.cos(hp.angle) * r;
-      const hpy = py + Math.sin(hp.angle) * r;
-      renderer.drawFilledCircle(hpx, hpy, 2.5 + instability * 1.5, [odr, odg, odb], 8, hp.brightness * 0.8);
-      // Short trail arc
-      const ta = hp.angle + hp.trailLen * Math.sign(hp.speed);
-      renderer.drawLine(
-        hpx, hpy,
-        px + Math.cos(ta) * r, py + Math.sin(ta) * r,
-        odr, odg, odb, hp.brightness * 0.4,
-      );
-    }
+    // (Orbit-dot particles removed — at gameplay zoom they were sub-pixel specks that
+    //  didn't register; the swirl arms + infall streaks carry the accretion motion.)
 
     // Swirl arms
     this.renderSwirlArms(renderer, px, py, baseR, 4, 3.0, 0.7);
