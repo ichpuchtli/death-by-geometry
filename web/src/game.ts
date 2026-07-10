@@ -707,7 +707,8 @@ export class Game {
         e.spawnTimer = Math.max(0, e.spawnTimer - dt / 1000);
         continue; // skip movement/AI during spawn
       }
-      (e as { update(dt: number, playerPos?: Vec2): void }).update(dt, this.player.position);
+      (e as { update(dt: number, playerPos?: Vec2, playerVel?: Vec2): void })
+        .update(dt, this.player.position, this.player.velocity);
     }
 
     // Enemies — Pass 2: Separation (push overlapping enemies apart)

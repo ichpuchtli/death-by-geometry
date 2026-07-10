@@ -2,7 +2,8 @@ import { Enemy } from './enemy';
 import { Vec2 } from '../../core/vector';
 import type { Renderer } from '../../renderer/sprite-batch';
 import { COLORS, ENEMY_SPEED, ENEMY_SCORES, SPAWN_DURATION_CHILD,
-         CIRCLE_EJECT_DECAY, CIRCLE_FLOCK_PULL } from '../../config';
+         CIRCLE_EJECT_DECAY, CIRCLE_FLOCK_PULL,
+         CIRCLE_LEAD_MAX_MS, CIRCLE_COMMIT_RADIUS } from '../../config';
 
 export class CircleEnemy extends Enemy {
   radius = 10;
@@ -29,7 +30,7 @@ export class CircleEnemy extends Enemy {
     this.displacer = Vec2.random().scale(25);
   }
 
-  update(dt: number, playerPos?: Vec2): void {
+  update(dt: number, playerPos?: Vec2, playerVel?: Vec2): void {
     if (!this.active || !playerPos) return;
 
     // Decay ejection burst
@@ -37,18 +38,41 @@ export class CircleEnemy extends Enemy {
     this.ejectVel.x *= decay;
     this.ejectVel.y *= decay;
 
-    // Base player-follow velocity
-    this.follow(playerPos);
+    // Distance to the player, and a 0..1 "commit" factor that fades the swirl-offset
+    // and flock cohesion out on the terminal approach (→0 at contact) so the final
+    // strike is a clean straight line instead of an orbit-past.
+    const pdx = playerPos.x - this.position.x;
+    const pdy = playerPos.y - this.position.y;
+    const dist = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
+    const commit = Math.min(1, dist / CIRCLE_COMMIT_RADIUS);
 
-    // Elastic flock pull toward group centroid
+    // Predictive interception: aim where the player WILL be. Lead time is the time to
+    // traverse the current gap at our speed (first-order intercept), capped so a hard
+    // juke still shakes it. A same-speed circle now cuts the corner instead of trailing.
+    let aimX = playerPos.x + this.displacer.x * commit;
+    let aimY = playerPos.y + this.displacer.y * commit;
+    if (playerVel) {
+      const lead = Math.min(CIRCLE_LEAD_MAX_MS, dist / this.speed);
+      aimX += playerVel.x * lead;
+      aimY += playerVel.y * lead;
+    }
+
+    // Constant-speed seek toward the intercept point (never decelerates near the target)
+    const adx = aimX - this.position.x;
+    const ady = aimY - this.position.y;
+    const am = Math.sqrt(adx * adx + ady * ady) || 1;
+    this.velocity.set((adx / am) * this.speed, (ady / am) * this.speed);
+
+    // Elastic flock pull toward group centroid — faded out on the terminal approach so
+    // group cohesion doesn't sap the kill.
     if (this.flockCenter) {
       const dx = this.flockCenter.x - this.position.x;
       const dy = this.flockCenter.y - this.position.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 1) {
-        const pullSpeed = CIRCLE_FLOCK_PULL * dist;
-        this.velocity.x += (dx / dist) * pullSpeed;
-        this.velocity.y += (dy / dist) * pullSpeed;
+      const fdist = Math.sqrt(dx * dx + dy * dy);
+      if (fdist > 1) {
+        const pullSpeed = CIRCLE_FLOCK_PULL * fdist * commit;
+        this.velocity.x += (dx / fdist) * pullSpeed;
+        this.velocity.y += (dy / fdist) * pullSpeed;
       }
     }
 

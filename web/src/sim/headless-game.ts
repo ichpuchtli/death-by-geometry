@@ -143,8 +143,8 @@ export class HeadlessGame {
         e.spawnTimer = Math.max(0, e.spawnTimer - dt / 1000);
         continue;
       }
-      (e as { update(dt: number, playerPos?: import('../core/vector').Vec2): void })
-        .update(dt, this.player.position);
+      (e as { update(dt: number, playerPos?: import('../core/vector').Vec2, playerVel?: import('../core/vector').Vec2): void })
+        .update(dt, this.player.position, this.player.velocity);
     }
 
     separateEnemies(this.enemies, this.gravity.getEnemiesInGravityWell());

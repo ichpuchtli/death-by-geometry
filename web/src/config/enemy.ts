@@ -24,7 +24,7 @@ export const COLORS = {
 export const ENEMY_SPEED = {
   rhombus: 0.15,
   pinwheel: 0.05,
-  circle: 0.35,
+  circle: 0.38,
   triangle: 0.2,
   blackhole: 0,
   // --- New enemies ---
@@ -133,6 +133,13 @@ export const CIRCLE_EJECT_SPEED_MAX = 0.85;       // px/ms max ejection speed
 export const CIRCLE_EJECT_DECAY = 0.0022;          // fraction lost per ms (~80% gone in 730ms)
 export const CIRCLE_FLOCK_PULL = 0.0008;           // elastic spring: speed px/ms = pull * distPx
 export const CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER = 3; // circles emitted = absorbedCount * this
+// Predictive interception: circles lead the player's motion (aim where they WILL be)
+// instead of tail-chasing where they ARE — a same-speed pursuer can't otherwise close
+// on a fleeing target. Lead time ≈ dist / speed (first-order intercept), capped.
+export const CIRCLE_LEAD_MAX_MS = 550;             // ms — cap on prediction lead (dodgeable if player jukes)
+// Terminal commit: within this radius the swirl-offset (displacer) and flock cohesion
+// fade to zero so the final approach is a clean straight strike, not an orbit-past.
+export const CIRCLE_COMMIT_RADIUS = 220;           // px
 export const BLACKHOLE_LENSING_BASE = 1.5;
 export const BLACKHOLE_LENSING_PER_ABSORB = 0.35;
 

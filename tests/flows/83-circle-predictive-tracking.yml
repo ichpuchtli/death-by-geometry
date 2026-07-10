@@ -1,0 +1,144 @@
+name: "Circle predictive tracking — supernova circles lead the player and close the distance"
+tags: [regression, blackhole, circle, combat]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Intense phase + heavy pull so BlackHoles overload fast and eject circle flocks.
+  - action: evalCheck
+    description: "Configure for rapid BH overload"
+    script: |
+      const settings = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      settings.startingPhase = 'intense';
+      settings.startingLives = 99;
+      settings.spawnRateMultiplier = 4;
+      settings.maxEnemies = 200;
+      settings.bhEnemyPull = 24;
+      settings.bhAttractRadius = 600;
+      localStorage.setItem('gg_settings', JSON.stringify(settings));
+      return true;
+
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  - action: wait
+    ms: 200
+
+  - action: keyPress
+    key: "f"
+    duration: 100
+
+  - action: mouseMove
+    x: 800
+    y: 400
+
+  # Reset the min-distance tracker.
+  - action: evalCheck
+    description: "Init circle-to-player min-distance tracker"
+    script: |
+      window.__minCircleDist = Infinity;
+      window.__circleSeen = false;
+      return true;
+
+  # --- Deterministic lead-vector check ---------------------------------------
+  # Directly drive a live circle with a known lateral player velocity and assert
+  # its steering velocity points AHEAD of the pure pursuit vector (i.e. it leads).
+  # Wait for a supernova to eject circles first (up to ~24s of movement below).
+  - action: keys
+    keys: ["w", "d"]
+    duration: 4000
+  - action: keys
+    keys: ["s", "a"]
+    duration: 4000
+  - action: keys
+    keys: ["w", "a"]
+    duration: 4000
+
+  - action: evalCheck
+    description: "A live circle leads a laterally-moving player (steer points ahead of pursuit)"
+    script: |
+      const g = window.game;
+      if (!g) return false;
+      const circ = g.enemies.find(e => e.active && !e.isSpawning && e.family === 'circle');
+      if (!circ) { return true; } // no circle yet — don't fail; convergence check below still runs
+      window.__circleSeen = true;
+      // Known geometry: player to the +x of the circle, moving in +y.
+      const px = circ.position.x + 300, py = circ.position.y;
+      g.player.position.x = px; g.player.position.y = py;
+      g.player.velocity.x = 0; g.player.velocity.y = 0.35; // px/ms, moving +y
+      circ.flockCenter = null; circ.ejectVel.x = 0; circ.ejectVel.y = 0;
+      circ.update(16, g.player.position, g.player.velocity);
+      // Pursuit direction (straight at player) is +x. A leading circle also steers +y.
+      const vy = circ.velocity.y;
+      // Must have a clear +y (lead) component, not a pure +x tail-chase.
+      return vy > 0.05;
+
+  # --- Convergence check ------------------------------------------------------
+  # Over sustained play, sample the nearest circle's distance. Predictive + committed
+  # circles should close to near-contact rather than orbiting at a fixed radius.
+  - action: keys
+    keys: ["s", "d"]
+    duration: 3000
+  - action: evalCheck
+    script: |
+      const g = window.game; if (!g) return true;
+      for (const e of g.enemies) {
+        if (e.active && !e.isSpawning && e.family === 'circle') {
+          window.__circleSeen = true;
+          const d = Math.hypot(e.position.x - g.player.position.x, e.position.y - g.player.position.y);
+          window.__minCircleDist = Math.min(window.__minCircleDist, d);
+        }
+      }
+      return true;
+
+  - action: keys
+    keys: ["w"]
+    duration: 3000
+  - action: evalCheck
+    script: |
+      const g = window.game; if (!g) return true;
+      for (const e of g.enemies) {
+        if (e.active && !e.isSpawning && e.family === 'circle') {
+          window.__circleSeen = true;
+          const d = Math.hypot(e.position.x - g.player.position.x, e.position.y - g.player.position.y);
+          window.__minCircleDist = Math.min(window.__minCircleDist, d);
+        }
+      }
+      return true;
+
+  - action: keys
+    keys: ["s"]
+    duration: 3000
+  - action: evalCheck
+    script: |
+      const g = window.game; if (!g) return true;
+      for (const e of g.enemies) {
+        if (e.active && !e.isSpawning && e.family === 'circle') {
+          window.__circleSeen = true;
+          const d = Math.hypot(e.position.x - g.player.position.x, e.position.y - g.player.position.y);
+          window.__minCircleDist = Math.min(window.__minCircleDist, d);
+        }
+      }
+      return true;
+
+  - action: screenshot
+    name: "83-circle-predictive-tracking"
+
+  - action: evalCheck
+    description: "If circles appeared, at least one closed to near-contact (converges, not orbits)"
+    script: |
+      if (!window.__circleSeen) return true; // no supernova this run — nothing to assert
+      return window.__minCircleDist < 120;
