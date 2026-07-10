@@ -116,6 +116,42 @@ steps:
     script: |
       return window.particleLab.bh.absorbedCount >= 1;
 
+  # (C) Geometry shatter — breaking a shape must emit one fragment per edge into the pool
+  - action: assertEval
+    description: "Renderer exposes the tidal-warp hook and shatter breaks a shape into edge fragments"
+    script: |
+      const lab = window.particleLab;
+      if (typeof lab.renderer.setWarp !== 'function') return false;
+      const before = lab.debris.count;
+      lab.debris.shatter([[20,0],[0,20],[-20,0],[0,-20]], 0, 0, [1,1,1], 0, 0.2);
+      return lab.debris.count >= before + 4;
+
+  # (V) Death warp is enabled by default
+  - action: assertEval
+    description: "Death warp toggle is on"
+    script: |
+      return window.particleLab.warpOn === true;
+
+  # BlackHole life cycle: feed to critical → destabilize → detonate → shed mass + recycle.
+  # This also exercises the dust field's life-stage coupling (heat + eruption).
+  - action: keyPress
+    key: "f"
+    duration: 60
+  - action: assertEval
+    description: "Feeding to critical drives the hole to max mass and destabilization"
+    script: |
+      const bh = window.particleLab.bh;
+      return bh.absorbedCount >= 12 && bh.destabilizing === true;
+  - action: keyPress
+    key: "t"
+    duration: 60
+  - action: waitForEval
+    description: "Supernova erupts, sheds the hole's mass, and recycles it (cycle loops)"
+    timeout: 4000
+    script: |
+      const bh = window.particleLab.bh;
+      return bh.active && bh.absorbedCount === 0 && bh.destabilizing === false && bh.overloaded === false;
+
   # Toggle each effect off — render must stay stable (no crash) with everything disabled
   - action: evalCheck
     description: "Disable all four effects"

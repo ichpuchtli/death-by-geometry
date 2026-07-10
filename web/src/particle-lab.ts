@@ -4,6 +4,7 @@ import { SpringMassGrid } from './renderer/grid';
 import { TrailSystem } from './renderer/trails';
 import { Starfield } from './renderer/starfield';
 import { ParticleField, FieldAttractor, FieldView } from './renderer/particle-field';
+import { DebrisField } from './renderer/debris-field';
 import { Camera } from './core/camera';
 import { Input } from './core/input';
 import { AudioManager } from './core/audio';
@@ -16,7 +17,10 @@ import { BlackHole } from './entities/enemies/blackhole';
 import { Rhombus } from './entities/enemies/rhombus';
 import { Vec2 } from './core/vector';
 import { gameSettings } from './settings';
-import { TRAIL_LENGTH_ENEMY, BH_CORE_RADIUS_FRACTION, BH_CORE_PULL_MULT } from './config';
+import {
+  TRAIL_LENGTH_ENEMY, BH_CORE_RADIUS_FRACTION, BH_CORE_PULL_MULT,
+  DEATH_WARP_STRETCH, DEATH_WARP_TWIST,
+} from './config';
 
 const RHOMBUS_SPAWN_INTERVAL = 160; // ms — fast enough to sustain a visible swarm vs. the hole's appetite
 const MAX_RHOMBUSES = 40;
@@ -63,6 +67,7 @@ export class ParticleLab {
   private trails: TrailSystem;
   private starfield: Starfield;
   private field: ParticleField;
+  private debris: DebrisField;
   private camera: Camera;
   private input: Input;
   private audio: AudioManager;
@@ -79,12 +84,15 @@ export class ParticleLab {
   swirlOn = true;
   thrusterOn = true;
   sparkletsOn = true;
+  shatterOn = true;       // (C) death breaks the unit along its own edges
+  warpOn = true;          // (V) tidal spaghettification of units in the hole's core
   gridOn = true;
   bloomOn = true;
 
   // Tunables
   dustPull = 2000;        // BlackHole strength as seen by the dust field
   gravitySwirl = 0.35;    // tangential gravity on enemies (fraction of radial pull) — subtle path curve
+  warpReach = 190;        // px around the hole where geometry starts to tear
 
   private baseBloom = 1;
   private rhombusTimer = 400;
@@ -105,6 +113,7 @@ export class ParticleLab {
     this.trails = new TrailSystem();
     this.starfield = new Starfield(90, gameSettings.arenaWidth, gameSettings.arenaHeight);
     this.field = new ParticleField();
+    this.debris = new DebrisField();
     this.camera = new Camera(this.renderer.width, this.renderer.height);
     this.input = new Input(canvas);
     this.input.setCamera(this.camera);
@@ -144,6 +153,7 @@ export class ParticleLab {
     this.trails.clear();
     this.bullets.clear();
     this.explosions.clear();
+    this.debris.clear();
     this.field.reseed();
     this.rhombusTimer = 400;
 
@@ -175,6 +185,10 @@ export class ParticleLab {
       case 'Digit2': this.swirlOn = !this.swirlOn; break;
       case 'Digit3': this.thrusterOn = !this.thrusterOn; break;
       case 'Digit4': this.sparkletsOn = !this.sparkletsOn; break;
+      case 'KeyC': this.shatterOn = !this.shatterOn; break;
+      case 'KeyV': this.warpOn = !this.warpOn; break;
+      case 'KeyF': this.feedToCritical(); break;
+      case 'KeyT': this.detonate(); break;
       case 'KeyQ': this.field.density = Math.max(60, this.field.density - 80); this.field.reseed(); break;
       case 'KeyW': this.field.density = Math.min(1400, this.field.density + 80); this.field.reseed(); break;
       case 'KeyA': this.field.swirl = Math.max(0, +(this.field.swirl - 0.1).toFixed(2)); break;
@@ -245,6 +259,7 @@ export class ParticleLab {
       }
       if (e instanceof BlackHole) {
         e.update(dt);
+        if (e.overloaded) this.eruptSupernova(e);
         if (e.needsGridPulse) {
           this.grid.applyImpulse(e.position.x, e.position.y, e.gridPulseStrength, 150);
           e.needsGridPulse = false;
@@ -272,6 +287,10 @@ export class ParticleLab {
     }
 
     this.explosions.update(dt);
+    this.debris.update(dt);
+    // Dust glows hotter while the hole is destabilizing (life-stage feedback)
+    const stressBH = this.bh;
+    this.field.brightness = stressBH && stressBH.destabilizing && !stressBH.overloaded ? 1.4 : 1;
     this.grid.update(dt);
     this.camera.follow(this.player.position);
     this.camera.updateShake(dt);
@@ -310,11 +329,19 @@ export class ParticleLab {
     const list: FieldAttractor[] = [];
     for (const e of this.enemies) {
       if (!e.active || e.isSpawning || !(e instanceof BlackHole)) continue;
+      // Life-stage coupling: pull ramps with swallowed mass; heat (hue bias) tracks
+      // instability and spikes to near-white during the destabilize warning window.
+      const inst = e.absorbedCount / BlackHole.MAX_ABSORB;
+      let heat = inst * 0.5;
+      if (e.destabilizing && !e.overloaded) {
+        heat = 0.8 + 0.2 * Math.min(1, e.destabilizeTimer / e.destabilizeDuration);
+      }
       list.push({
         x: e.position.x,
         y: e.position.y,
-        strength: this.dustPull * (1 + e.absorbedCount * 0.12),
+        strength: this.dustPull * (1 + inst * 1.2),
         radius: BlackHole.ATTRACT_RADIUS * 1.7,
+        heat,
       });
     }
     return list;
@@ -352,6 +379,52 @@ export class ParticleLab {
     for (let i = 0; i < WAVE_COUNT; i++) {
       this.spawnRhombus((i / WAVE_COUNT) * Math.PI * 2, 0.72);
     }
+  }
+
+  /** (C) Destroy a unit by breaking it along its own wireframe edges — or fall back to
+   *  the generic particle burst when shatter is toggled off. */
+  private killShatter(e: Enemy, angle: number, speed: number): void {
+    if (this.shatterOn && e.shapePoints.length >= 2) {
+      this.debris.shatter(e.getWorldPoints(), e.position.x, e.position.y, e.color, angle, speed);
+    } else {
+      this.explosions.spawn(e.position.x, e.position.y, e.color, 12, 0.5, 1, angle);
+    }
+  }
+
+  /** Feed the hole straight to its destabilize threshold so the full life cycle
+   *  (feeding → warning → supernova) can be watched on demand. */
+  private feedToCritical(): void {
+    const bh = this.bh;
+    if (!bh || !bh.active) return;
+    while (bh.absorbedCount < BlackHole.MAX_ABSORB) bh.absorbEnemy();
+  }
+
+  /** Force the hole to overload immediately (skips the warning window). */
+  private detonate(): void {
+    const bh = this.bh;
+    if (!bh || !bh.active) return;
+    bh.overloaded = true;
+  }
+
+  /** Supernova: the dust field erupts outward in a hot ring, then the hole sheds its
+   *  mass and resets so the life cycle can loop. */
+  private eruptSupernova(bh: BlackHole): void {
+    const x = bh.position.x;
+    const y = bh.position.y;
+    for (let i = 0; i < 48; i++) {
+      const a = (i / 48) * Math.PI * 2;
+      this.field.spawnBurst(x + Math.cos(a) * 24, y + Math.sin(a) * 24, a, 0.5, 6, 9, 35, 1.2);
+    }
+    this.explosions.spawn(x, y, [1, 0.6, 0.2], 120, 2.2);
+    this.grid.applyImpulse(x, y, 1400, 500);
+    this.camera.shake(1);
+    if (this.audio.initialized) this.audio.playSupernovaVariant('subdrop', bh.absorbedCount);
+    // Shed mass + recycle so the perpetual devourer keeps cycling
+    bh.absorbedCount = 0;
+    bh.collisionRadius = 30;
+    bh.destabilizing = false;
+    bh.overloaded = false;
+    bh.destabilizeTimer = 0;
   }
 
   /** (B) Enemy gravity with an optional tangential swirl so rhombuses spiral in. */
@@ -445,7 +518,7 @@ export class ParticleLab {
           }
         } else if (e.hit()) {
           e.active = false;
-          this.explosions.spawn(e.position.x, e.position.y, e.color, 12, 0.5, 1, b.angle);
+          this.killShatter(e, b.angle, Math.hypot(b.velocity.x, b.velocity.y));
         }
 
         // (D) Impact sparklets — a forward puff carrying the bullet's momentum
@@ -466,7 +539,7 @@ export class ParticleLab {
       const r = e.collisionRadius + this.player.collisionRadius;
       if (dx * dx + dy * dy < r * r) {
         e.active = false;
-        this.explosions.spawn(e.position.x, e.position.y, [1, 0.3, 0.2], 16, 0.5);
+        this.killShatter(e, Math.atan2(e.velocity.y, e.velocity.x), Math.hypot(e.velocity.x, e.velocity.y));
         this.camera.shake(0.3);
       }
     }
@@ -493,7 +566,19 @@ export class ParticleLab {
 
     this.renderer.begin(false);
     this.renderArenaBorder();
-    for (const e of this.enemies) e.render(this.renderer);
+    // (V) Tidal warp: while a unit's geometry is inside the hole's reach, stretch + twist
+    // it toward the core. Applied per-vertex by the renderer; the hole itself renders clean.
+    const wbh = this.bh;
+    const warpOn = this.warpOn && wbh !== null && wbh.active && !wbh.isSpawning;
+    for (const e of this.enemies) {
+      if (warpOn && e !== wbh && !e.isSpawning) {
+        this.renderer.setWarp(wbh!.position.x, wbh!.position.y, 1, DEATH_WARP_STRETCH, DEATH_WARP_TWIST, this.warpReach);
+      } else {
+        this.renderer.clearWarp();
+      }
+      e.render(this.renderer);
+    }
+    this.renderer.clearWarp();
     this.player.render(this.renderer);
     this.bullets.render(this.renderer);
     const mouse = this.input.getMouseWorldPos();
@@ -505,6 +590,7 @@ export class ParticleLab {
     this.renderer.setBlendMode('additive');
     if (this.dustOn) this.field.render(this.renderer);
     this.trails.render(this.renderer);
+    this.debris.render(this.renderer);
     this.explosions.render(this.renderer);
     this.renderer.setBlendMode('normal');
     this.renderer.end();
@@ -539,7 +625,9 @@ export class ParticleLab {
       `<span style="color:#fff">1</span> dust field <b>${this.onOff(this.dustOn)}</b> · ` +
       `<span style="color:#fff">2</span> gravity swirl <b>${this.onOff(this.swirlOn)}</b> · ` +
       `<span style="color:#fff">3</span> thruster wake <b>${this.onOff(this.thrusterOn)}</b> · ` +
-      `<span style="color:#fff">4</span> impact sparklets <b>${this.onOff(this.sparkletsOn)}</b>`;
+      `<span style="color:#fff">4</span> impact sparklets <b>${this.onOff(this.sparkletsOn)}</b> · ` +
+      `<span style="color:#fff">C</span> geo shatter <b>${this.onOff(this.shatterOn)}</b> · ` +
+      `<span style="color:#fff">V</span> death warp <b>${this.onOff(this.warpOn)}</b>`;
     const tune = document.createElement('div');
     tune.style.color = '#9f8fe0';
     tune.textContent =
@@ -547,13 +635,16 @@ export class ParticleLab {
       `gravity swirl ${this.gravitySwirl.toFixed(2)} (Z/X) · streak ${this.field.streak.toFixed(1)} (E/D)`;
     const keys = document.createElement('div');
     keys.style.color = '#6f78c8';
-    keys.textContent = 'SPACE spawn enemy wave · G grid · B bloom · R reset · WASD move · mouse aim · click/hold shoot';
+    keys.textContent = 'SPACE spawn wave · F feed-to-critical · T detonate · G grid · B bloom · R reset · WASD move · mouse aim · click/hold shoot';
     this.overlay.append(title, effects, tune, keys, this.statusLine);
   }
 
   private updateStatusLine(): void {
     const bh = this.bh;
     const mass = bh && bh.active ? bh.absorbedCount : 0;
-    this.statusLine.textContent = `motes ${this.field.count} · absorbed ${mass} · enemies ${this.enemies.filter(e => e.active).length}`;
+    const stage = bh && bh.destabilizing ? 'DESTABILIZING' : mass >= BlackHole.MAX_ABSORB * 0.6 ? 'stressed' : 'feeding';
+    this.statusLine.textContent =
+      `motes ${this.field.count} · shards ${this.debris.count} · mass ${mass}/${BlackHole.MAX_ABSORB} (${stage}) · ` +
+      `enemies ${this.enemies.filter(e => e.active).length}`;
   }
 }

@@ -27,6 +27,24 @@ export const PARTICLE_FIELD_STREAK = 2.4;        // velocity-stretch multiplier 
 export const PARTICLE_FIELD_SOFTENING = 850;     // distance² softening so the core pull stays finite
 export const PARTICLE_FIELD_MAX_TRANSIENT = 420; // cap on live burst motes (thruster wake + impact sparks)
 
+// --- Geometry shatter (solid-object death) ---
+// When a unit is destroyed by a bullet/contact (not absorbed, not a boss), it breaks
+// along its OWN edges: each edge becomes a rigid line fragment that tumbles outward
+// carrying the impact momentum, instead of dissolving into a generic particle cloud.
+export const SHATTER_EDGE_SUBDIV = 2;        // split each shape edge into N shards (more = finer debris)
+export const SHATTER_EJECT_SPEED = 0.10;     // px/ms base outward speed from the shape centroid
+export const SHATTER_IMPACT_SHARE = 0.55;    // how much of the impact direction each shard inherits
+export const SHATTER_SPIN = 0.010;           // rad/ms max tumble rate
+export const SHATTER_DRAG = 0.94;            // per-frame velocity retention (frame-normalized)
+export const SHATTER_LIFE = 0.9;             // seconds a shard lives before it fades out
+export const SHATTER_POOL_SIZE = 900;        // shard pool cap (edges * subdiv * concurrent deaths)
+
+// --- Tidal death warp (spaghettification) ---
+// A unit caught in a BlackHole's core has its geometry stretched + twisted toward the
+// hole in its final moments before it's swallowed. Driven per-vertex by Renderer.setWarp.
+export const DEATH_WARP_STRETCH = 0.55;      // radial inward tidal displacement at full intensity
+export const DEATH_WARP_TWIST = 2.2;         // radians of frame-drag swirl at full intensity, at the core
+
 // --- Camera ---
 export const CAMERA_LERP_SPEED = 0.08;
 export const SCREEN_SHAKE_SMALL = 5;

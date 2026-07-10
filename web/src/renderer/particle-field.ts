@@ -17,6 +17,9 @@ export interface FieldAttractor {
   y: number;
   strength: number;
   radius: number;
+  /** 0..1 stress/instability of this attractor — biases nearby dust toward hot hues
+   *  (amber → white) so the field visibly reacts to a BlackHole's life stage. Optional. */
+  heat?: number;
 }
 
 /** Camera-space view window the ambient motes wrap within, so density stays even
@@ -195,6 +198,7 @@ export class ParticleField {
 
       let ax = 0;
       let ay = 0;
+      let heatPull = 0; // strongest heat*proximity across attractors this frame
       for (const a of attractors) {
         const dx = a.x - m.x;
         const dy = a.y - m.y;
@@ -206,6 +210,11 @@ export class ParticleField {
         const swirl = (a.strength * swirlFactor) / d2;
         ax += dx * inv * pull + (-dy * inv) * swirl;
         ay += dy * inv * pull + (dx * inv) * swirl;
+        if (a.heat) {
+          const prox = 1 - Math.sqrt(raw) / a.radius; // 1 at centre → 0 at rim
+          const h = a.heat * prox;
+          if (h > heatPull) heatPull = h;
+        }
       }
 
       m.vx += ax * f;
@@ -227,6 +236,12 @@ export class ParticleField {
       m.x += m.vx * f;
       m.y += m.vy * f;
       m.hue = (m.hue + 0.05 * f + Math.sqrt(sp2) * 0.02) % 360;
+      // Heat bias: stressed attractors drag nearby dust toward an amber-hot hue (~30°),
+      // so the field glows hotter as the hole nears overload.
+      if (heatPull > 0) {
+        const diff = ((30 - m.hue + 540) % 360) - 180; // shortest signed path to 30°
+        m.hue = (m.hue + diff * heatPull * 0.3 * f + 360) % 360;
+      }
 
       // Ambient motes wrap within the camera view so density stays even
       if (m.mode === 0) {

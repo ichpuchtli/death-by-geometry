@@ -35,7 +35,34 @@ export class Renderer {
   public zoom = 1.0;
   private blendMode: 'normal' | 'additive' = 'normal';
 
+  // --- Tidal warp field (spaghettification of dying units) ---
+  // While active, every emitted vertex within warpRadius of (warpCX, warpCY) is pulled
+  // radially inward (stronger closer in → the shape elongates like taffy) and twisted
+  // around the centre (frame dragging). Set it around a dying enemy's render() call.
+  private warpActive = false;
+  private warpCX = 0;
+  private warpCY = 0;
+  private warpK = 0;       // 0..1 intensity
+  private warpStretch = 0; // inward tidal displacement scale
+  private warpTwist = 0;   // radians of swirl at the core
+  private warpRadius = 1;
+
   getGL(): WebGLRenderingContext { return this.gl; }
+
+  /** Enable the tidal warp for subsequent draw calls (call clearWarp() after). */
+  setWarp(cx: number, cy: number, k: number, stretch: number, twist: number, radius: number): void {
+    this.warpActive = k > 0.001;
+    this.warpCX = cx;
+    this.warpCY = cy;
+    this.warpK = k;
+    this.warpStretch = stretch;
+    this.warpTwist = twist;
+    this.warpRadius = radius;
+  }
+
+  clearWarp(): void {
+    this.warpActive = false;
+  }
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl', { alpha: false, antialias: true })
@@ -93,6 +120,28 @@ export class Renderer {
 
   private pushVertex(x: number, y: number, r: number, g: number, b: number, a: number): void {
     if (this.vertexCount >= MAX_VERTICES) return;
+    if (this.warpActive) {
+      const dx = x - this.warpCX;
+      const dy = y - this.warpCY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0.001 && dist < this.warpRadius) {
+        // closeness: 0 at the edge of influence → 1 at the centre (eased)
+        let c = 1 - dist / this.warpRadius;
+        c *= c;
+        // Frame-drag twist: rotate the vertex around the centre, more near the core
+        const ang = this.warpK * this.warpTwist * c;
+        const cosA = Math.cos(ang);
+        const sinA = Math.sin(ang);
+        const rx = dx * cosA - dy * sinA;
+        const ry = dx * sinA + dy * cosA;
+        // Tidal inward pull, stronger closer in → near vertices lead, the shape stretches
+        let delta = this.warpK * this.warpStretch * c * this.warpRadius;
+        if (delta > dist * 0.85) delta = dist * 0.85;
+        const scale = (dist - delta) / dist;
+        x = this.warpCX + rx * scale;
+        y = this.warpCY + ry * scale;
+      }
+    }
     const i = this.vertexCount * FLOATS_PER_VERTEX;
     this.data[i] = x;
     this.data[i + 1] = y;
