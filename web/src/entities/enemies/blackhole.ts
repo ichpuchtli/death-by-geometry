@@ -52,6 +52,16 @@ export class BlackHole extends Enemy {
 
   visualMode: BlackHoleVisualMode = 'dense';
 
+  // Per-instance "personality" — each spawned hole gets a unique blend of the Particle Lab
+  // knobs so no two look/behave the same (random visual mode + dust/swirl/warp ratios).
+  // Set in the constructor; labs/gallery override visualMode explicitly after construction.
+  readonly dustStrengthMult: number;
+  readonly dustRadiusMult: number;
+  readonly dustSwirl: number;
+  readonly enemySwirl: number;
+  readonly warpStretchMult: number;
+  readonly warpTwistMult: number;
+
   private wobbleTime = 0;
   // Hit feedback: a ring pulse + a puff of emitted sparks (replaces the old white overlay)
   private hitPulse = 0;
@@ -94,6 +104,16 @@ export class BlackHole extends Enemy {
     this.shapePoints = [];
     // Long, harmless warp-in so a hole never materializes lethally on top of the player.
     this.spawnDuration = this.spawnTimer = SPAWN_DURATION_BLACKHOLE;
+
+    // Unique "personality": randomised visual mode + a distinct ratio of the particle knobs
+    const modes: BlackHoleVisualMode[] = ['dense', 'haze', 'corona', 'molten'];
+    this.visualMode = modes[Math.floor(Math.random() * modes.length)];
+    this.dustStrengthMult = 0.55 + Math.random() * 1.1;  // dust pull → accretion-disk brightness/tightness
+    this.dustRadiusMult = 1.4 + Math.random() * 0.9;     // how far the dust disk reaches
+    this.dustSwirl = 0.15 + Math.random() * 1.25;        // dust orbit vs. straight infall
+    this.enemySwirl = 0.1 + Math.random() * 0.6;         // tangential pull → how much enemies spiral in
+    this.warpStretchMult = 0.7 + Math.random() * 0.7;    // tidal spaghettification strength
+    this.warpTwistMult = 0.6 + Math.random();            // tidal frame-drag twist
 
     // Initialize shared state
     for (let i = 0; i < 28; i++) this.pushSwirlParticle(i % 4);

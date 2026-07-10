@@ -52,7 +52,7 @@ export const DEATH_WARP_REACH_MULT = 3.5;    // influence radius = max(min, hole
 export const PARTICLE_FIELD_GAME_DENSITY = 420;        // ambient dust motes (desktop)
 export const PARTICLE_FIELD_GAME_DENSITY_MOBILE = 120; // fewer on mobile for perf
 export const PARTICLE_FIELD_DUST_PULL = 2000;          // BlackHole strength as seen by the dust field
-export const GRAVITY_ENEMY_SWIRL = 0.35;               // subtle tangential term so enemies spiral into holes
+export const GRAVITY_ENEMY_SWIRL = 0.35;               // baseline tangential swirl (now randomised per-hole via BlackHole.enemySwirl 0.1–0.7)
 export const SHATTER_IMPACT_SPEED = 0.3;               // px/ms momentum handed to geometry shards on a kill
 
 // --- Camera ---

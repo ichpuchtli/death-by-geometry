@@ -26,7 +26,6 @@ import {
   CIRCLE_EJECT_SPEED_MIN,
   CIRCLE_EJECT_SPEED_MAX,
   CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER,
-  GRAVITY_ENEMY_SWIRL,
 } from '../config';
 import type { Renderer } from '../renderer/sprite-batch';
 
@@ -153,9 +152,9 @@ export class GravitySystem {
           const ny = dy / dist;
           e.position.x += nx * force;
           e.position.y += ny * force;
-          // Subtle tangential swirl → enemies spiral into the hole instead of falling straight
-          if (GRAVITY_ENEMY_SWIRL > 0) {
-            const tang = force * GRAVITY_ENEMY_SWIRL;
+          // Per-hole tangential swirl → enemies spiral into the hole instead of falling straight
+          if (bh.enemySwirl > 0) {
+            const tang = force * bh.enemySwirl;
             e.position.x += -ny * tang;
             e.position.y += nx * tang;
           }

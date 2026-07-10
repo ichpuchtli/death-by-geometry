@@ -835,9 +835,10 @@ export class Game {
       attractors.push({
         x: e.position.x,
         y: e.position.y,
-        strength: PARTICLE_FIELD_DUST_PULL * (1 + inst * 1.2),
-        radius: BlackHole.ATTRACT_RADIUS * 1.7,
+        strength: PARTICLE_FIELD_DUST_PULL * e.dustStrengthMult * (1 + inst * 1.2),
+        radius: BlackHole.ATTRACT_RADIUS * e.dustRadiusMult,
         heat,
+        swirl: e.dustSwirl,
       });
     }
     this.field.brightness = destabilizing ? 1.4 : 1;
@@ -1259,7 +1260,10 @@ export class Game {
           const dx = h.position.x - e.position.x;
           const dy = h.position.y - e.position.y;
           if (dx * dx + dy * dy < reach * reach) {
-            this.renderer.setWarp(h.position.x, h.position.y, 1, DEATH_WARP_STRETCH, DEATH_WARP_TWIST, reach);
+            this.renderer.setWarp(
+              h.position.x, h.position.y, 1,
+              DEATH_WARP_STRETCH * h.warpStretchMult, DEATH_WARP_TWIST * h.warpTwistMult, reach,
+            );
             warped = true;
             break;
           }

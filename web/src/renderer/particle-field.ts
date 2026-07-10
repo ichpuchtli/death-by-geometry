@@ -20,6 +20,9 @@ export interface FieldAttractor {
   /** 0..1 stress/instability of this attractor — biases nearby dust toward hot hues
    *  (amber → white) so the field visibly reacts to a BlackHole's life stage. Optional. */
   heat?: number;
+  /** Per-attractor tangential swirl (fraction of pull). Overrides the field's global
+   *  `swirl` for this attractor, so each BlackHole spins its dust disk differently. */
+  swirl?: number;
 }
 
 /** Camera-space view window the ambient motes wrap within, so density stays even
@@ -207,7 +210,8 @@ export class ParticleField {
         const d2 = raw + soft;
         const inv = 1 / Math.sqrt(d2);
         const pull = a.strength / d2;
-        const swirl = (a.strength * swirlFactor) / d2;
+        const sf = a.swirl !== undefined ? a.swirl : swirlFactor;
+        const swirl = (a.strength * sf) / d2;
         ax += dx * inv * pull + (-dy * inv) * swirl;
         ay += dy * inv * pull + (dx * inv) * swirl;
         if (a.heat) {
