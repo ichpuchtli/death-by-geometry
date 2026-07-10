@@ -179,7 +179,7 @@ export class BlackHole extends Enemy {
     // Hit feedback: decay the pulse, advance + fade the emitted sparks
     if (this.hitPulse > 0) this.hitPulse = Math.max(0, this.hitPulse - dt * 0.005);
     if (this.hitSparks.length > 0) {
-      const drag = Math.pow(0.9, dt / 16.6667);
+      const drag = Math.pow(0.95, dt / 16.6667);
       for (const s of this.hitSparks) {
         s.x += s.vx * dt;
         s.y += s.vy * dt;
@@ -613,28 +613,33 @@ export class BlackHole extends Enemy {
     this.hitPulse = 1;
     const ox = this.position.x + Math.cos(bulletAngle) * this.collisionRadius;
     const oy = this.position.y + Math.sin(bulletAngle) * this.collisionRadius;
-    for (let i = 0; i < 8; i++) {
-      const a = bulletAngle + (Math.random() - 0.5) * 1.4;
-      const sp = 0.06 + Math.random() * 0.16;
-      const life = 0.3 + Math.random() * 0.25;
+    for (let i = 0; i < 14; i++) {
+      const a = bulletAngle + (Math.random() - 0.5) * 1.7;
+      const sp = 0.16 + Math.random() * 0.32; // px/ms — fast enough to clearly shoot out past the disk
+      const life = 0.35 + Math.random() * 0.3;
       this.hitSparks.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, maxLife: life });
     }
-    if (this.hitSparks.length > 64) this.hitSparks.splice(0, this.hitSparks.length - 64);
+    if (this.hitSparks.length > 90) this.hitSparks.splice(0, this.hitSparks.length - 90);
   }
 
-  /** Hit feedback: an outward ring pulse + emitted sparks (no white overlay). */
+  /** Hit feedback: an outward ring pulse + emitted spark streaks (no white overlay). */
   private renderHitFeedback(renderer: Renderer, px: number, py: number, ringR: number): void {
-    if (this.hitPulse > 0) {
-      const p = 1 - this.hitPulse; // 0 → 1 as it decays
-      const rr = ringR * (1 + p * 0.7);
-      renderer.drawCircle(px, py, rr, [1, 0.92, 0.7], 40, this.hitPulse * 0.7);
-      renderer.drawCircle(px, py, rr * 0.9, [1, 0.75, 0.35], 40, this.hitPulse * 0.4);
-      // A brief inner brighten (a ring, not a full-disc overlay)
-      renderer.drawCircle(px, py, ringR * 0.5, [1, 0.85, 0.55], 24, this.hitPulse * 0.3);
-    }
     for (const s of this.hitSparks) {
       const a = Math.max(0, s.life / s.maxLife);
-      renderer.drawLine(s.x - s.vx * 5, s.y - s.vy * 5, s.x, s.y, 1, 0.85, 0.5, a);
+      // Velocity-stretched streak (vx is px/ms, so scale up hard to get a visible tail) with
+      // a bright white comet head. Drawn last, so it reads on top of the disk.
+      const tx = s.vx * 55;
+      const ty = s.vy * 55;
+      renderer.drawLine(s.x - tx, s.y - ty, s.x, s.y, 1, 0.8, 0.45, a * 0.9);
+      renderer.drawLine(s.x - tx * 0.35, s.y - ty * 0.35, s.x, s.y, 1, 1, 0.85, a);
+    }
+    if (this.hitPulse > 0) {
+      const p = 1 - this.hitPulse; // 0 → 1 as it decays
+      const rr = ringR * (1 + p * 1.0);
+      renderer.drawCircle(px, py, rr, [1, 0.95, 0.75], 44, this.hitPulse * 0.85);
+      renderer.drawCircle(px, py, rr * 1.14, [1, 0.7, 0.3], 44, this.hitPulse * 0.5);
+      // A brief inner brighten (a ring, not a full-disc overlay)
+      renderer.drawCircle(px, py, ringR * 0.5, [1, 0.85, 0.55], 24, this.hitPulse * 0.35);
     }
   }
 
