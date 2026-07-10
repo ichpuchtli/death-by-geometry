@@ -18,9 +18,12 @@ import { Vec2 } from './core/vector';
 import { gameSettings } from './settings';
 import { TRAIL_LENGTH_ENEMY, BH_CORE_RADIUS_FRACTION, BH_CORE_PULL_MULT } from './config';
 
-const RHOMBUS_SPAWN_INTERVAL = 420; // ms
-const MAX_RHOMBUSES = 34;
+const RHOMBUS_SPAWN_INTERVAL = 160; // ms — fast enough to sustain a visible swarm vs. the hole's appetite
+const MAX_RHOMBUSES = 40;
 const WAVE_COUNT = 16;
+// Keep the hole below its destabilize threshold (BlackHole.MAX_ABSORB = 12) so this lab
+// stays a stable perpetual devourer — no supernova path to manage here.
+const MAX_FEED = 8;
 
 /** Convert an RGB triplet (0..1) to an HSL hue in degrees. */
 function rgbToHue(r: number, g: number, b: number): number {
@@ -231,6 +234,13 @@ export class ParticleLab {
     // Enemy AI
     for (const e of this.enemies) {
       if (!e.active) continue;
+      // Advance the warp-in timer — without this, rhombuses stay isSpawning forever,
+      // so gravity skips them and they only ever render the faint spawn animation.
+      if (e.isSpawning) {
+        e.spawnTimer = Math.max(0, e.spawnTimer - dt / 1000);
+        if (e.trailId >= 0) this.trails.update(e.trailId, e.position.x, e.position.y);
+        continue;
+      }
       if (e instanceof BlackHole) {
         e.update(dt);
         if (e.needsGridPulse) {
@@ -322,7 +332,7 @@ export class ParticleLab {
 
   /** Spawn a rhombus somewhere on the BlackHole's gravity-well rim so it immediately
    *  falls/spirals in — the whole point is watching the interaction. */
-  private spawnRhombus(angle = Math.random() * Math.PI * 2, radiusFrac = 0.55 + Math.random() * 0.4): void {
+  private spawnRhombus(angle = Math.random() * Math.PI * 2, radiusFrac = 0.75 + Math.random() * 0.3): void {
     const cx = this.bh ? this.bh.position.x : 0;
     const cy = this.bh ? this.bh.position.y : 0;
     const r = BlackHole.ATTRACT_RADIUS * radiusFrac;
@@ -359,7 +369,7 @@ export class ParticleLab {
 
       if (dist2 < absorbR2) {
         e.active = false;
-        if (bh.absorbedCount < BlackHole.MAX_ABSORB) bh.absorbEnemy();
+        if (bh.absorbedCount < MAX_FEED) bh.absorbEnemy();
         this.explosions.spawn(e.position.x, e.position.y, e.color, 12, 0.5);
         this.grid.applyImpulse(e.position.x, e.position.y, -20, 120);
         continue;

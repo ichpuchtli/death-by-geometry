@@ -46,6 +46,20 @@ steps:
       lab.field.spawnBurst(0, 0, 0, 1.0, 12, 3, 40, 0.6);
       return lab.field.count >= before + 8;
 
+  # Regression guard: enemies must actually finish spawning, spiral in, and be eaten on
+  # their own (a stuck spawn timer would leave them frozen/invisible and never absorbed).
+  - action: waitForEval
+    description: "Enemies naturally spiral in and get absorbed"
+    timeout: 8000
+    script: |
+      return window.particleLab.bh.absorbedCount >= 1;
+  - action: assertEval
+    description: "A healthy swarm of solid (finished-spawning) enemies is on screen"
+    script: |
+      const lab = window.particleLab;
+      const solid = lab.enemies.filter(e => e.active && e.family === 'rhombus' && !e.isSpawning).length;
+      return solid >= 3;
+
   # Tether: fly hard away from the hole — it must stay framed on screen (else spawns
   # at the hole would be invisible and it'd look like "nothing spawns")
   - action: keyPress
