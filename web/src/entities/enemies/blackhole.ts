@@ -53,7 +53,9 @@ export class BlackHole extends Enemy {
   visualMode: BlackHoleVisualMode = 'dense';
 
   private wobbleTime = 0;
-  private hitFlash = 0;
+  // Hit feedback: a ring pulse + a puff of emitted sparks (replaces the old white overlay)
+  private hitPulse = 0;
+  private hitSparks: { x: number; y: number; vx: number; vy: number; life: number; maxLife: number }[] = [];
 
   // Shared swirl state
   private swirlParticles: SwirlParticle[] = [];
@@ -142,8 +144,8 @@ export class BlackHole extends Enemy {
     }
   }
 
-  override onBulletHit(_bulletAngle: number): 'damage' | 'absorb' | 'reflect' {
-    this.hitFlash = 1;
+  override onBulletHit(bulletAngle: number): 'damage' | 'absorb' | 'reflect' {
+    this.registerHit(bulletAngle);
     if (this.absorbedCount > 0) {
       this.absorbedCount--;
       this.collisionRadius = 30 + this.absorbedCount * 2.5;
@@ -174,8 +176,18 @@ export class BlackHole extends Enemy {
     this.wobbleTime += dt;
     this.breathPhase += dt * (0.002 + instability * 0.003);
 
-    if (this.hitFlash > 0) {
-      this.hitFlash = Math.max(0, this.hitFlash - dt * 0.004);
+    // Hit feedback: decay the pulse, advance + fade the emitted sparks
+    if (this.hitPulse > 0) this.hitPulse = Math.max(0, this.hitPulse - dt * 0.005);
+    if (this.hitSparks.length > 0) {
+      const drag = Math.pow(0.9, dt / 16.6667);
+      for (const s of this.hitSparks) {
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.vx *= drag;
+        s.vy *= drag;
+        s.life -= dt / 1000;
+      }
+      this.hitSparks = this.hitSparks.filter(s => s.life > 0);
     }
 
     // Swirl rotation — accelerates with mass
@@ -258,8 +270,21 @@ export class BlackHole extends Enemy {
     // Bright inner ring edge
     renderer.drawCircle(px, py, ringR - bandWidth * 0.3, [1, 1, 1], 48, 0.3 + instability * 0.1);
 
-    // (Orbit-dot particles removed — at gameplay zoom they were sub-pixel specks that
-    //  didn't register; the swirl arms + infall streaks carry the accretion motion.)
+    // Orbit particles as larger filled dots
+    const [odr, odg, odb] = P.orbitDot;
+    for (const hp of this.horizonParticles) {
+      const r = ringR * hp.orbitR;
+      const hpx = px + Math.cos(hp.angle) * r;
+      const hpy = py + Math.sin(hp.angle) * r;
+      renderer.drawFilledCircle(hpx, hpy, 2.5 + instability * 1.5, [odr, odg, odb], 8, hp.brightness * 0.8);
+      // Short trail arc
+      const ta = hp.angle + hp.trailLen * Math.sign(hp.speed);
+      renderer.drawLine(
+        hpx, hpy,
+        px + Math.cos(ta) * r, py + Math.sin(ta) * r,
+        odr, odg, odb, hp.brightness * 0.4,
+      );
+    }
 
     // Swirl arms
     this.renderSwirlArms(renderer, px, py, baseR, 4, 3.0, 0.7);
@@ -275,7 +300,7 @@ export class BlackHole extends Enemy {
 
     this.needsGridPulse = true;
     this.gridPulseStrength = 12 + instability * 30;
-    this.renderHitFlash(renderer, px, py, baseR);
+    this.renderHitFeedback(renderer, px, py, ringR);
   }
 
   // ============================================================
@@ -343,7 +368,7 @@ export class BlackHole extends Enemy {
 
     this.needsGridPulse = true;
     this.gridPulseStrength = 10 + instability * 25;
-    this.renderHitFlash(renderer, px, py, baseR);
+    this.renderHitFeedback(renderer, px, py, ringR);
   }
 
   // ============================================================
@@ -430,7 +455,7 @@ export class BlackHole extends Enemy {
 
     this.needsGridPulse = true;
     this.gridPulseStrength = 12 + instability * 30;
-    this.renderHitFlash(renderer, px, py, baseR);
+    this.renderHitFeedback(renderer, px, py, ringR);
   }
 
   // ============================================================
@@ -515,7 +540,7 @@ export class BlackHole extends Enemy {
 
     this.needsGridPulse = true;
     this.gridPulseStrength = 14 + instability * 32;
-    this.renderHitFlash(renderer, px, py, baseR);
+    this.renderHitFeedback(renderer, px, py, ringR);
   }
 
   // ============================================================
@@ -583,10 +608,33 @@ export class BlackHole extends Enemy {
     }
   }
 
-  private renderHitFlash(renderer: Renderer, px: number, py: number, radius: number): void {
-    if (this.hitFlash > 0) {
-      const flashAlpha = Math.min(this.hitFlash * 3, 1);
-      renderer.drawFilledCircle(px, py, radius * 1.2, [1, 1, 1], 24, flashAlpha * 0.5);
+  /** Register a bullet hit: kick a ring pulse and emit a puff of sparks from the impact. */
+  private registerHit(bulletAngle: number): void {
+    this.hitPulse = 1;
+    const ox = this.position.x + Math.cos(bulletAngle) * this.collisionRadius;
+    const oy = this.position.y + Math.sin(bulletAngle) * this.collisionRadius;
+    for (let i = 0; i < 8; i++) {
+      const a = bulletAngle + (Math.random() - 0.5) * 1.4;
+      const sp = 0.06 + Math.random() * 0.16;
+      const life = 0.3 + Math.random() * 0.25;
+      this.hitSparks.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life, maxLife: life });
+    }
+    if (this.hitSparks.length > 64) this.hitSparks.splice(0, this.hitSparks.length - 64);
+  }
+
+  /** Hit feedback: an outward ring pulse + emitted sparks (no white overlay). */
+  private renderHitFeedback(renderer: Renderer, px: number, py: number, ringR: number): void {
+    if (this.hitPulse > 0) {
+      const p = 1 - this.hitPulse; // 0 → 1 as it decays
+      const rr = ringR * (1 + p * 0.7);
+      renderer.drawCircle(px, py, rr, [1, 0.92, 0.7], 40, this.hitPulse * 0.7);
+      renderer.drawCircle(px, py, rr * 0.9, [1, 0.75, 0.35], 40, this.hitPulse * 0.4);
+      // A brief inner brighten (a ring, not a full-disc overlay)
+      renderer.drawCircle(px, py, ringR * 0.5, [1, 0.85, 0.55], 24, this.hitPulse * 0.3);
+    }
+    for (const s of this.hitSparks) {
+      const a = Math.max(0, s.life / s.maxLife);
+      renderer.drawLine(s.x - s.vx * 5, s.y - s.vy * 5, s.x, s.y, 1, 0.85, 0.5, a);
     }
   }
 

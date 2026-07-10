@@ -7,6 +7,7 @@ import {
   SHATTER_DRAG,
   SHATTER_LIFE,
   SHATTER_POOL_SIZE,
+  SHATTER_THICKNESS,
 } from '../config';
 
 /**
@@ -155,20 +156,30 @@ export class DebrisField {
     for (const s of this.shards) {
       if (!s.active) continue;
       const life = s.life / s.maxLife; // 1 → 0
-      // A brief near-white pop only at the very instant of the break, then it fades from
-      // the start — no lingering at full brightness.
-      const flash = Math.max(0, life - 0.8) / 0.2; // 1 only in the first 20% of life
+      // A near-white pop at the instant of the break, cooling to the unit's colour.
+      const flash = Math.max(0, life - 0.7) / 0.3; // hot for the first 30% of life
       const r = s.r + (1 - s.r) * flash;
       const g = s.g + (1 - s.g) * flash;
       const b = s.b + (1 - s.b) * flash;
-      const alpha = life * life; // eased fade that starts immediately
+      const alpha = life; // fades from the instant of the break, but stays legible
       const cosA = Math.cos(s.angle);
       const sinA = Math.sin(s.angle);
       const p1x = s.x + s.ex1 * cosA - s.ey1 * sinA;
       const p1y = s.y + s.ex1 * sinA + s.ey1 * cosA;
       const p2x = s.x + s.ex2 * cosA - s.ey2 * sinA;
       const p2y = s.y + s.ex2 * sinA + s.ey2 * cosA;
+      // Give the shard body: a bright core line + two dimmer parallel lines offset along
+      // the segment normal, so it reads as a solid snapped-off strut, not a hairline.
       renderer.drawLine(p1x, p1y, p2x, p2y, r, g, b, alpha);
+      let nx = p2y - p1y;
+      let ny = -(p2x - p1x);
+      const nl = Math.hypot(nx, ny);
+      if (nl > 0.001) {
+        nx = (nx / nl) * SHATTER_THICKNESS;
+        ny = (ny / nl) * SHATTER_THICKNESS;
+        renderer.drawLine(p1x + nx, p1y + ny, p2x + nx, p2y + ny, r, g, b, alpha * 0.5);
+        renderer.drawLine(p1x - nx, p1y - ny, p2x - nx, p2y - ny, r, g, b, alpha * 0.5);
+      }
     }
   }
 

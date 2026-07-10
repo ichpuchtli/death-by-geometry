@@ -117,7 +117,7 @@ export const SUPERNOVA_GRID_IMPULSE = 2500;
 export const SUPERNOVA_HITSTOP = 300;
 export const SUPERNOVA_FLASH_DURATION = 450; // ms
 export const SUPERNOVA_DESTABILIZE_MS = 350; // warning window between destabilize and detonation (short fuse — the stress wobble telegraphs earlier)
-export const SUPERNOVA_SHARD_COUNT = 8;      // shards ejected alongside circles
+export const SUPERNOVA_SHARD_COUNT = 0;      // shards disabled — the little triangles read as noise at gameplay zoom (circles carry the ejecta)
 export const SUPERNOVA_SHOCKWAVE_RINGS = 3;  // expanding ring visuals on detonation
 
 // --- BlackHole gravity core ---

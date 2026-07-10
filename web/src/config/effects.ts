@@ -31,12 +31,13 @@ export const PARTICLE_FIELD_MAX_TRANSIENT = 420; // cap on live burst motes (thr
 // When a unit is destroyed by a bullet/contact (not absorbed, not a boss), it breaks
 // along its OWN edges: each edge becomes a rigid line fragment that tumbles outward
 // carrying the impact momentum, instead of dissolving into a generic particle cloud.
-export const SHATTER_EDGE_SUBDIV = 2;        // split each shape edge into N shards (more = finer debris)
-export const SHATTER_EJECT_SPEED = 0.10;     // px/ms base outward speed from the shape centroid
+export const SHATTER_EDGE_SUBDIV = 1;        // 1 = each shard is a literal edge of the shape (most recognizable breakup)
+export const SHATTER_EJECT_SPEED = 0.13;     // px/ms base outward speed from the shape centroid
 export const SHATTER_IMPACT_SHARE = 0.55;    // how much of the impact direction each shard inherits
 export const SHATTER_SPIN = 0.010;           // rad/ms max tumble rate
 export const SHATTER_DRAG = 0.94;            // per-frame velocity retention (frame-normalized)
-export const SHATTER_LIFE = 0.45;            // seconds a shard lives before it fades out
+export const SHATTER_LIFE = 0.5;             // seconds a shard lives before it fades out
+export const SHATTER_THICKNESS = 1.4;        // px half-offset for the parallel lines that give each shard body
 export const SHATTER_POOL_SIZE = 900;        // shard pool cap (edges * subdiv * concurrent deaths)
 
 // --- Tidal death warp (spaghettification) ---
