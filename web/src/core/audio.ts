@@ -515,7 +515,32 @@ export class AudioManager {
       case 'rhombus': this.playKillCrystal(); break;
       case 'pinwheel': this.playKillSpin(); break;
       case 'sierpinski': this.playKillFractal(); break;
+      // Small orbs/children (circle flocks from supernovae, shards, minimandels) —
+      // a short pitch-varied bubble pop so a whole flock crackles instead of going silent.
+      case 'circle':
+      case 'shard':
+      case 'minimandel':
+        this.playKillPop();
+        break;
     }
+  }
+
+  /** Short, soft, pitch-varied bubble pop for small orbs/children (circle flock kills). */
+  private playKillPop(): void {
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    const base = 820 + Math.random() * 520; // varied pitch so a flock reads as a crackle
+    osc.frequency.setValueAtTime(base, now);
+    osc.frequency.exponentialRampToValueAtTime(base * 0.38, now + 0.09);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.09, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.connect(gain);
+    gain.connect(this.sfxGain!);
+    osc.start(now);
+    osc.stop(now + 0.14);
   }
 
   /** Sharp crystalline ping for rhombus kills */

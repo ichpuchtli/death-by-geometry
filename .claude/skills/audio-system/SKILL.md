@@ -19,6 +19,7 @@ Use when working on sound effects, music, audio mixing, the ElevenLabs pipeline,
 - **Square:** heavy thud (120→40 Hz sine + noise crunch)
 - **Pinwheel:** spinning whoosh (sawtooth sweep 400→1600→200 Hz through bandpass)
 - **Sierpinski:** layered fractal tones (3 descending triangle waves at 880/660/440 Hz)
+- **Circle / Shard / MiniMandel:** short soft bubble pop (`playKillPop` — sine ~820–1340→×0.38 Hz, ~0.12s, gain 0.09) with **randomised pitch** so a circle flock (supernova ejecta, up to 36 at once) crackles instead of going silent or machine-gunning. Previously these families had no case and were silent.
 - **BlackHole:** existing procedural explosion (`playBlackHoleDeath`)
 
 ## Weapon SFX
