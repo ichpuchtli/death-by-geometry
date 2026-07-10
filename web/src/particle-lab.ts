@@ -84,7 +84,7 @@ export class ParticleLab {
 
   // Tunables
   dustPull = 2000;        // BlackHole strength as seen by the dust field
-  gravitySwirl = 2.2;     // tangential gravity on enemies (multiple of radial pull) — high enough to orbit
+  gravitySwirl = 0.35;    // tangential gravity on enemies (fraction of radial pull) — subtle path curve
 
   private baseBloom = 1;
   private rhombusTimer = 400;
@@ -179,8 +179,8 @@ export class ParticleLab {
       case 'KeyW': this.field.density = Math.min(1400, this.field.density + 80); this.field.reseed(); break;
       case 'KeyA': this.field.swirl = Math.max(0, +(this.field.swirl - 0.1).toFixed(2)); break;
       case 'KeyS': this.field.swirl = Math.min(2.5, +(this.field.swirl + 0.1).toFixed(2)); break;
-      case 'KeyZ': this.gravitySwirl = Math.max(0, +(this.gravitySwirl - 0.4).toFixed(2)); break;
-      case 'KeyX': this.gravitySwirl = Math.min(6, +(this.gravitySwirl + 0.4).toFixed(2)); break;
+      case 'KeyZ': this.gravitySwirl = Math.max(0, +(this.gravitySwirl - 0.1).toFixed(2)); break;
+      case 'KeyX': this.gravitySwirl = Math.min(6, +(this.gravitySwirl + 0.1).toFixed(2)); break;
       case 'KeyE': this.field.streak = Math.max(0.5, +(this.field.streak - 0.3).toFixed(2)); break;
       case 'KeyD': this.field.streak = Math.min(6, +(this.field.streak + 0.3).toFixed(2)); break;
       case 'KeyG': this.gridOn = !this.gridOn; break;
