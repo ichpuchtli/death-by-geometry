@@ -204,6 +204,7 @@ export class ParticleLab {
 
     // Player + shooting
     this.player.update(dt);
+    this.tetherPlayerToHole();
     const shots = this.player.tryShoot();
     if (shots) {
       for (const angle of shots) {
@@ -269,6 +270,19 @@ export class ParticleLab {
     });
 
     this.updateStatusLine();
+  }
+
+  /** Keep the ship within a screen-sized box around the BlackHole so the hole — and
+   *  everything spawning at / spiralling into it — stays on screen. Without this you can
+   *  fly away, the hole leaves the view, and it looks like nothing is spawning. */
+  private tetherPlayerToHole(): void {
+    const bh = this.bh;
+    if (!bh) return;
+    const mx = this.renderer.width / 2 - 90;
+    const my = this.renderer.height / 2 - 90;
+    const p = this.player.position;
+    p.x = Math.max(bh.position.x - mx, Math.min(bh.position.x + mx, p.x));
+    p.y = Math.max(bh.position.y - my, Math.min(bh.position.y + my, p.y));
   }
 
   private view(): FieldView {

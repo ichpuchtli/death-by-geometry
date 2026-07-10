@@ -21,6 +21,21 @@ steps:
   - action: screenshot
     name: "80-particle-baseline"
 
+  # SPACE must spawn an on-demand wave of enemies at the well
+  - action: evalCheck
+    description: "Record enemy count before pressing SPACE"
+    script: |
+      window.__enemiesBefore = window.particleLab.enemies.filter(e => e.active && e.family === 'rhombus').length;
+      return true;
+  - action: keyPress
+    key: "Space"
+    duration: 80
+  - action: assertEval
+    description: "SPACE spawned a fresh ring of enemies"
+    script: |
+      const now = window.particleLab.enemies.filter(e => e.active && e.family === 'rhombus').length;
+      return now >= window.__enemiesBefore + 10;
+
   # Burst injection is the shared path for thruster wake (C) + impact sparklets (D):
   # spawning a burst must add live transient motes to the field.
   - action: assertEval
@@ -30,6 +45,18 @@ steps:
       const before = lab.field.count;
       lab.field.spawnBurst(0, 0, 0, 1.0, 12, 3, 40, 0.6);
       return lab.field.count >= before + 8;
+
+  # Tether: fly hard away from the hole — it must stay framed on screen (else spawns
+  # at the hole would be invisible and it'd look like "nothing spawns")
+  - action: keyPress
+    key: "d"
+    duration: 2500
+  - action: assertEval
+    description: "BlackHole stays within the camera view after flying away"
+    script: |
+      const lab = window.particleLab;
+      const dx = Math.abs(lab.bh.position.x - lab.camera.renderX);
+      return dx < lab.renderer.width / 2 - 30;
 
   # Move around + hold fire so the live thruster wake + sparklets actually run
   - action: keyPress
