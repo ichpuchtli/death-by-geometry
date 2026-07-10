@@ -36,7 +36,7 @@ export const SHATTER_EJECT_SPEED = 0.10;     // px/ms base outward speed from th
 export const SHATTER_IMPACT_SHARE = 0.55;    // how much of the impact direction each shard inherits
 export const SHATTER_SPIN = 0.010;           // rad/ms max tumble rate
 export const SHATTER_DRAG = 0.94;            // per-frame velocity retention (frame-normalized)
-export const SHATTER_LIFE = 0.9;             // seconds a shard lives before it fades out
+export const SHATTER_LIFE = 0.45;            // seconds a shard lives before it fades out
 export const SHATTER_POOL_SIZE = 900;        // shard pool cap (edges * subdiv * concurrent deaths)
 
 // --- Tidal death warp (spaghettification) ---

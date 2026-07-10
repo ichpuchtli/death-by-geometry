@@ -155,12 +155,13 @@ export class DebrisField {
     for (const s of this.shards) {
       if (!s.active) continue;
       const life = s.life / s.maxLife; // 1 → 0
-      // Bright, near-white at the instant of the break; cools to the unit's colour, then fades
-      const flash = Math.max(0, life - 0.6) / 0.4; // 1 for first 40% of life
+      // A brief near-white pop only at the very instant of the break, then it fades from
+      // the start — no lingering at full brightness.
+      const flash = Math.max(0, life - 0.8) / 0.2; // 1 only in the first 20% of life
       const r = s.r + (1 - s.r) * flash;
       const g = s.g + (1 - s.g) * flash;
       const b = s.b + (1 - s.b) * flash;
-      const alpha = Math.min(1, life * 1.4);
+      const alpha = life * life; // eased fade that starts immediately
       const cosA = Math.cos(s.angle);
       const sinA = Math.sin(s.angle);
       const p1x = s.x + s.ex1 * cosA - s.ey1 * sinA;
