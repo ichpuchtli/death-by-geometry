@@ -2,6 +2,7 @@ import { Game } from './game';
 import type { Gallery as GalleryType } from './gallery';
 import type { ThreatLab as ThreatLabType } from './threat-lab';
 import type { ParticleLab as ParticleLabType } from './particle-lab';
+import type { CircleLab as CircleLabType } from './circle-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -57,6 +58,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(particleLoop);
     }
     requestAnimationFrame(particleLoop);
+  });
+} else if (bootParams.has('circles')) {
+  // Circle Lab — tracking-behaviour + visual-DNA sandbox for the Circle enemy (`?circles=1`)
+  import('./circle-lab').then(({ CircleLab }) => {
+    const lab = new CircleLab(gameCanvas);
+    (window as unknown as { circleLab: CircleLabType }).circleLab = lab;
+    let last = performance.now();
+    function circleLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(circleLoop);
+    }
+    requestAnimationFrame(circleLoop);
   });
 } else {
   bootGame();

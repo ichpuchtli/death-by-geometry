@@ -1,0 +1,94 @@
+name: "Circle Lab — tracking-model + visual-DNA sandbox boots and cycles cleanly"
+tags: [lab, circle, visual]
+steps:
+  - action: launch
+    url: "/?circles=1"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 500
+
+  - action: evalCheck
+    description: "Lab booted with a populated flock and default ORBITAL model"
+    script: |
+      const l = window.circleLab;
+      if (!l) return false;
+      if (l.mode !== 2) return false;              // default = orbital
+      return l.circles.length > 0;
+
+  # Fly around so circles have a moving target — momentum models accumulate velocity.
+  - action: keys
+    keys: ["d", "s"]
+    duration: 1500
+  - action: keys
+    keys: ["a", "w"]
+    duration: 1500
+
+  - action: evalCheck
+    description: "Orbital circles carry momentum (non-zero average speed)"
+    script: |
+      const l = window.circleLab;
+      const avg = l.circles.reduce((s,c)=>s+Math.hypot(c.vel.x,c.vel.y),0)/Math.max(1,l.circles.length);
+      return avg > 0.02;
+
+  - action: screenshot
+    name: "84-circle-lab-orbital"
+
+  # Cycle every tracking model — each must run a frame without error.
+  - action: keyPress
+    key: "1"
+    duration: 60
+  - action: wait
+    ms: 300
+  - action: keyPress
+    key: "3"
+    duration: 60
+  - action: wait
+    ms: 300
+  - action: keyPress
+    key: "4"
+    duration: 60
+  - action: wait
+    ms: 300
+  - action: keyPress
+    key: "5"
+    duration: 60
+  - action: wait
+    ms: 400
+
+  - action: evalCheck
+    description: "Swarm model selected and flock still alive"
+    script: |
+      const l = window.circleLab;
+      return l.mode === 5 && l.circles.length > 0;
+
+  - action: screenshot
+    name: "84-circle-lab-swarm"
+
+  # Toggle every visual-DNA layer off then eject a fresh ring.
+  - action: keyPress
+    key: "o"
+    duration: 60
+  - action: keyPress
+    key: "p"
+    duration: 60
+  - action: keyPress
+    key: "u"
+    duration: 60
+  - action: keyPress
+    key: "t"
+    duration: 60
+  - action: evalCheck
+    description: "DNA layers toggled off"
+    script: |
+      const l = window.circleLab;
+      return !l.dotsOn && !l.shedOn && !l.pulseOn && !l.trailsOn;
+
+  - action: keyPress
+    key: " "
+    duration: 60
+  - action: wait
+    ms: 300
+
+  - action: assertNoErrors
+    description: "All five tracking models + DNA toggles + ring eject run without JS errors"
