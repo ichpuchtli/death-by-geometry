@@ -30,6 +30,7 @@ import { Wingman } from './entities/wingman';
 import { RunStats, computeMedals } from './core/run-stats';
 import { createEnemy } from './spawner/enemy-factory';
 import { BlackHole } from './entities/enemies/blackhole';
+import { CircleEnemy } from './entities/enemies/circle';
 import {
   WEAPON_STAGES,
   EXPLOSION_PARTICLE_COUNT_LARGE,
@@ -825,8 +826,20 @@ export class Game {
     // pull ramps with swallowed mass, heat (hue bias) spikes to near-white while destabilizing.
     const attractors: FieldAttractor[] = [];
     let destabilizing = false;
+    const shedChance = this.mobile ? 0.25 : 0.5;
     for (const e of this.enemies) {
-      if (!e.active || e.isSpawning || !(e instanceof BlackHole)) continue;
+      if (!e.active || e.isSpawning) continue;
+      // Blue circles carry the BlackHole dust DNA: each sheds a mote of ambient dust
+      // behind its motion, so a supernova flock reads as a drifting cloud of dusty debris.
+      if (e instanceof CircleEnemy) {
+        const sp = Math.hypot(e.velocity.x, e.velocity.y);
+        if (sp > 0.03 && Math.random() < shedChance) {
+          const behind = Math.atan2(-e.velocity.y, -e.velocity.x);
+          this.field.spawnBurst(e.position.x, e.position.y, behind, 1.4, 1, 0.6 + sp * 1.4, 205, 0.5);
+        }
+        continue;
+      }
+      if (!(e instanceof BlackHole)) continue;
       const inst = e.absorbedCount / BlackHole.MAX_ABSORB;
       let heat = inst * 0.5;
       if (e.destabilizing && !e.overloaded) {

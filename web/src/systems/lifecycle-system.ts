@@ -33,11 +33,14 @@ export class LifecycleSystem {
     return this.trails;
   }
 
-  /** Register a trail for a newly-spawned enemy. Safe to call multiple times. */
+  /** Register a trail for a newly-spawned enemy. Safe to call multiple times.
+   *  Enemies with `hasTrail = false` (Circles) opt out — no trail is registered. */
   spawnEnemy(enemy: Enemy): void {
     if (enemy.trailId >= 0) {
       this.trails.unregister(enemy.trailId);
+      enemy.trailId = -1;
     }
+    if (!enemy.hasTrail) return;
     enemy.trailId = this.trails.register(enemy.color, this.trailLenEnemy);
   }
 

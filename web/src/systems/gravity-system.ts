@@ -25,6 +25,9 @@ import {
   BH_CORE_PULL_MULT,
   CIRCLE_EJECT_SPEED_MIN,
   CIRCLE_EJECT_SPEED_MAX,
+  CIRCLE_EJECT_RADIAL_SHARE,
+  CIRCLE_ORBIT_KICK_MIN,
+  CIRCLE_ORBIT_KICK_MAX,
   CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER,
 } from '../config';
 import type { Renderer } from '../renderer/sprite-batch';
@@ -195,7 +198,19 @@ export class GravitySystem {
       const cPos = new Vec2(px + Math.cos(angle) * dist, py + Math.sin(angle) * dist);
       const ce = createEnemy('circle', cPos) as CircleEnemy;
       const ejectSpeed = CIRCLE_EJECT_SPEED_MIN + Math.random() * (CIRCLE_EJECT_SPEED_MAX - CIRCLE_EJECT_SPEED_MIN);
-      ce.ejectVel.set(Math.cos(angle) * ejectSpeed, Math.sin(angle) * ejectSpeed);
+      // Radial burst from the BH (the visible "explosion outward")…
+      let vx = Math.cos(angle) * ejectSpeed * CIRCLE_EJECT_RADIAL_SHARE;
+      let vy = Math.sin(angle) * ejectSpeed * CIRCLE_EJECT_RADIAL_SHARE;
+      // …plus a tangential kick around the PLAYER so the circle has angular momentum and
+      // orbits the player (who acts as the gravity well) instead of falling straight in.
+      const pdx = cPos.x - player.position.x;
+      const pdy = cPos.y - player.position.y;
+      const pd = Math.hypot(pdx, pdy) || 1;
+      const spin = Math.random() < 0.5 ? 1 : -1;
+      const orbitKick = (CIRCLE_ORBIT_KICK_MIN + Math.random() * (CIRCLE_ORBIT_KICK_MAX - CIRCLE_ORBIT_KICK_MIN)) * spin;
+      vx += (-pdy / pd) * orbitKick;
+      vy += (pdx / pd) * orbitKick;
+      ce.ejectVel.set(vx, vy);
       ce.flockCenter = flockCenter;
       lifecycle.spawnEnemy(ce);
       enemies.push(ce);

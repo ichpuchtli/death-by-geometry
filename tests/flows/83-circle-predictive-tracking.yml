@@ -1,4 +1,4 @@
-name: "Circle predictive tracking — supernova circles lead the player and close the distance"
+name: "Circle orbital tracking — supernova circles orbit the player like a BlackHole, no trail"
 tags: [regression, blackhole, circle, combat]
 steps:
   - action: launch
@@ -45,18 +45,14 @@ steps:
     x: 800
     y: 400
 
-  # Reset the min-distance tracker.
   - action: evalCheck
-    description: "Init circle-to-player min-distance tracker"
+    description: "Init circle tracker"
     script: |
-      window.__minCircleDist = Infinity;
       window.__circleSeen = false;
+      window.__maxCircleDist = 0;
       return true;
 
-  # --- Deterministic lead-vector check ---------------------------------------
-  # Directly drive a live circle with a known lateral player velocity and assert
-  # its steering velocity points AHEAD of the pure pursuit vector (i.e. it leads).
-  # Wait for a supernova to eject circles first (up to ~24s of movement below).
+  # Play so a supernova fires and ejects a circle flock.
   - action: keys
     keys: ["w", "d"]
     duration: 4000
@@ -68,30 +64,33 @@ steps:
     duration: 4000
 
   - action: evalCheck
-    description: "A live circle leads a laterally-moving player (steer points ahead of pursuit)"
+    description: "Circles carry ORBITAL momentum (spring toward player, momentum retained — not hard-set)"
     script: |
       const g = window.game;
       if (!g) return false;
       const circ = g.enemies.find(e => e.active && !e.isSpawning && e.family === 'circle');
-      if (!circ) { return true; } // no circle yet — don't fail; convergence check below still runs
+      if (!circ) return true; // no supernova yet — later checks still run
       window.__circleSeen = true;
-      // Known geometry: player to the +x of the circle, moving in +y.
-      const px = circ.position.x + 300, py = circ.position.y;
-      g.player.position.x = px; g.player.position.y = py;
-      g.player.velocity.x = 0; g.player.velocity.y = 0.35; // px/ms, moving +y
-      circ.flockCenter = null; circ.ejectVel.x = 0; circ.ejectVel.y = 0;
+      // Player to the circle's +x, circle already moving +y. Orbital: spring adds +x while
+      // the +y momentum is RETAINED (a hard-set-at-player would zero the +y).
+      g.player.position.x = circ.position.x + 300;
+      g.player.position.y = circ.position.y;
+      circ.velocity.x = 0; circ.velocity.y = 0.3;
       circ.update(16, g.player.position, g.player.velocity);
-      // Pursuit direction (straight at player) is +x. A leading circle also steers +y.
-      const vy = circ.velocity.y;
-      // Must have a clear +y (lead) component, not a pure +x tail-chase.
-      return vy > 0.05;
+      return circ.velocity.x > 0 && circ.velocity.y > 0.2;
 
-  # --- Convergence check ------------------------------------------------------
-  # Over sustained play, sample the nearest circle's distance. Predictive + committed
-  # circles should close to near-contact rather than orbiting at a fixed radius.
+  - action: evalCheck
+    description: "Circles have NO trail (hasTrail false, trailId unset)"
+    script: |
+      const g = window.game;
+      const circ = g.enemies.find(e => e.active && e.family === 'circle');
+      if (!circ) return true;
+      return circ.hasTrail === false && circ.trailId === -1;
+
+  # Circles are spring-bound to the player — they orbit rather than escaping to the arena edge.
   - action: keys
     keys: ["s", "d"]
-    duration: 3000
+    duration: 4000
   - action: evalCheck
     script: |
       const g = window.game; if (!g) return true;
@@ -99,46 +98,19 @@ steps:
         if (e.active && !e.isSpawning && e.family === 'circle') {
           window.__circleSeen = true;
           const d = Math.hypot(e.position.x - g.player.position.x, e.position.y - g.player.position.y);
-          window.__minCircleDist = Math.min(window.__minCircleDist, d);
-        }
-      }
-      return true;
-
-  - action: keys
-    keys: ["w"]
-    duration: 3000
-  - action: evalCheck
-    script: |
-      const g = window.game; if (!g) return true;
-      for (const e of g.enemies) {
-        if (e.active && !e.isSpawning && e.family === 'circle') {
-          window.__circleSeen = true;
-          const d = Math.hypot(e.position.x - g.player.position.x, e.position.y - g.player.position.y);
-          window.__minCircleDist = Math.min(window.__minCircleDist, d);
-        }
-      }
-      return true;
-
-  - action: keys
-    keys: ["s"]
-    duration: 3000
-  - action: evalCheck
-    script: |
-      const g = window.game; if (!g) return true;
-      for (const e of g.enemies) {
-        if (e.active && !e.isSpawning && e.family === 'circle') {
-          window.__circleSeen = true;
-          const d = Math.hypot(e.position.x - g.player.position.x, e.position.y - g.player.position.y);
-          window.__minCircleDist = Math.min(window.__minCircleDist, d);
+          window.__maxCircleDist = Math.max(window.__maxCircleDist, d);
         }
       }
       return true;
 
   - action: screenshot
-    name: "83-circle-predictive-tracking"
+    name: "83-circle-orbital-tracking"
 
   - action: evalCheck
-    description: "If circles appeared, at least one closed to near-contact (converges, not orbits)"
+    description: "If circles appeared, they stayed spring-bound near the player (never flung off)"
     script: |
-      if (!window.__circleSeen) return true; // no supernova this run — nothing to assert
-      return window.__minCircleDist < 120;
+      if (!window.__circleSeen) return true;
+      return window.__maxCircleDist < 1400;
+
+  - action: assertNoErrors
+    description: "Orbital circles + dust shed + hit sparks run without JS errors"

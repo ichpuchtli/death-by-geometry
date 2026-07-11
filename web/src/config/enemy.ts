@@ -130,16 +130,20 @@ export const BH_CORE_PULL_MULT = 2.5;
 // --- Circle (BlackHole supernova ejecta) ---
 export const CIRCLE_EJECT_SPEED_MIN = 0.35;       // px/ms min ejection speed
 export const CIRCLE_EJECT_SPEED_MAX = 0.85;       // px/ms max ejection speed
-export const CIRCLE_EJECT_DECAY = 0.0022;          // fraction lost per ms (~80% gone in 730ms)
-export const CIRCLE_FLOCK_PULL = 0.0008;           // elastic spring: speed px/ms = pull * distPx
 export const CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER = 3; // circles emitted = absorbedCount * this
-// Predictive interception: circles lead the player's motion (aim where they WILL be)
-// instead of tail-chasing where they ARE — a same-speed pursuer can't otherwise close
-// on a fleeing target. Lead time ≈ dist / speed (first-order intercept), capped.
-export const CIRCLE_LEAD_MAX_MS = 550;             // ms — cap on prediction lead (dodgeable if player jukes)
-// Terminal commit: within this radius the swirl-offset (displacer) and flock cohesion
-// fade to zero so the final approach is a clean straight strike, not an orbit-past.
-export const CIRCLE_COMMIT_RADIUS = 220;           // px
+// Orbital tracking: the player is treated as a gravity well. Each circle carries momentum
+// (persistent velocity) and is pulled toward the player by a central spring that strengthens
+// with distance, so it overshoots, curves into an orbit, and falls back into the player's
+// "gravity" — the elastic feel from the Circle Lab. The eject burst seeds initial momentum.
+export const CIRCLE_ORBIT_SPRING = 1.4e-6;         // spring accel toward player: a = SPRING * distPx per ms
+export const CIRCLE_ORBIT_DRAG = 0.995;            // per-frame velocity retention (low → sustained orbits)
+export const CIRCLE_ORBIT_SPEED_CAP = 0.55;        // px/ms — max orbital speed
+// On supernova, each circle gets a tangential kick AROUND THE PLAYER (perpendicular to the
+// player→circle line, random handedness) so it has angular momentum and orbits rather than
+// falling straight in and instantly dying. ≈ sqrt(SPRING)·r for a near-circular orbit.
+export const CIRCLE_ORBIT_KICK_MIN = 0.28;         // px/ms
+export const CIRCLE_ORBIT_KICK_MAX = 0.44;         // px/ms
+export const CIRCLE_EJECT_RADIAL_SHARE = 0.5;      // how much of the radial BH burst is kept (the rest is orbital)
 export const BLACKHOLE_LENSING_BASE = 1.5;
 export const BLACKHOLE_LENSING_PER_ABSORB = 0.35;
 

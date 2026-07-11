@@ -270,6 +270,19 @@ export class CombatSystem {
           this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 350, 180);
           break;
         }
+        case 'circle': {
+          // Circles are dusty ejecta of a BlackHole: killing one throws off a puff of
+          // gold hit-sparks (velocity-stretched via the dust field) in the bullet's
+          // direction, like shooting the hole itself — plus a small blue dust burst.
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, dir ?? 0, 1.6, this.mobile ? 6 : 12, 5.0, 42, 0.4);
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, dir ?? 0, 2.4, this.mobile ? 4 : 8, 2.2, 205, 0.5);
+          this.deps.explosions.spawn(
+            kill.position.x, kill.position.y, kill.color,
+            this.mobile ? 6 : 12, EXPLOSION_DURATION_DEFAULT * 0.7, 1, dir,
+          );
+          this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 200, 120);
+          break;
+        }
         default: {
           // Regular units break into their own geometry (shards) — the "box" particle
           // cloud is replaced by a flash + the tumbling edges. Ring units keep the cloud.

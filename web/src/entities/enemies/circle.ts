@@ -2,18 +2,20 @@ import { Enemy } from './enemy';
 import { Vec2 } from '../../core/vector';
 import type { Renderer } from '../../renderer/sprite-batch';
 import { COLORS, ENEMY_SPEED, ENEMY_SCORES, SPAWN_DURATION_CHILD,
-         CIRCLE_EJECT_DECAY, CIRCLE_FLOCK_PULL,
-         CIRCLE_LEAD_MAX_MS, CIRCLE_COMMIT_RADIUS } from '../../config';
+         CIRCLE_ORBIT_SPRING, CIRCLE_ORBIT_DRAG, CIRCLE_ORBIT_SPEED_CAP } from '../../config';
 
 export class CircleEnemy extends Enemy {
   radius = 10;
   override gravityImmune = true;
   override family = 'circle' as const;
+  override hasTrail = false; // circles read as dusty motes, not streaking trails
 
-  /** Initial outward burst velocity set on supernova spawn — decays over ~730ms */
+  /** Outward burst velocity set on supernova spawn — consumed once into `velocity` as
+   *  the circle's initial orbital momentum (see update). */
   ejectVel = new Vec2(0, 0);
-  /** Shared Vec2 pointing to group centroid — updated each frame by game.ts */
+  /** Shared Vec2 pointing to group centroid — set by Threat Lab (vestigial for the game). */
   flockCenter: Vec2 | null = null;
+  private ejectConsumed = false;
 
   constructor(pos?: Vec2, radius: number = 10) {
     super();
@@ -30,55 +32,45 @@ export class CircleEnemy extends Enemy {
     this.displacer = Vec2.random().scale(25);
   }
 
-  update(dt: number, playerPos?: Vec2, playerVel?: Vec2): void {
+  /**
+   * Orbital tracking — the player is treated as a BlackHole. The circle carries momentum
+   * and is pulled toward the player by a central spring that strengthens with distance, so
+   * it overshoots, curves into an orbit, and falls back into the player's "gravity". Low
+   * drag keeps the orbit alive; the supernova eject burst seeds the initial momentum.
+   */
+  update(dt: number, playerPos?: Vec2, _playerVel?: Vec2): void {
     if (!this.active || !playerPos) return;
 
-    // Decay ejection burst
-    const decay = Math.max(0, 1 - dt * CIRCLE_EJECT_DECAY);
-    this.ejectVel.x *= decay;
-    this.ejectVel.y *= decay;
-
-    // Distance to the player, and a 0..1 "commit" factor that fades the swirl-offset
-    // and flock cohesion out on the terminal approach (→0 at contact) so the final
-    // strike is a clean straight line instead of an orbit-past.
-    const pdx = playerPos.x - this.position.x;
-    const pdy = playerPos.y - this.position.y;
-    const dist = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
-    const commit = Math.min(1, dist / CIRCLE_COMMIT_RADIUS);
-
-    // Predictive interception: aim where the player WILL be. Lead time is the time to
-    // traverse the current gap at our speed (first-order intercept), capped so a hard
-    // juke still shakes it. A same-speed circle now cuts the corner instead of trailing.
-    let aimX = playerPos.x + this.displacer.x * commit;
-    let aimY = playerPos.y + this.displacer.y * commit;
-    if (playerVel) {
-      const lead = Math.min(CIRCLE_LEAD_MAX_MS, dist / this.speed);
-      aimX += playerVel.x * lead;
-      aimY += playerVel.y * lead;
+    // Consume the one-time eject burst into persistent velocity (initial orbital momentum).
+    if (!this.ejectConsumed) {
+      this.velocity.x += this.ejectVel.x;
+      this.velocity.y += this.ejectVel.y;
+      this.ejectConsumed = true;
     }
 
-    // Constant-speed seek toward the intercept point (never decelerates near the target)
-    const adx = aimX - this.position.x;
-    const ady = aimY - this.position.y;
-    const am = Math.sqrt(adx * adx + ady * ady) || 1;
-    this.velocity.set((adx / am) * this.speed, (ady / am) * this.speed);
+    const f = Math.max(0.35, Math.min(2.2, dt / 16.6667));
 
-    // Elastic flock pull toward group centroid — faded out on the terminal approach so
-    // group cohesion doesn't sap the kill.
-    if (this.flockCenter) {
-      const dx = this.flockCenter.x - this.position.x;
-      const dy = this.flockCenter.y - this.position.y;
-      const fdist = Math.sqrt(dx * dx + dy * dy);
-      if (fdist > 1) {
-        const pullSpeed = CIRCLE_FLOCK_PULL * fdist * commit;
-        this.velocity.x += (dx / fdist) * pullSpeed;
-        this.velocity.y += (dy / fdist) * pullSpeed;
-      }
+    // Central spring pull toward the player: a = SPRING * distance, so a straying circle
+    // is always reeled back in — bound orbits, no escape.
+    const dx = playerPos.x - this.position.x;
+    const dy = playerPos.y - this.position.y;
+    this.velocity.x += dx * CIRCLE_ORBIT_SPRING * dt;
+    this.velocity.y += dy * CIRCLE_ORBIT_SPRING * dt;
+
+    // Low drag bleeds a little energy so the orbit slowly tightens rather than orbiting
+    // forever; the eject momentum gives the initial overshoot.
+    const dragF = Math.pow(CIRCLE_ORBIT_DRAG, f);
+    this.velocity.x *= dragF;
+    this.velocity.y *= dragF;
+
+    // Speed cap.
+    const sp2 = this.velocity.x * this.velocity.x + this.velocity.y * this.velocity.y;
+    const cap = CIRCLE_ORBIT_SPEED_CAP;
+    if (sp2 > cap * cap) {
+      const s = cap / Math.sqrt(sp2);
+      this.velocity.x *= s;
+      this.velocity.y *= s;
     }
-
-    // Layer ejection on top of computed velocity
-    this.velocity.x += this.ejectVel.x;
-    this.velocity.y += this.ejectVel.y;
 
     this.move(dt);
   }

@@ -27,6 +27,8 @@ export abstract class Enemy extends Entity {
   shapePoints: number[][] = [];
   rotationSpeed = 0;
   trailId = -1; // assigned by TrailSystem
+  /** Whether the LifecycleSystem registers a motion trail for this enemy (Circles opt out). */
+  hasTrail = true;
   spawnDuration = SPAWN_DURATION_DEFAULT;
   spawnTimer = SPAWN_DURATION_DEFAULT; // seconds remaining in spawn warp-in animation
   get isSpawning(): boolean { return this.spawnTimer > 0; }
