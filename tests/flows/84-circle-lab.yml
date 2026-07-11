@@ -16,6 +16,15 @@ steps:
       if (l.mode !== 2) return false;              // default = orbital
       return l.circles.length > 0;
 
+  - action: evalCheck
+    description: "Satellite dots OFF by default; circles are decorated by the ambient dust-field halo instead"
+    script: |
+      const l = window.circleLab;
+      // Headline change: no orbiting satellite dots; the dust field is the accretion decoration.
+      if (l.dotsOn !== false) return false;
+      // Ambient dust field is live (motes present to swirl into per-circle halos).
+      return l.field.count > 0;
+
   # Fly around so circles have a moving target — momentum models accumulate velocity.
   - action: keys
     keys: ["d", "s"]
@@ -65,7 +74,8 @@ steps:
   - action: screenshot
     name: "84-circle-lab-swarm"
 
-  # Toggle every visual-DNA layer off then eject a fresh ring.
+  # Toggle every visual-DNA layer once and confirm each flips from its default.
+  # Defaults: dots OFF, shed/pulse/trails ON — so one press each → dots ON, rest OFF.
   - action: keyPress
     key: "o"
     duration: 60
@@ -79,10 +89,10 @@ steps:
     key: "t"
     duration: 60
   - action: evalCheck
-    description: "DNA layers toggled off"
+    description: "Each DNA layer toggled from its default state"
     script: |
       const l = window.circleLab;
-      return !l.dotsOn && !l.shedOn && !l.pulseOn && !l.trailsOn;
+      return l.dotsOn && !l.shedOn && !l.pulseOn && !l.trailsOn;
 
   - action: keyPress
     key: " "

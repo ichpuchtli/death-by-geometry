@@ -69,6 +69,9 @@ import {
   PARTICLE_FIELD_GAME_DENSITY,
   PARTICLE_FIELD_GAME_DENSITY_MOBILE,
   PARTICLE_FIELD_DUST_PULL,
+  PARTICLE_FIELD_CIRCLE_PULL,
+  PARTICLE_FIELD_CIRCLE_RADIUS,
+  PARTICLE_FIELD_CIRCLE_SWIRL,
 } from './config';
 import { gameSettings } from './settings';
 import { showDesktopSettings, hideDesktopSettings } from './ui/settings-panel';
@@ -826,17 +829,19 @@ export class Game {
     // pull ramps with swallowed mass, heat (hue bias) spikes to near-white while destabilizing.
     const attractors: FieldAttractor[] = [];
     let destabilizing = false;
-    const shedChance = this.mobile ? 0.25 : 0.5;
     for (const e of this.enemies) {
       if (!e.active || e.isSpawning) continue;
-      // Blue circles carry the BlackHole dust DNA: each sheds a mote of ambient dust
-      // behind its motion, so a supernova flock reads as a drifting cloud of dusty debris.
+      // Blue circles carry the BlackHole dust DNA: each is a small attractor so the ambient
+      // dust field swirls into a tight accretion halo around it — the same "decorated with
+      // the dust field" look the hole has, at circle scale (no satellite dots).
       if (e instanceof CircleEnemy) {
-        const sp = Math.hypot(e.velocity.x, e.velocity.y);
-        if (sp > 0.03 && Math.random() < shedChance) {
-          const behind = Math.atan2(-e.velocity.y, -e.velocity.x);
-          this.field.spawnBurst(e.position.x, e.position.y, behind, 1.4, 1, 0.6 + sp * 1.4, 205, 0.5);
-        }
+        attractors.push({
+          x: e.position.x,
+          y: e.position.y,
+          strength: PARTICLE_FIELD_CIRCLE_PULL,
+          radius: PARTICLE_FIELD_CIRCLE_RADIUS,
+          swirl: PARTICLE_FIELD_CIRCLE_SWIRL,
+        });
         continue;
       }
       if (!(e instanceof BlackHole)) continue;

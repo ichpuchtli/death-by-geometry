@@ -2,7 +2,7 @@ import { Renderer } from './renderer/sprite-batch';
 import { BloomPass } from './renderer/bloom';
 import { SpringMassGrid } from './renderer/grid';
 import { Starfield } from './renderer/starfield';
-import { ParticleField, FieldView } from './renderer/particle-field';
+import { ParticleField, FieldView, FieldAttractor } from './renderer/particle-field';
 import { Camera } from './core/camera';
 import { Input } from './core/input';
 import { AudioManager } from './core/audio';
@@ -11,7 +11,7 @@ import { BulletPool } from './entities/bullet';
 import { AimIndicator } from './entities/crosshair';
 import { Vec2 } from './core/vector';
 import { gameSettings } from './settings';
-import { COLORS } from './config';
+import { COLORS, PARTICLE_FIELD_CIRCLE_PULL, PARTICLE_FIELD_CIRCLE_RADIUS, PARTICLE_FIELD_CIRCLE_SWIRL } from './config';
 
 /**
  * Circle Lab (`?circles=1`) — a playable sandbox for the *tracking behaviour* and
@@ -80,8 +80,8 @@ export class CircleLab {
   mode: TrackMode = 2;
 
   // Visual DNA toggles (exposed for tests)
-  dotsOn = true;      // orbiting satellite particles (accretion)
-  shedOn = true;      // shed dust motes into the field
+  dotsOn = false;     // orbiting satellite dots — OFF: the ambient dust-field halo is the accretion decoration now
+  shedOn = true;      // shed dust motes into the field (fed to the per-circle attractor halo)
   pulseOn = true;     // breathing halo
   trailsOn = true;    // velocity streak tail (drawn directly)
   gridOn = true;
@@ -115,7 +115,7 @@ export class CircleLab {
     this.grid.rebuild(gameSettings.arenaWidth, gameSettings.arenaHeight, gameSettings.gridSpacing);
     this.starfield = new Starfield(90, gameSettings.arenaWidth, gameSettings.arenaHeight);
     this.field = new ParticleField();
-    this.field.density = 160; // lighter ambient dust; circles do most of the emitting
+    this.field.density = 360; // enough ambient dust that each circle's attractor swirls a visible halo
     this.camera = new Camera(this.renderer.width, this.renderer.height);
     this.input = new Input(canvas);
     this.input.setCamera(this.camera);
@@ -255,7 +255,20 @@ export class CircleLab {
     this.handleBulletHits();
     this.handlePlayerContact();
 
-    this.field.update(dt, [], this.view());
+    // Each circle is a small attractor so the ambient dust swirls into an accretion halo
+    // around it — the BlackHole "decorated with the dust field" DNA, at circle scale.
+    const dustAttractors: FieldAttractor[] = [];
+    for (const c of this.circles) {
+      if (!c.active) continue;
+      dustAttractors.push({
+        x: c.pos.x,
+        y: c.pos.y,
+        strength: PARTICLE_FIELD_CIRCLE_PULL,
+        radius: PARTICLE_FIELD_CIRCLE_RADIUS,
+        swirl: PARTICLE_FIELD_CIRCLE_SWIRL,
+      });
+    }
+    this.field.update(dt, dustAttractors, this.view());
     this.grid.update(dt);
     this.camera.follow(this.player.position);
     this.camera.updateShake(dt);

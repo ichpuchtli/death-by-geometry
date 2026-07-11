@@ -52,6 +52,11 @@ export const DEATH_WARP_REACH_MULT = 3.5;    // influence radius = max(min, hole
 export const PARTICLE_FIELD_GAME_DENSITY = 420;        // ambient dust motes (desktop)
 export const PARTICLE_FIELD_GAME_DENSITY_MOBILE = 120; // fewer on mobile for perf
 export const PARTICLE_FIELD_DUST_PULL = 2000;          // BlackHole strength as seen by the dust field
+// Blue circles carry the BlackHole's dust DNA: each is a small attractor so ambient dust
+// swirls into a tight accretion halo around it (instead of decorative satellite dots).
+export const PARTICLE_FIELD_CIRCLE_PULL = 380;         // circle attractor strength as seen by the dust field (tuned for a visible tight halo)
+export const PARTICLE_FIELD_CIRCLE_RADIUS = 110;       // px — influence radius (tight halo, not a wide well)
+export const PARTICLE_FIELD_CIRCLE_SWIRL = 1.5;        // high tangential → dust orbits into a halo rather than collapsing in
 export const GRAVITY_ENEMY_SWIRL = 0.35;               // baseline tangential swirl (now randomised per-hole via BlackHole.enemySwirl 0.1–0.7)
 export const SHATTER_IMPACT_SPEED = 0.3;               // px/ms momentum handed to geometry shards on a kill
 
