@@ -3,6 +3,7 @@ import type { Gallery as GalleryType } from './gallery';
 import type { ThreatLab as ThreatLabType } from './threat-lab';
 import type { ParticleLab as ParticleLabType } from './particle-lab';
 import type { CircleLab as CircleLabType } from './circle-lab';
+import type { TaxonomyLab as TaxonomyLabType } from './taxonomy-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -73,6 +74,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(circleLoop);
     }
     requestAnimationFrame(circleLoop);
+  });
+} else if (bootParams.has('taxonomy')) {
+  // Taxonomy Lab — labeled anatomy chart of every BlackHole visual effect (`?taxonomy=1`)
+  import('./taxonomy-lab').then(({ TaxonomyLab }) => {
+    const lab = new TaxonomyLab(gameCanvas);
+    (window as unknown as { taxonomyLab: TaxonomyLabType }).taxonomyLab = lab;
+    let last = performance.now();
+    function taxonomyLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(taxonomyLoop);
+    }
+    requestAnimationFrame(taxonomyLoop);
   });
 } else {
   bootGame();

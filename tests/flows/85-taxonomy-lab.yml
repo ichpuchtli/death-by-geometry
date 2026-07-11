@@ -1,0 +1,62 @@
+name: "Taxonomy Lab — labeled BlackHole effect anatomy boots and isolates each component"
+tags: [lab, blackhole, visual]
+steps:
+  - action: launch
+    url: "/?taxonomy=1"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 1200
+
+  - action: evalCheck
+    description: "Lab booted with 3 sections and every anatomy cell present"
+    script: |
+      const l = window.taxonomyLab;
+      if (!l) return false;
+      const cells = l.sections.flatMap(s => s.cells);
+      if (cells.length < 12) return false;
+      const names = cells.map(c => c.name).join('|');
+      return names.includes('Swirl Arms') && names.includes('Orbit Dots')
+        && names.includes('Infall Streaks') && names.includes('Ambient Dust Field');
+
+  - action: evalCheck
+    description: "Component-visibility flags correctly SOLO each in-class particle system"
+    script: |
+      const l = window.taxonomyLab;
+      const cells = l.sections.flatMap(s => s.cells);
+      const byName = n => cells.find(c => c.name.includes(n)).bh;
+      const arms = byName('Swirl Arms');
+      const dots = byName('Orbit Dots');
+      const streaks = byName('Infall Streaks');
+      const stat = byName('Static Core');
+      // Each anatomy cell shows exactly one system; static shows none.
+      if (!(arms.showSwirlArms && !arms.showOrbitDots && !arms.showInfallStreaks)) return false;
+      if (!(dots.showOrbitDots && !dots.showSwirlArms && !dots.showInfallStreaks)) return false;
+      if (!(streaks.showInfallStreaks && !streaks.showSwirlArms && !streaks.showOrbitDots)) return false;
+      if (stat.showSwirlArms || stat.showOrbitDots || stat.showInfallStreaks) return false;
+      return true;
+
+  - action: screenshot
+    name: "85-taxonomy-lab"
+
+  # Toggle bloom + grid, and pause — none should error.
+  - action: keyPress
+    key: "b"
+    duration: 60
+  - action: keyPress
+    key: "g"
+    duration: 60
+  - action: keyPress
+    key: " "
+    duration: 60
+  - action: wait
+    ms: 200
+
+  - action: evalCheck
+    description: "Toggles applied (bloom off, grid on, paused)"
+    script: |
+      const l = window.taxonomyLab;
+      return l.bloomOn === false && l.gridOn === true && l.paused === true;
+
+  - action: assertNoErrors
+    description: "Anatomy render + component solo flags + toggles run without JS errors"

@@ -52,6 +52,15 @@ export class BlackHole extends Enemy {
 
   visualMode: BlackHoleVisualMode = 'dense';
 
+  // Component-visibility flags — all default true, so the shipped hole is unchanged.
+  // The Taxonomy Lab (?taxonomy=1) flips these to SOLO one particle system at a time so
+  // each named effect can be seen (and screenshotted) in isolation. These gate the three
+  // in-class particle systems that "swirl" around the hole (distinct from the external
+  // ParticleField ambient dust): swirl arms, orbit dots, infall streaks.
+  showSwirlArms = true;
+  showOrbitDots = true;
+  showInfallStreaks = true;
+
   // Per-instance "personality" — each spawned hole gets a unique blend of the Particle Lab
   // knobs so no two look/behave the same (random visual mode + dust/swirl/warp ratios).
   // Set in the constructor; labs/gallery override visualMode explicitly after construction.
@@ -293,6 +302,7 @@ export class BlackHole extends Enemy {
     // Orbit particles as larger filled dots
     const [odr, odg, odb] = P.orbitDot;
     for (const hp of this.horizonParticles) {
+      if (!this.showOrbitDots) break;
       const r = ringR * hp.orbitR;
       const hpx = px + Math.cos(hp.angle) * r;
       const hpy = py + Math.sin(hp.angle) * r;
@@ -371,6 +381,7 @@ export class BlackHole extends Enemy {
     // Small ember particles scattered in the cloud
     const [odr, odg, odb] = P.orbitDot;
     for (const hp of this.horizonParticles) {
+      if (!this.showOrbitDots) break;
       const r = ringR * (0.85 + hp.orbitR * 0.3);
       const hpx = px + Math.cos(hp.angle) * r;
       const hpy = py + Math.sin(hp.angle) * r;
@@ -455,6 +466,7 @@ export class BlackHole extends Enemy {
     // Orbit particles
     const [odr, odg, odb] = P.orbitDot;
     for (const hp of this.horizonParticles) {
+      if (!this.showOrbitDots) break;
       const r = ringR * hp.orbitR;
       const hpx = px + Math.cos(hp.angle) * r;
       const hpy = py + Math.sin(hp.angle) * r;
@@ -540,6 +552,7 @@ export class BlackHole extends Enemy {
     // Orbit particles
     const [odr, odg, odb] = P.orbitDot;
     for (const hp of this.horizonParticles) {
+      if (!this.showOrbitDots) break;
       const r = (innerR + outerR) / 2 * hp.orbitR;
       const hpx = px + Math.cos(hp.angle) * r;
       const hpy = py + Math.sin(hp.angle) * r;
@@ -594,6 +607,7 @@ export class BlackHole extends Enemy {
     renderer: Renderer, px: number, py: number, baseR: number,
     armCount: number, wrapRadians: number, alphaScale: number,
   ): void {
+    if (!this.showSwirlArms) return;
     const [ar, ag, ab] = P.swirlArm;
     for (const sp of this.swirlParticles) {
       const armIdx = sp.arm % armCount;
@@ -615,6 +629,7 @@ export class BlackHole extends Enemy {
 
   /** Render infall streaks falling toward ring */
   private renderInfallStreaks(renderer: Renderer, px: number, py: number, targetR: number): void {
+    if (!this.showInfallStreaks) return;
     const [ir, ig, ib] = P.infallStreak;
     for (const s of this.infallStreaks) {
       const ca = Math.cos(s.angle);
