@@ -274,13 +274,13 @@ export class CombatSystem {
           // Circles are dusty ejecta of a BlackHole: killing one throws off a puff of
           // gold hit-sparks (velocity-stretched via the dust field) in the bullet's
           // direction, like shooting the hole itself — plus a small blue dust burst.
-          this.deps.field.spawnBurst(kill.position.x, kill.position.y, dir ?? 0, 1.6, this.mobile ? 6 : 12, 5.0, 42, 0.4);
-          this.deps.field.spawnBurst(kill.position.x, kill.position.y, dir ?? 0, 2.4, this.mobile ? 4 : 8, 2.2, 205, 0.5);
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, dir ?? 0, 1.6, this.mobile ? 12 : 22, 6.5, 42, 0.5);
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, dir ?? 0, 2.6, this.mobile ? 7 : 14, 2.8, 205, 0.6);
           this.deps.explosions.spawn(
             kill.position.x, kill.position.y, kill.color,
-            this.mobile ? 6 : 12, EXPLOSION_DURATION_DEFAULT * 0.7, 1, dir,
+            this.mobile ? 8 : 16, EXPLOSION_DURATION_DEFAULT * 0.7, 1.2, dir,
           );
-          this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 200, 120);
+          this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 240, 130);
           break;
         }
         default: {

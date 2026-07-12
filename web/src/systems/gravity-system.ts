@@ -7,6 +7,7 @@ import { Enemy } from '../entities/enemies/enemy';
 import { BlackHole } from '../entities/enemies/blackhole';
 import { CircleEnemy } from '../entities/enemies/circle';
 import type { ExplosionPool } from '../entities/explosion';
+import type { ParticleField } from '../renderer/particle-field';
 import { LifecycleSystem } from './lifecycle-system';
 import { createEnemy } from '../spawner/enemy-factory';
 import { Vec2 } from '../core/vector';
@@ -29,6 +30,7 @@ import {
   CIRCLE_ORBIT_KICK_MIN,
   CIRCLE_ORBIT_KICK_MAX,
   CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER,
+  PARTICLE_FIELD_BH_DETONATE_BURST,
 } from '../config';
 import type { Renderer } from '../renderer/sprite-batch';
 
@@ -50,6 +52,7 @@ export interface GravitySystemDeps {
   grid: SpringMassGrid;
   camera: Camera;
   audio: AudioManager;
+  field: ParticleField;
   /** Game-owned feedback when a BlackHole starts destabilizing (border pulse). */
   onSupernovaWarning: () => void;
   /** Game-owned feedback when a BlackHole detonates (hitstop, screen flash, haptics). */
@@ -189,7 +192,7 @@ export class GravitySystem {
     const py = bh.position.y;
 
     // Circles — elastic flock snap-back
-    const circleCount = absorbed * CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER;
+    const circleCount = Math.round(absorbed * CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER);
     const flockCenter = new Vec2(px, py);
     const flockGroup: CircleEnemy[] = [];
     for (let ci = 0; ci < circleCount; ci++) {
@@ -243,6 +246,10 @@ export class GravitySystem {
         x: px, y: py,
       });
     }
+
+    // Dust eruption — the hole blows its accreted dust outward in a hot amber ring, the
+    // climax of the life-stage emission that built up while it was filling/destabilizing.
+    this.deps.field.spawnBurst(px, py, 0, Math.PI * 2, this.mobile ? 45 : PARTICLE_FIELD_BH_DETONATE_BURST, 3.0, 30, 1.0);
 
     grid.applyImpulse(px, py, SUPERNOVA_GRID_IMPULSE, 600);
     camera.shake(SCREEN_SHAKE_DEATH);

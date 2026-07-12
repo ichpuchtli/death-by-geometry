@@ -64,7 +64,7 @@ export class HeadlessGame {
     });
     this.gravity = new GravitySystem(false, {
       player: this.player, enemies: this.enemies, bullets: this.bullets,
-      lifecycle: this.lifecycle, explosions, grid, camera, audio,
+      lifecycle: this.lifecycle, explosions, grid, camera, audio, field,
       onSupernovaWarning: () => {},
       onSupernovaDetonate: () => {},
     });

@@ -43,6 +43,7 @@ Per-enemy-family death VFX rendered in additive blend pass (`KillEffect` array i
 - **Square:** chunky rotating fragment outlines
 - **Pinwheel:** spark spiral with rotating particles + bright tips
 - **Sierpinski:** layered concentric triangle outlines expanding
+- **Circle** (BlackHole ejecta): gold velocity-stretched hit-sparks + a blue dust burst fanned in the bullet direction via `field.spawnBurst` (like shooting the hole itself) + a small explosion; no shatter (ring unit). Counts bumped for visibility; shares the raised `PARTICLE_FIELD_MAX_TRANSIENT` (700) so it isn't starved during a supernova.
 - **Elite kills:** golden-white primary burst + secondary colored burst (longer/larger)
 - Config: effect duration (0.4s), ray count (6), ray length (80px)
 

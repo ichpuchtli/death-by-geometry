@@ -48,17 +48,29 @@ steps:
       while (bh.absorbedCount < 12) bh.absorbEnemy();
       return bh.destabilizing === true;
 
+  # Life-stage dust emission: a destabilizing hole actively sheds an inrushing dust storm,
+  # so the field's live mote count climbs well above the ambient baseline (~420) even with
+  # the test player idle (no thruster wake).
+  - action: wait
+    ms: 250
+  - action: assertEval
+    description: "Destabilizing BlackHole emits a dust storm (mote count above ambient)"
+    script: |
+      const g = window.game;
+      return window.__bh.destabilizing === true && g.field.count > 480;
+
   # 350ms fuse — detonation must fire even with no bullets touching it
   # (regression: the old code only detonated inside the absorb branch)
   - action: wait
-    ms: 1200
+    ms: 1000
 
   - action: assertEval
-    description: "BlackHole detonated on its own and ejected circles"
+    description: "BlackHole detonated on its own, ejected a reduced circle flock (1.5×), and erupted dust"
     script: |
       const g = window.game;
       const circles = g.enemies.filter(e => e.active && e.family === 'circle').length;
-      return window.__bh.active === false && circles >= 10;
+      // round(12 * 1.5) = 18 emitted (was 3×=36); some may have orbited into the player by now.
+      return window.__bh.active === false && circles >= 8 && circles <= 20 && g.field.count > 450;
 
   - action: screenshot
     name: "78-supernova-chaos"

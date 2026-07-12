@@ -72,6 +72,9 @@ import {
   PARTICLE_FIELD_CIRCLE_PULL,
   PARTICLE_FIELD_CIRCLE_RADIUS,
   PARTICLE_FIELD_CIRCLE_SWIRL,
+  PARTICLE_FIELD_CIRCLE_SHED,
+  PARTICLE_FIELD_BH_EMIT_RATE,
+  PARTICLE_FIELD_BH_EMIT_CRITICAL,
 } from './config';
 import { gameSettings } from './settings';
 import { showDesktopSettings, hideDesktopSettings } from './ui/settings-panel';
@@ -250,6 +253,7 @@ export class Game {
       grid: this.grid,
       camera: this.camera,
       audio: this.audio,
+      field: this.field,
       onSupernovaWarning: () => { this.phaseBorderPulseTimer = PHASE_BORDER_PULSE_DURATION; },
       onSupernovaDetonate: () => {
         this.haptics.supernova();
@@ -842,6 +846,13 @@ export class Game {
           radius: PARTICLE_FIELD_CIRCLE_RADIUS,
           swirl: PARTICLE_FIELD_CIRCLE_SWIRL,
         });
+        // Active shed: a moving circle leaks a blue dust mote behind it so the dusty DNA
+        // is visible even in fast play (the attractor above then swirls it into a halo).
+        const csp = Math.hypot(e.velocity.x, e.velocity.y);
+        if (csp > 0.03 && Math.random() < (this.mobile ? 0.3 : PARTICLE_FIELD_CIRCLE_SHED)) {
+          const behind = Math.atan2(-e.velocity.y, -e.velocity.x);
+          this.field.spawnBurst(e.position.x, e.position.y, behind, 1.4, 1, 0.4 + csp * 1.2, 205, 0.55);
+        }
         continue;
       }
       if (!(e instanceof BlackHole)) continue;
@@ -859,6 +870,27 @@ export class Game {
         heat,
         swirl: e.dustSwirl,
       });
+      // Life-stage dust EMISSION — the hole actively sheds dust that rides its life cycle:
+      // a trickle scaling with swallowed mass that becomes a hot inrushing storm as it
+      // destabilizes toward supernova. Motes appear on the rim and rain inward (hue slides
+      // cool-blue → amber-hot with heat), so the disk visibly thickens + heats as it fills.
+      const rimBase = e.collisionRadius * 1.6;
+      const emitHue = 210 - heat * 180;
+      const emit = (count: number, speed: number, life: number): void => {
+        for (let k = 0; k < count; k++) {
+          const a = Math.random() * Math.PI * 2;
+          const rr = rimBase + Math.random() * e.collisionRadius * 1.4;
+          const rx = e.position.x + Math.cos(a) * rr;
+          const ry = e.position.y + Math.sin(a) * rr;
+          const inward = Math.atan2(e.position.y - ry, e.position.x - rx);
+          this.field.spawnBurst(rx, ry, inward, 1.1, 1, speed, emitHue, life);
+        }
+      };
+      if (e.destabilizing && !e.overloaded) {
+        emit(this.mobile ? 2 : PARTICLE_FIELD_BH_EMIT_CRITICAL, 0.25 + Math.random() * 0.2, 0.8);
+      } else if (Math.random() < inst * PARTICLE_FIELD_BH_EMIT_RATE) {
+        emit(this.mobile ? 1 : 2, 0.12 + Math.random() * 0.14, 0.95);
+      }
     }
     this.field.brightness = destabilizing ? 1.4 : 1;
     this.field.update(dt, attractors, {
