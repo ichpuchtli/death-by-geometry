@@ -1,0 +1,95 @@
+name: "Movement Lab — momentum feel sandbox boots; ship has inertia, curved turns, glide"
+tags: [lab, movement, player]
+steps:
+  - action: launch
+    url: "/?movement=1"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 500
+
+  - action: evalCheck
+    description: "Lab booted in the default MOMENTUM + DRIFT model"
+    script: |
+      const l = window.movementLab;
+      if (!l) return false;
+      return l.mode === 1 && l.inputSmoothOn === true;
+
+  - action: mouseMove
+    x: 800
+    y: 300
+
+  # Hold W: velocity should ramp up toward the top speed (momentum, not instant snap).
+  - action: keys
+    keys: ["w"]
+    duration: 700
+  - action: evalCheck
+    description: "Holding W builds upward velocity toward the cap"
+    script: |
+      const l = window.movementLab;
+      return l.vel.y > 0.2;
+
+  # Release everything and wait briefly: the ship must KEEP MOVING (inertia/glide).
+  # The old instant model would be exactly 0 the frame input stops.
+  - action: wait
+    ms: 100
+  - action: evalCheck
+    description: "After releasing input the ship glides (velocity does not snap to zero)"
+    script: |
+      const l = window.movementLab;
+      return Math.hypot(l.vel.x, l.vel.y) > 0.08;
+
+  # Test a curved turn deterministically: prime full upward momentum, then thrust RIGHT.
+  # Both components should be non-zero after — the upward momentum is carried through while
+  # the rightward thrust builds, so the trajectory arcs instead of snapping 90°.
+  - action: wait
+    ms: 400
+  - action: evalCheck
+    description: "Prime upward momentum at top speed"
+    script: |
+      window.movementLab.vel.set(0, 0.35);
+      return true;
+  - action: keys
+    keys: ["d"]
+    duration: 100
+  - action: evalCheck
+    description: "Turning arcs: rightward velocity builds while upward momentum is retained"
+    script: |
+      const l = window.movementLab;
+      return l.vel.x > 0.03 && l.vel.y > 0.08;
+
+  - action: screenshot
+    name: "86-movement-lab-momentum"
+
+  # Cycle the other feel presets + toggle the knobs — each must run without error.
+  - action: keyPress
+    key: "2"
+    duration: 60
+  - action: evalCheck
+    description: "Snappy preset loaded (lower drag = quicker stop)"
+    script: |
+      const l = window.movementLab;
+      return l.mode === 2 && l.drag < 0.85;
+  - action: keyPress
+    key: "3"
+    duration: 60
+  - action: evalCheck
+    description: "Heavy preset loaded (high drag = long drift)"
+    script: |
+      const l = window.movementLab;
+      return l.mode === 3 && l.drag > 0.9;
+  - action: keyPress
+    key: "i"
+    duration: 60
+  - action: keyPress
+    key: "t"
+    duration: 60
+  - action: keyPress
+    key: "k"
+    duration: 60
+  - action: keyPress
+    key: "1"
+    duration: 60
+
+  - action: assertNoErrors
+    description: "Momentum integration + presets + toggles run without JS errors"
