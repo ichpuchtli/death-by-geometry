@@ -4,7 +4,6 @@ import type { ThreatLab as ThreatLabType } from './threat-lab';
 import type { ParticleLab as ParticleLabType } from './particle-lab';
 import type { CircleLab as CircleLabType } from './circle-lab';
 import type { TaxonomyLab as TaxonomyLabType } from './taxonomy-lab';
-import type { MovementLab as MovementLabType } from './movement-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -90,21 +89,6 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(taxonomyLoop);
     }
     requestAnimationFrame(taxonomyLoop);
-  });
-} else if (bootParams.has('movement')) {
-  // Movement Lab — momentum/feel sandbox for the player ship's WASD movement (`?movement=1`)
-  import('./movement-lab').then(({ MovementLab }) => {
-    const lab = new MovementLab(gameCanvas);
-    (window as unknown as { movementLab: MovementLabType }).movementLab = lab;
-    let last = performance.now();
-    function movementLoop(time: number): void {
-      const dt = Math.min(time - last, 50);
-      last = time;
-      lab.update(dt);
-      lab.render();
-      requestAnimationFrame(movementLoop);
-    }
-    requestAnimationFrame(movementLoop);
   });
 } else {
   bootGame();
