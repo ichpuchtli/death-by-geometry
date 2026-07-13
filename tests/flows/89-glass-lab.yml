@@ -1,0 +1,59 @@
+name: "Glass Lab — chromatic photon-ring variant chooser boots and renders"
+tags: [lab, blackhole, visual, glass]
+steps:
+  - action: launch
+    url: "/?glass=1"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 1200
+
+  - action: evalCheck
+    description: "Lab booted with the full set of ring variants"
+    script: |
+      const l = window.glassLab;
+      if (!l) return false;
+      if (!Array.isArray(l.variants) || l.variants.length < 9) return false;
+      const names = l.variants.map(v => v.name).join('|');
+      return names.includes('Thick RGB bands') && names.includes('Spectral')
+        && names.includes('shards');
+
+  - action: screenshot
+    name: "89-glass-lab-grid"
+
+  # Focus a single variant large (Digit key), then verify focus state.
+  - action: keyPress
+    key: "2"
+    duration: 60
+  - action: wait
+    ms: 300
+
+  - action: evalCheck
+    description: "Pressing 2 focuses variant index 1 (large single view)"
+    script: |
+      return window.glassLab.focus === 1;
+
+  - action: screenshot
+    name: "89-glass-lab-focus"
+
+  # Dispersion + mass knobs, bloom/grid toggles — none should error.
+  - action: keyPress
+    key: "]"
+    duration: 60
+  - action: keyPress
+    key: "="
+    duration: 60
+  - action: keyPress
+    key: "b"
+    duration: 60
+  - action: wait
+    ms: 150
+
+  - action: evalCheck
+    description: "Knobs + bloom toggle applied"
+    script: |
+      const l = window.glassLab;
+      return l.dispMult > 1 && l.inst > 0.55 && l.bloomOn === false;
+
+  - action: assertNoErrors
+    description: "All variant draws + focus + knobs run without JS errors"

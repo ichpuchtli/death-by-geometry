@@ -4,6 +4,7 @@ import type { ThreatLab as ThreatLabType } from './threat-lab';
 import type { ParticleLab as ParticleLabType } from './particle-lab';
 import type { CircleLab as CircleLabType } from './circle-lab';
 import type { TaxonomyLab as TaxonomyLabType } from './taxonomy-lab';
+import type { GlassLab as GlassLabType } from './glass-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -89,6 +90,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(taxonomyLoop);
     }
     requestAnimationFrame(taxonomyLoop);
+  });
+} else if (bootParams.has('glass')) {
+  // Glass Lab — A/B chooser for the BlackHole chromatic photon-ring variants (`?glass=1`)
+  import('./glass-lab').then(({ GlassLab }) => {
+    const lab = new GlassLab(gameCanvas);
+    (window as unknown as { glassLab: GlassLabType }).glassLab = lab;
+    let last = performance.now();
+    function glassLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(glassLoop);
+    }
+    requestAnimationFrame(glassLoop);
   });
 } else {
   bootGame();
