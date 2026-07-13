@@ -1,0 +1,51 @@
+name: "Liquid Glass Lab — GLSL refractive-material variants boot and render"
+tags: [lab, glass, liquid, visual]
+steps:
+  - action: launch
+    url: "/?liquid=1"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 1200
+
+  - action: evalCheck
+    description: "Lab booted with the 8 liquid-glass variants"
+    script: |
+      const l = window.liquidGlassLab;
+      if (!l) return false;
+      if (!Array.isArray(l.variants) || l.variants.length !== 8) return false;
+      const names = l.variants.map(v => v.name).join('|');
+      return names.includes('Liquid droplet') && names.includes('Frosted')
+        && names.includes('Chromatic edge') && names.includes('Concave');
+
+  - action: screenshot
+    name: "90-liquid-glass-grid"
+
+  # Focus the signature droplet variant (index 1) large.
+  - action: keyPress
+    key: "2"
+    duration: 60
+  - action: wait
+    ms: 300
+
+  - action: evalCheck
+    description: "Pressing 2 focuses variant index 1"
+    script: |
+      return window.liquidGlassLab.focus === 1;
+
+  - action: screenshot
+    name: "90-liquid-glass-focus"
+
+  - action: keyPress
+    key: "g"
+    duration: 60
+  - action: wait
+    ms: 120
+
+  - action: evalCheck
+    description: "Scene grid toggled off"
+    script: |
+      return window.liquidGlassLab.gridOn === false;
+
+  - action: assertNoErrors
+    description: "GLSL refraction pass + focus + toggles run without JS/GL errors"

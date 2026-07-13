@@ -5,6 +5,7 @@ import type { ParticleLab as ParticleLabType } from './particle-lab';
 import type { CircleLab as CircleLabType } from './circle-lab';
 import type { TaxonomyLab as TaxonomyLabType } from './taxonomy-lab';
 import type { GlassLab as GlassLabType } from './glass-lab';
+import type { LiquidGlassLab as LiquidGlassLabType } from './liquid-glass-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -105,6 +106,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(glassLoop);
     }
     requestAnimationFrame(glassLoop);
+  });
+} else if (bootParams.has('liquid')) {
+  // Liquid Glass Lab — GLSL refractive-material variant prototypes (`?liquid=1`)
+  import('./liquid-glass-lab').then(({ LiquidGlassLab }) => {
+    const lab = new LiquidGlassLab(gameCanvas);
+    (window as unknown as { liquidGlassLab: LiquidGlassLabType }).liquidGlassLab = lab;
+    let last = performance.now();
+    function liquidLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(liquidLoop);
+    }
+    requestAnimationFrame(liquidLoop);
   });
 } else {
   bootGame();
