@@ -1,0 +1,64 @@
+name: "BlackHole spawn — prominent warning telegraph + bassy spawn sound"
+tags: [blackhole, spawn, audio, visual]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+  - action: wait
+    ms: 300
+
+  # Intense phase + high spawn rate so a BlackHole appears quickly
+  - action: evalCheck
+    description: "Configure settings so BlackHoles spawn fast"
+    script: |
+      const s = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      s.startingPhase = 'intense';
+      s.startingLives = 99;
+      s.spawnRateMultiplier = 4;
+      s.maxEnemies = 200;
+      localStorage.setItem('gg_settings', JSON.stringify(s));
+      return true;
+
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+  - action: wait
+    ms: 300
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  # Spy on the new bassy spawn sound (audio is a runtime-accessible field on Game).
+  - action: evalCheck
+    description: "Install a spy on the bassy BlackHole spawn sound"
+    script: |
+      const audio = window.game.audio;
+      if (!audio || typeof audio.playBlackHoleSpawn !== 'function') return false;
+      window.__bhSpawnSfx = 0;
+      const orig = audio.playBlackHoleSpawn.bind(audio);
+      audio.playBlackHoleSpawn = (...a) => { window.__bhSpawnSfx++; return orig(...a); };
+      return true;
+
+  # Catch a BlackHole mid-spawn so the screenshot captures the prominent telegraph.
+  - action: waitForEval
+    description: "A BlackHole is ~halfway through spawning (telegraph at full prominence)"
+    timeout: 22000
+    script: |
+      const bh = window.game.enemies.find(e => e.active && e.family === 'blackhole' && e.isSpawning);
+      if (!bh) return false;
+      window.__spawningBH = bh;
+      const progress = 1 - bh.spawnTimer / bh.spawnDuration;
+      return progress > 0.5;
+
+  - action: screenshot
+    name: "88-blackhole-spawn-telegraph"
+
+  # The bassy spawn sound must have fired when the hole spawned.
+  - action: assertEval
+    description: "Bassy playBlackHoleSpawn fired on spawn (replaces the old 'deathstar' SFX)"
+    script: |
+      return window.__bhSpawnSfx >= 1;
+
+  - action: assertNoErrors
+    description: "The prominent renderSpawn telegraph draws without JS errors"

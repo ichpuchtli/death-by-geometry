@@ -251,8 +251,62 @@ export class BlackHole extends Enemy {
     this.infallStreaks = this.infallStreaks.filter(s => s.r > ringR * 0.85);
   }
 
+  /**
+   * Prominent black-hole spawn telegraph. The generic gravity-well spawn was too subtle —
+   * players kept drifting onto a hole as it formed (harmless during spawn, but the lethal
+   * well appears the instant it finishes). This draws a loud, unmistakable "keep clear"
+   * warning: an amber danger footprint with radar-ping rings + a rotating reticle, imploding
+   * accretion rings, and a growing dark core that resolves into the singularity.
+   */
   override renderSpawn(renderer: Renderer): void {
-    this.renderSpawnGravity(renderer);
+    const progress = 1 - this.spawnTimer / this.spawnDuration; // 0→1 over spawn
+    const cx = this.position.x;
+    const cy = this.position.y;
+    const t = Date.now() * 0.001;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 7); // fast warning throb
+
+    // Danger footprint — the exclusion zone the gravity well will occupy, grown with progress.
+    const footprint = 70 + progress * 150; // → ~220px "stay clear" radius
+    const W: [number, number, number] = [1.0, 0.55, 0.12]; // amber warning
+
+    // Radar-ping rings expanding out from the core (two staggered) — draw the eye in.
+    for (let i = 0; i < 2; i++) {
+      const ph = (t * 0.8 + i * 0.5) % 1;
+      const r = footprint * (0.25 + ph * 0.95);
+      renderer.drawCircle(cx, cy, r, W, 48, (1 - ph) * 0.55 * progress);
+    }
+
+    // Steady throbbing footprint ring (double line for weight).
+    renderer.drawCircle(cx, cy, footprint, W, 56, (0.28 + pulse * 0.4) * progress);
+    renderer.drawCircle(cx, cy, footprint - 3, [1, 0.9, 0.7], 56, (0.16 + pulse * 0.22) * progress);
+
+    // Rotating warning reticle — dashed arcs sweeping around the footprint.
+    const arcs = 6;
+    const rot = t * 1.6;
+    for (let i = 0; i < arcs; i++) {
+      if (i % 2 === 0) continue;
+      const a1 = rot + (i / arcs) * TWO_PI;
+      const a2 = rot + ((i + 0.7) / arcs) * TWO_PI;
+      const rr = footprint + 9;
+      renderer.drawLine(
+        cx + Math.cos(a1) * rr, cy + Math.sin(a1) * rr,
+        cx + Math.cos(a2) * rr, cy + Math.sin(a2) * rr,
+        W[0], W[1], W[2], 0.55 * progress);
+    }
+
+    // Imploding accretion rings — matter raining into the forming singularity.
+    const ringCount = 5;
+    for (let i = 0; i < ringCount; i++) {
+      const phase = (i / ringCount + progress * 1.3) % 1;
+      const ringR = footprint * 0.75 * (1 - phase) + 6;
+      renderer.drawCircle(cx, cy, ringR, this.color, 32, 0.5 * phase * (1 - phase) * (0.6 + progress * 0.4));
+    }
+
+    // Growing dark core + bright accretion rim resolving into the hole.
+    const coreR = 6 + progress * (this.collisionRadius - 6);
+    renderer.drawFilledCircle(cx, cy, coreR, P.voidBlack, 28, 0.85 * progress);
+    renderer.drawCircle(cx, cy, coreR + 2, [1, 1, 1], 28, (0.4 + pulse * 0.3) * progress);
+    renderer.drawCircle(cx, cy, coreR, this.color2, 28, 0.6 * progress);
   }
 
   render(renderer: Renderer): void {

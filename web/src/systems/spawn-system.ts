@@ -135,7 +135,7 @@ export class SpawnSystem {
     switch (type) {
       case 'rhombus': this.deps.audio.playSFX('rhombus'); break;
       case 'pinwheel': this.deps.audio.playSFX('pinwheel'); break;
-      case 'blackhole': this.deps.audio.playSFX('deathstar'); break;
+      case 'blackhole': this.deps.audio.playBlackHoleSpawn(); break;
       case 'sierpinski': this.deps.audio.playSFX('octagon'); break;
     }
   }
@@ -145,7 +145,7 @@ export class SpawnSystem {
     switch (type) {
       case 'rhombus': this.deps.audio.playSFXAtVolume('rhombus', volume); break;
       case 'pinwheel': this.deps.audio.playSFXAtVolume('pinwheel', volume); break;
-      case 'blackhole': this.deps.audio.playSFXAtVolume('deathstar', volume); break;
+      case 'blackhole': this.deps.audio.playBlackHoleSpawn(volume); break;
       case 'sierpinski': this.deps.audio.playSFXAtVolume('octagon', volume); break;
     }
   }

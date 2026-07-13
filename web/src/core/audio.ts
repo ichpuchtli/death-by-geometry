@@ -876,6 +876,67 @@ export class AudioManager {
     whine.stop(now + dur + 0.1);
   }
 
+  /**
+   * BlackHole spawn: a deep, ominous bass swell as the gravity well tears open in space.
+   * Low & weighty — a saturated sub sweeping DOWN (matter collapsing inward), a slow detuned
+   * beat for unease, and a low-passed noise rumble for the "tearing" texture. Roughly matches
+   * the 3s spawn telegraph so the sound and the growing warning ring land together.
+   */
+  playBlackHoleSpawn(volume: number = 1): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const v = Math.min(1, Math.max(0, volume));
+
+    // 1. Deep saturated sub — sweeps 70→28Hz as the well opens. Saturation adds harmonics so
+    //    the sub reads as WEIGHT even on laptop speakers.
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(70, now);
+    sub.frequency.exponentialRampToValueAtTime(28, now + 1.7);
+    const sat = this.makeSaturator(3.0);
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0.001, now);
+    subGain.gain.exponentialRampToValueAtTime(0.6 * v, now + 0.3);
+    subGain.gain.setValueAtTime(0.6 * v, now + 1.0);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 2.1);
+    sub.connect(sat);
+    sat.connect(subGain);
+    subGain.connect(this.sfxGain);
+    sub.start(now);
+    sub.stop(now + 2.2);
+
+    // 2. Detuned second sub — beats slowly against the first for a heavy, uneasy wobble.
+    const sub2 = ctx.createOscillator();
+    sub2.type = 'sine';
+    sub2.frequency.setValueAtTime(73, now);
+    sub2.frequency.exponentialRampToValueAtTime(30, now + 1.7);
+    const sub2Gain = ctx.createGain();
+    sub2Gain.gain.setValueAtTime(0.001, now);
+    sub2Gain.gain.exponentialRampToValueAtTime(0.32 * v, now + 0.35);
+    sub2Gain.gain.exponentialRampToValueAtTime(0.001, now + 2.1);
+    sub2.connect(sub2Gain);
+    sub2Gain.connect(this.sfxGain);
+    sub2.start(now);
+    sub2.stop(now + 2.2);
+
+    // 3. Low-passed noise rumble — the "tearing open" texture, kept well below the subs.
+    const noise = this.makeNoiseSource(2.0);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(420, now);
+    lp.frequency.exponentialRampToValueAtTime(110, now + 1.8);
+    const nGain = ctx.createGain();
+    nGain.gain.setValueAtTime(0.001, now);
+    nGain.gain.linearRampToValueAtTime(0.12 * v, now + 0.45);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 1.9);
+    noise.connect(lp);
+    lp.connect(nGain);
+    nGain.connect(this.sfxGain);
+    noise.start(now);
+    noise.stop(now + 2.0);
+  }
+
   // --- BlackHole stress loop: two detuned subs beating + LFO tremolo, level-driven ---
   private stressOsc1: OscillatorNode | null = null;
   private stressOsc2: OscillatorNode | null = null;
