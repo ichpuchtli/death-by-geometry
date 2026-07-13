@@ -1,0 +1,62 @@
+name: "Grid Opacity — spacetime-fabric line opacity is a live-tunable setting"
+tags: [smoke, settings, grid, visual]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 1500
+
+  - action: evalCheck
+    description: "Grid Opacity slider exists with the 0.05–1.0 range"
+    script: |
+      var ds = document.getElementById('desktop-settings');
+      if (!ds) return false;
+      var labels = ds.querySelectorAll('.sp-label');
+      for (var i = 0; i < labels.length; i++) {
+        if (labels[i].textContent === 'Grid Opacity') {
+          var row = labels[i].closest('.sp-row');
+          var input = row && row.querySelector('input[type="range"]');
+          return input && input.min === '0.05' && input.max === '1';
+        }
+      }
+      return false;
+
+  - action: evalCheck
+    description: "Grid Opacity defaults to the lowered baseline (GRID_LINE_ALPHA 0.4, down from 0.75)"
+    script: |
+      var ds = document.getElementById('desktop-settings');
+      var labels = ds.querySelectorAll('.sp-label');
+      for (var i = 0; i < labels.length; i++) {
+        if (labels[i].textContent === 'Grid Opacity') {
+          var row = labels[i].closest('.sp-row');
+          var input = row && row.querySelector('input[type="range"]');
+          return input && Math.abs(parseFloat(input.value) - 0.4) < 0.001;
+        }
+      }
+      return false;
+
+  - action: evalCheck
+    description: "Dragging the slider writes through to gameSettings + localStorage (what the grid shader reads each frame)"
+    script: |
+      var ds = document.getElementById('desktop-settings');
+      var labels = ds.querySelectorAll('.sp-label');
+      var input = null;
+      for (var i = 0; i < labels.length; i++) {
+        if (labels[i].textContent === 'Grid Opacity') {
+          input = labels[i].closest('.sp-row').querySelector('input[type="range"]');
+          break;
+        }
+      }
+      if (!input) return false;
+      input.value = '0.15';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      var saved = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      return Math.abs(saved.gridOpacity - 0.15) < 0.001;
+
+  - action: screenshot
+    name: "87-grid-opacity"
+
+  - action: assertNoErrors
+    description: "Grid opacity uniform + slider run without JS errors"

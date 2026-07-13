@@ -12,6 +12,7 @@ import {
   GRID_SPACING,
   GRID_SUBSTEPS,
   GRID_SPRING_STIFFNESS,
+  GRID_LINE_ALPHA,
   WORLD_WIDTH,
   WORLD_HEIGHT,
 } from './config';
@@ -26,6 +27,7 @@ export interface GameSettings {
   maxEnemies: number;             // 20–150
   bloomIntensity: number;         // 0.5–4.0
   trailLength: number;            // 2–30
+  gridOpacity: number;            // 0.05–1.0 (static baseline opacity of the spacetime-fabric grid lines)
   // BlackHole gravity tuning
   bhAttractRadius: number;        // 50–900 (px, how far gravity reaches)
   bhEnemyPull: number;            // 1–40 (force = pull/dist px/ms; core multiplier applies inside BH_CORE_RADIUS_FRACTION)
@@ -63,6 +65,7 @@ export const DEFAULTS: GameSettings = {
   maxEnemies: MOBILE_MAX_ENEMIES,
   bloomIntensity: BLOOM_INTENSITY,
   trailLength: TRAIL_LENGTH_ENEMY,
+  gridOpacity: GRID_LINE_ALPHA,
   // Threat Lab port: SINGULARITY-class gravity (with the core multiplier in config,
   // pull 24 → 60 inside 400px, capturing tracking rhombuses)
   bhAttractRadius: 500,

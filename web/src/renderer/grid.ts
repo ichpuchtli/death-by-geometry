@@ -66,6 +66,7 @@ export class SpringMassGrid {
   private uWellStrengths: WebGLUniformLocation;
   private uWellRadii: WebGLUniformLocation;
   private uPerspectiveDepth: WebGLUniformLocation;
+  private uBaseAlpha: WebGLUniformLocation;
 
   constructor(gl: WebGLRenderingContext, mobile: boolean) {
     this.gl = gl;
@@ -82,6 +83,7 @@ export class SpringMassGrid {
     this.uWellStrengths = gl.getUniformLocation(this.program, 'u_wellStrengths')!;
     this.uWellRadii = gl.getUniformLocation(this.program, 'u_wellRadii')!;
     this.uPerspectiveDepth = gl.getUniformLocation(this.program, 'u_perspectiveDepth')!;
+    this.uBaseAlpha = gl.getUniformLocation(this.program, 'u_baseAlpha')!;
 
     this.vertexBuffer = gl.createBuffer()!;
     this.indexBuffer = gl.createBuffer()!;
@@ -409,6 +411,7 @@ export class SpringMassGrid {
       gl.uniform1fv(this.uWellRadii, this.wellRadArray);
     }
     gl.uniform1f(this.uPerspectiveDepth, gameSettings.bhGridPerspectiveDepth);
+    gl.uniform1f(this.uBaseAlpha, gameSettings.gridOpacity);
 
     // Vertex attribs (stride = 20 bytes: 5 floats)
     const stride = 20;

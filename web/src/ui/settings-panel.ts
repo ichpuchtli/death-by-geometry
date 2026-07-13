@@ -28,6 +28,7 @@ const SLIDERS: SliderDef[] = [
   { key: 'maxEnemies', label: 'Max Enemies', desc: 'Hard cap on simultaneous enemies', min: 20, max: 150, step: 10, format: v => `${v}` },
   { key: 'bloomIntensity', label: 'Bloom', desc: 'Glow post-processing intensity', min: 0.5, max: 4.0, step: 0.1, format: v => `${v.toFixed(1)}` },
   { key: 'trailLength', label: 'Trail Length', desc: 'Length of motion trails behind entities', min: 2, max: 30, step: 1, format: v => `${v}` },
+  { key: 'gridOpacity', label: 'Grid Opacity', desc: 'Spacetime-fabric line opacity. Lower = enemies read clearer', min: 0.05, max: 1.0, step: 0.05, format: v => v.toFixed(2) },
   { key: 'zoomScale', label: 'Zoom', desc: 'Camera zoom (lower = see more arena)', min: 0.5, max: 1.5, step: 0.05, format: v => `${v.toFixed(2)}x` },
   // BlackHole gravity
   { key: 'bhAttractRadius', label: 'BH Pull Radius', desc: 'How far BlackHole gravity reaches (px)', min: 50, max: 900, step: 10, format: v => `${v}px` },

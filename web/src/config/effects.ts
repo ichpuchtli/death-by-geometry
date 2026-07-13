@@ -87,6 +87,10 @@ export const GRID_ANCHOR_STIFFNESS = 15;
 export const GRID_MAX_DISPLACEMENT = 160;
 export const GRID_SUBSTEPS = 3;
 export const GRID_MOBILE_SUBSTEPS = 2;
+// Static baseline opacity of the spacetime-fabric grid lines (runtime-tunable via
+// gameSettings.gridOpacity). Lowered from the old hard-coded 0.75 so the calm grid recedes
+// and enemy units read clearly; velocity/well-depth boosts still make the reactive parts pop.
+export const GRID_LINE_ALPHA = 0.4;
 export const GRID_COLOR_BASE: [number, number, number] = [0.38, 0.14, 0.72];
 export const GRID_COLOR_STRETCH: [number, number, number] = [0.0, 0.8, 1.0];
 export const GRID_COLOR_COMPRESS: [number, number, number] = [1.0, 0.2, 0.8];

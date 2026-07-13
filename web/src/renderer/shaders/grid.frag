@@ -6,9 +6,12 @@ varying float v_wellDepth;
 uniform vec3 u_colorBase;
 uniform vec3 u_colorStretch;
 uniform vec3 u_colorCompress;
+uniform float u_baseAlpha;
 
 void main() {
-    float alpha = 0.75;
+    // Static baseline opacity (tunable). The velocity glow + well-depth boosts below add on
+    // top, so the calm fabric stays subtle while the reactive parts (ripples, wells) still pop.
+    float alpha = u_baseAlpha;
 
     // Color shift based on displacement
     float t = clamp(v_displacement / 40.0, 0.0, 1.0);

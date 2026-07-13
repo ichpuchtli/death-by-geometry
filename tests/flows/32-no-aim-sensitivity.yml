@@ -26,12 +26,12 @@ steps:
       return true;
 
   - action: evalCheck
-    description: "Settings panel has exactly 27 sliders (26 original + BH Depth Effect)"
+    description: "Settings panel has exactly 29 sliders (28 prior + Grid Opacity)"
     script: |
       var ds = document.getElementById('desktop-settings');
       if (!ds) return false;
       var sliders = ds.querySelectorAll('input[type="range"]');
-      return sliders.length === 27;
+      return sliders.length === 29;
 
   - action: evalCheck
     description: "Spawn Rate slider still exists"
