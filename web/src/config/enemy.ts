@@ -119,9 +119,23 @@ export const BLACKHOLE_PLAYER_PULL_STRENGTH = 0.4; // px/ms² force on player
 // through the gravitational "lens"). Gives even the darkest variant a crisp luminous edge,
 // makes holes read as refractive glass, and tells the light-bending physics story. Dispersion
 // widens with swallowed mass (a heavier hole bends light more).
-export const BH_DIFFRACTION_DISPERSION_BASE = 2.2;     // px R/G/B radial split at 0 mass
-export const BH_DIFFRACTION_DISPERSION_PER_MASS = 4.5; // additional split at full mass (× instability)
-export const BH_DIFFRACTION_RING_ALPHA = 0.6;          // base alpha of the prismatic ring bands
+export const BH_DIFFRACTION_DISPERSION_BASE = 2.2;     // px spectrum half-spread at 0 mass
+export const BH_DIFFRACTION_DISPERSION_PER_MASS = 4.5; // additional spread at full mass (× instability)
+export const BH_DIFFRACTION_RING_ALPHA = 0.5;          // per-band alpha of the prismatic ring
+export const BH_DIFFRACTION_BAND_THICKNESS_BASE = 2.5;   // px thickness of each spectral band at 0 mass
+export const BH_DIFFRACTION_BAND_THICKNESS_PER_MASS = 2; // additional band thickness at full mass
+// ROYGBIV spectrum for the "spectral-thick" photon ring (Glass Lab variant 4, user pick):
+// 7 stacked bands fanned across the dispersion width → a smooth rainbow gradient rim.
+// Red bent least (outer) → violet most (inner), as light disperses through a lens.
+export const BH_DIFFRACTION_SPECTRUM: [number, number, number][] = [
+  [1.0, 0.12, 0.16], // red
+  [1.0, 0.5, 0.1],   // orange
+  [1.0, 0.9, 0.2],   // yellow
+  [0.25, 1.0, 0.35], // green
+  [0.2, 0.9, 1.0],   // cyan
+  [0.25, 0.45, 1.0], // blue
+  [0.7, 0.3, 1.0],   // violet
+];
 
 // --- Supernova (BlackHole overload detonation) ---
 // "Chaos bomb" tuning (Threat Lab CATACLYSM payload + SINGULARITY gravity, user-picked)
