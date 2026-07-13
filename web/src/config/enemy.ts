@@ -85,6 +85,9 @@ export const MANDELBROT_BUD_REGROW_TIME = 3.0; // seconds
 
 // --- BlackHole ---
 export const BLACKHOLE_HP = 12;
+// How many enemies a BlackHole absorbs before it overloads → destabilizes → supernova.
+// Higher = longer "swell" time as the hole fills and stresses before it blows.
+export const BLACKHOLE_MAX_ABSORB = 22;
 
 // --- BlackHole Visual Palette (design lab variants) ---
 export const BLACKHOLE_PALETTE = {
@@ -130,7 +133,7 @@ export const BH_CORE_PULL_MULT = 2.5;
 // --- Circle (BlackHole supernova ejecta) ---
 export const CIRCLE_EJECT_SPEED_MIN = 0.35;       // px/ms min ejection speed
 export const CIRCLE_EJECT_SPEED_MAX = 0.85;       // px/ms max ejection speed
-export const CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER = 1.5; // circles emitted = round(absorbedCount * this); a full 12-absorb hole → 18 (was 3×→36, too many)
+export const CIRCLE_SUPERNOVA_SPAWN_MULTIPLIER = 0.8; // circles emitted = round(absorbedCount * this); a full 22-absorb hole → 18 (kept ~18 after MAX_ABSORB 12→22 so more swell time doesn't mean more circles)
 // Orbital tracking: the player is treated as a gravity well. Each circle carries momentum
 // (persistent velocity) and is pulled toward the player by a central spring that strengthens
 // with distance, so it overshoots, curves into an orbit, and falls back into the player's

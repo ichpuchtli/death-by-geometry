@@ -39,14 +39,22 @@ steps:
   # to critical mass via the real absorb path
   - action: waitForEval
     timeout: 45000
-    description: "Feed a BlackHole to MAX_ABSORB — destabilize must start"
+    description: "Feeding to the OLD threshold (12) must NOT destabilize — capacity was raised to 22"
     script: |
       const g = window.game;
       const bh = g.enemies.find(e => e.family === 'blackhole' && e.active && !e.isSpawning);
       if (!bh) return false;
       window.__bh = bh;
       while (bh.absorbedCount < 12) bh.absorbEnemy();
-      return bh.destabilizing === true;
+      // Regression guard: at 12 the hole is still swelling, not yet critical (MAX_ABSORB 12→22).
+      return bh.destabilizing === false;
+
+  - action: assertEval
+    description: "Feed the rest to MAX_ABSORB (22) — destabilize must start"
+    script: |
+      const bh = window.__bh;
+      while (bh.absorbedCount < 22) bh.absorbEnemy();
+      return bh.absorbedCount === 22 && bh.destabilizing === true;
 
   # Life-stage dust emission: a destabilizing hole actively sheds an inrushing dust storm,
   # so the field's live mote count climbs well above the ambient baseline (~420) even with
@@ -65,12 +73,14 @@ steps:
     ms: 1000
 
   - action: assertEval
-    description: "BlackHole detonated on its own, ejected a reduced circle flock (1.5×), and erupted dust"
+    description: "BlackHole detonated on its own, ejected ~18 circles (all gravity-immune), and erupted dust"
     script: |
       const g = window.game;
-      const circles = g.enemies.filter(e => e.active && e.family === 'circle').length;
-      // round(12 * 1.5) = 18 emitted (was 3×=36); some may have orbited into the player by now.
-      return window.__bh.active === false && circles >= 8 && circles <= 20 && g.field.count > 450;
+      const circleEnemies = g.enemies.filter(e => e.active && e.family === 'circle');
+      const circles = circleEnemies.length;
+      // round(22 * 0.8) = 18 emitted (kept ~18 despite MAX_ABSORB 12→22); some may have orbited into the player.
+      const allImmune = circleEnemies.every(e => e.gravityImmune === true);
+      return window.__bh.active === false && circles >= 8 && circles <= 20 && allImmune && g.field.count > 450;
 
   - action: screenshot
     name: "78-supernova-chaos"

@@ -25,7 +25,7 @@ import {
 const RHOMBUS_SPAWN_INTERVAL = 160; // ms — fast enough to sustain a visible swarm vs. the hole's appetite
 const MAX_RHOMBUSES = 40;
 const WAVE_COUNT = 16;
-// Keep the hole below its destabilize threshold (BlackHole.MAX_ABSORB = 12) so this lab
+// Keep the hole below its destabilize threshold (BlackHole.MAX_ABSORB) so this lab
 // stays a stable perpetual devourer — no supernova path to manage here.
 const MAX_FEED = 8;
 // Long enemy trails so the swirl's spiral arcs actually draw (default 18 is too short to read).

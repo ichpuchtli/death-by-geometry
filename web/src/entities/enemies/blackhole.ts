@@ -1,7 +1,7 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
 import type { Renderer } from '../../renderer/sprite-batch';
-import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS, SPAWN_DURATION_BLACKHOLE } from '../../config';
+import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_MAX_ABSORB, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS, SPAWN_DURATION_BLACKHOLE } from '../../config';
 import { gameSettings } from '../../settings';
 
 export type BlackHoleVisualMode = 'dense' | 'haze' | 'corona' | 'molten';
@@ -92,7 +92,7 @@ export class BlackHole extends Enemy {
   needsGridPulse = false;
   gridPulseStrength = 0;
 
-  static readonly MAX_ABSORB = 12;
+  static readonly MAX_ABSORB = BLACKHOLE_MAX_ABSORB;
   static get ATTRACT_RADIUS(): number { return gameSettings.bhAttractRadius; }
   static get GRAVITY_STRENGTH(): number { return gameSettings.bhEnemyPull; }
 
