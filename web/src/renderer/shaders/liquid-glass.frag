@@ -17,6 +17,15 @@ uniform float u_radius[9];   // lens radii in y-normalized units
 uniform float u_variant[9];  // variant id per lens (0..7)
 uniform vec2  u_light;        // 2D light direction
 
+// Live tuning multipliers (Glass Lab knobs; all default 1.0) applied on top of the
+// per-variant param sets so a chosen look can be dialed in before porting.
+uniform float u_tMag;
+uniform float u_tRef;
+uniform float u_tChr;
+uniform float u_tSpec;
+uniform float u_tRim;
+uniform float u_tFrost;
+
 vec3 sampleBlur(vec2 uv, float amt) {
   vec3 s = texture2D(u_scene, uv).rgb * 0.36;
   s += texture2D(u_scene, uv + vec2(amt, 0.0)).rgb * 0.16;
@@ -73,6 +82,10 @@ void main() {
     } else {                  // 7 · Deep magnify (thick convex)
       magnify = 0.8; refract = 0.05; chroma = 0.5; specGain = 0.6; rimGain = 0.5; tintAmt = 0.05;
     }
+
+    // Live tuning multipliers (all 1.0 by default).
+    magnify *= u_tMag; refract *= u_tRef; chroma *= u_tChr;
+    specGain *= u_tSpec; rimGain *= u_tRim; frost *= u_tFrost;
 
     // Refraction: convex/concave magnify pulls the sampled uv toward the center, and an
     // edge-concentrated push along the surface normal bends the rim.

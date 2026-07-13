@@ -16,7 +16,11 @@ import { gameSettings } from './settings';
  *
  * Keys (also on window.liquidGlassLab):
  *   1-8  focus one variant large (again / 0 → back to grid)
+ *   Tuning (applied to the focused variant): Z/X pinch · C/V refraction · B/N chroma ·
+ *     J/K specular · ,/. rim · -/= frost · R reset · O photon-ring overlay
  *   G scene grid · Space pause · L labels
+ *
+ * Boots focused on variant 5 (Concave) — the user's pick — as a tuning bench.
  */
 
 interface Variant { name: string; desc: string; }
@@ -66,7 +70,18 @@ export class LiquidGlassLab {
   paused = false;
   gridOn = true;
   labelsOn = true;
-  focus = -1;
+  focus = 4; // boot focused on Concave (variant 5) — the user's pick — as a tuning bench
+  ringOverlay = false;
+
+  // Live tuning multipliers for the focused variant (all 1 = shader defaults).
+  tune = { mag: 1, ref: 1, chr: 1, spec: 1, rim: 1, frost: 1 };
+
+  private uTMag: WebGLUniformLocation | null;
+  private uTRef: WebGLUniformLocation | null;
+  private uTChr: WebGLUniformLocation | null;
+  private uTSpec: WebGLUniformLocation | null;
+  private uTRim: WebGLUniformLocation | null;
+  private uTFrost: WebGLUniformLocation | null;
 
   private labelRoot: HTMLDivElement;
 
@@ -96,6 +111,12 @@ export class LiquidGlassLab {
     this.uRadius = this.gl.getUniformLocation(p, 'u_radius');
     this.uVariant = this.gl.getUniformLocation(p, 'u_variant');
     this.uLight = this.gl.getUniformLocation(p, 'u_light');
+    this.uTMag = this.gl.getUniformLocation(p, 'u_tMag');
+    this.uTRef = this.gl.getUniformLocation(p, 'u_tRef');
+    this.uTChr = this.gl.getUniformLocation(p, 'u_tChr');
+    this.uTSpec = this.gl.getUniformLocation(p, 'u_tSpec');
+    this.uTRim = this.gl.getUniformLocation(p, 'u_tRim');
+    this.uTFrost = this.gl.getUniformLocation(p, 'u_tFrost');
     this.aPos = this.gl.getAttribLocation(p, 'a_position');
 
     this.ensureSceneFBO();
@@ -239,10 +260,52 @@ export class LiquidGlassLab {
     const la = this.totalTime * 0.00025;
     gl.uniform2f(this.uLight, Math.cos(la), Math.sin(la));
 
+    // Tuning knobs apply only to the focused variant; grid mode shows shader defaults.
+    const t = this.focus >= 0 ? this.tune : { mag: 1, ref: 1, chr: 1, spec: 1, rim: 1, frost: 1 };
+    gl.uniform1f(this.uTMag, t.mag);
+    gl.uniform1f(this.uTRef, t.ref);
+    gl.uniform1f(this.uTChr, t.chr);
+    gl.uniform1f(this.uTSpec, t.spec);
+    gl.uniform1f(this.uTRim, t.rim);
+    gl.uniform1f(this.uTFrost, t.frost);
+
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
     gl.enableVertexAttribArray(this.aPos);
     gl.vertexAttribPointer(this.aPos, 2, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Optional photon-ring overlay (preview "concave + spectral ring" combo) on the focused lens.
+    if (this.ringOverlay && this.focus >= 0) {
+      const l = this.lensAt(0);
+      const wx = (l.cx - 0.5) * this.renderer.width;
+      const wy = (l.cy - 0.5) * this.renderer.height;
+      const wr = l.r * this.renderer.height;
+      this.renderer.begin(false);
+      this.renderer.setBlendMode('additive');
+      this.drawSpectralRing(wx, wy, wr);
+      this.renderer.setBlendMode('normal');
+      this.renderer.end();
+    }
+  }
+
+  /** Spectral-thick photon ring (same look shipped on BlackHoles) for the combo preview. */
+  private drawSpectralRing(cx: number, cy: number, radius: number): void {
+    const spectrum: [number, number, number][] = [
+      [1.0, 0.12, 0.16], [1.0, 0.5, 0.1], [1.0, 0.9, 0.2], [0.25, 1.0, 0.35],
+      [0.2, 0.9, 1.0], [0.25, 0.45, 1.0], [0.7, 0.3, 1.0],
+    ];
+    const disp = radius * 0.05;
+    const thick = Math.max(1, radius * 0.02);
+    const band = (r: number, color: [number, number, number], a: number): void => {
+      const steps = Math.max(1, Math.round(thick));
+      for (let i = 0; i < steps; i++) {
+        const rr = r - thick / 2 + (steps === 1 ? thick / 2 : (i / (steps - 1)) * thick);
+        this.renderer.drawCircle(cx, cy, rr, color, 72, a);
+      }
+    };
+    const n = spectrum.length;
+    for (let i = 0; i < n; i++) band(radius + (i / (n - 1) - 0.5) * 2 * disp, spectrum[i], 0.5);
+    band(radius, [1, 1, 1], 0.4);
   }
 
   // ============================================================
@@ -264,8 +327,18 @@ export class LiquidGlassLab {
     this.labelRoot.appendChild(title);
     const hint = document.createElement('div');
     hint.style.cssText = 'position:absolute;left:50%;top:30px;transform:translateX(-50%);color:#7bd;font-size:11px;';
-    hint.textContent = '1-8 focus · G scene grid · Space pause · L labels';
+    hint.textContent = '1-8 focus · Z/X pinch · C/V refract · B/N chroma · J/K spec · ,/. rim · -/= frost · O ring · R reset · G grid · Space · L';
     this.labelRoot.appendChild(hint);
+
+    if (this.focus >= 0) {
+      const tu = this.tune;
+      const read = document.createElement('div');
+      read.style.cssText = 'position:absolute;left:50%;top:48px;transform:translateX(-50%);color:#9ec;font-size:11px;';
+      read.textContent =
+        `pinch ${tu.mag.toFixed(2)}× · refract ${tu.ref.toFixed(2)}× · chroma ${tu.chr.toFixed(2)}× · ` +
+        `spec ${tu.spec.toFixed(2)}× · rim ${tu.rim.toFixed(2)}× · frost ${tu.frost.toFixed(2)}× · ring ${this.ringOverlay ? 'ON' : 'off'}`;
+      this.labelRoot.appendChild(read);
+    }
 
     const cssW = this.canvas.clientWidth || window.innerWidth;
     for (let i = 0; i < this.lensCount(); i++) {
@@ -295,6 +368,10 @@ export class LiquidGlassLab {
       this.buildLabels();
       return;
     }
+    const step = (k: keyof typeof this.tune, d: number): void => {
+      this.tune[k] = Math.max(0, Math.round((this.tune[k] + d) * 100) / 100);
+      this.buildLabels();
+    };
     switch (code) {
       case 'Space': this.paused = !this.paused; break;
       case 'KeyG': this.gridOn = !this.gridOn; break;
@@ -302,6 +379,23 @@ export class LiquidGlassLab {
         this.labelsOn = !this.labelsOn;
         this.labelRoot.style.display = this.labelsOn ? 'block' : 'none';
         break;
+      case 'KeyO': this.ringOverlay = !this.ringOverlay; this.buildLabels(); break;
+      case 'KeyR':
+        this.tune = { mag: 1, ref: 1, chr: 1, spec: 1, rim: 1, frost: 1 };
+        this.buildLabels();
+        break;
+      case 'KeyZ': step('mag', -0.1); break;
+      case 'KeyX': step('mag', 0.1); break;
+      case 'KeyC': step('ref', -0.1); break;
+      case 'KeyV': step('ref', 0.1); break;
+      case 'KeyB': step('chr', -0.1); break;
+      case 'KeyN': step('chr', 0.1); break;
+      case 'KeyJ': step('spec', -0.1); break;
+      case 'KeyK': step('spec', 0.1); break;
+      case 'Comma': step('rim', -0.1); break;
+      case 'Period': step('rim', 0.1); break;
+      case 'Minus': step('frost', -0.1); break;
+      case 'Equal': step('frost', 0.1); break;
     }
   }
 }

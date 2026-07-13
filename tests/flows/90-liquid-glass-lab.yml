@@ -1,4 +1,4 @@
-name: "Liquid Glass Lab — GLSL refractive-material variants boot and render"
+name: "Liquid Glass Lab — GLSL refractive-material variants + concave tuning bench"
 tags: [lab, glass, liquid, visual]
 steps:
   - action: launch
@@ -9,43 +9,58 @@ steps:
     ms: 1200
 
   - action: evalCheck
-    description: "Lab booted with the 8 liquid-glass variants"
+    description: "Lab boots with 8 variants, focused on Concave (index 4) as the tuning bench"
     script: |
       const l = window.liquidGlassLab;
       if (!l) return false;
       if (!Array.isArray(l.variants) || l.variants.length !== 8) return false;
-      const names = l.variants.map(v => v.name).join('|');
-      return names.includes('Liquid droplet') && names.includes('Frosted')
-        && names.includes('Chromatic edge') && names.includes('Concave');
+      if (l.focus !== 4) return false;
+      return l.variants[4].name.indexOf('Concave') !== -1;
+
+  - action: screenshot
+    name: "90-liquid-glass-concave"
+
+  # Tuning knob: X deepens the pinch (mag multiplier up).
+  - action: keyPress
+    key: "x"
+    duration: 60
+  - action: keyPress
+    key: "x"
+    duration: 60
+  - action: wait
+    ms: 120
+  - action: evalCheck
+    description: "X deepens the concave pinch (tune.mag rises above 1)"
+    script: |
+      return window.liquidGlassLab.tune.mag > 1.0;
+
+  # Photon-ring overlay preview (concave + spectral ring combo).
+  - action: keyPress
+    key: "o"
+    duration: 60
+  - action: wait
+    ms: 120
+  - action: evalCheck
+    description: "O enables the photon-ring overlay"
+    script: |
+      return window.liquidGlassLab.ringOverlay === true;
+
+  - action: screenshot
+    name: "90-liquid-glass-concave-ring"
+
+  # Back to the full variant grid.
+  - action: keyPress
+    key: "0"
+    duration: 60
+  - action: wait
+    ms: 120
+  - action: evalCheck
+    description: "0 returns to the variant grid"
+    script: |
+      return window.liquidGlassLab.focus === -1;
 
   - action: screenshot
     name: "90-liquid-glass-grid"
 
-  # Focus the signature droplet variant (index 1) large.
-  - action: keyPress
-    key: "2"
-    duration: 60
-  - action: wait
-    ms: 300
-
-  - action: evalCheck
-    description: "Pressing 2 focuses variant index 1"
-    script: |
-      return window.liquidGlassLab.focus === 1;
-
-  - action: screenshot
-    name: "90-liquid-glass-focus"
-
-  - action: keyPress
-    key: "g"
-    duration: 60
-  - action: wait
-    ms: 120
-
-  - action: evalCheck
-    description: "Scene grid toggled off"
-    script: |
-      return window.liquidGlassLab.gridOn === false;
-
   - action: assertNoErrors
-    description: "GLSL refraction pass + focus + toggles run without JS/GL errors"
+    description: "GLSL refraction pass + tuning knobs + ring overlay run without JS/GL errors"
