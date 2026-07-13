@@ -113,6 +113,16 @@ export const BLACKHOLE_PALETTE = {
 };
 export const BLACKHOLE_PLAYER_PULL_STRENGTH = 0.4; // px/ms² force on player
 
+// --- BlackHole "glass" chromatic photon ring (light-bending diffraction rim) ---
+// A bright thin ring of light bent around the hole (Einstein/photon ring), split into R/G/B
+// at offset radii = chromatic dispersion (different wavelengths bend by different amounts
+// through the gravitational "lens"). Gives even the darkest variant a crisp luminous edge,
+// makes holes read as refractive glass, and tells the light-bending physics story. Dispersion
+// widens with swallowed mass (a heavier hole bends light more).
+export const BH_DIFFRACTION_DISPERSION_BASE = 2.2;     // px R/G/B radial split at 0 mass
+export const BH_DIFFRACTION_DISPERSION_PER_MASS = 4.5; // additional split at full mass (× instability)
+export const BH_DIFFRACTION_RING_ALPHA = 0.6;          // base alpha of the prismatic ring bands
+
 // --- Supernova (BlackHole overload detonation) ---
 // "Chaos bomb" tuning (Threat Lab CATACLYSM payload + SINGULARITY gravity, user-picked)
 export const SUPERNOVA_PARTICLE_COUNT = 1000;

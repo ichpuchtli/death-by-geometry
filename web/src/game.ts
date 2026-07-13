@@ -834,7 +834,35 @@ export class Game {
     const attractors: FieldAttractor[] = [];
     let destabilizing = false;
     for (const e of this.enemies) {
-      if (!e.active || e.isSpawning) continue;
+      if (!e.active) continue;
+      // Dust-driven spawn accretion: a forming hole pulls + swirls the ambient dust into an
+      // organic accretion ring (replaces the old perfect geometric spawn rings). The attractor
+      // and rim emission ramp with spawn progress so the disk visibly tightens as it resolves.
+      if (e.isSpawning) {
+        if (e instanceof BlackHole) {
+          const progress = 1 - e.spawnTimer / e.spawnDuration;
+          attractors.push({
+            x: e.position.x,
+            y: e.position.y,
+            strength: PARTICLE_FIELD_DUST_PULL * e.dustStrengthMult * (0.35 + progress * 0.75),
+            radius: BlackHole.ATTRACT_RADIUS * e.dustRadiusMult * (0.5 + progress * 0.5),
+            heat: 0.12 + progress * 0.28,
+            swirl: Math.max(0.9, e.dustSwirl), // strong swirl → a spiralling ring, not straight infall
+          });
+          // Rain motes onto the growing footprint so there's always a visible converging ring.
+          const footR = 70 + progress * 150;
+          const count = this.mobile ? 2 : 4;
+          for (let k = 0; k < count; k++) {
+            const a = Math.random() * Math.PI * 2;
+            const rr = footR * (0.85 + Math.random() * 0.3);
+            const rx = e.position.x + Math.cos(a) * rr;
+            const ry = e.position.y + Math.sin(a) * rr;
+            const inward = Math.atan2(e.position.y - ry, e.position.x - rx);
+            this.field.spawnBurst(rx, ry, inward, 1.2, 1, 0.14 + Math.random() * 0.2, 200 - progress * 45, 0.7);
+          }
+        }
+        continue;
+      }
       // Blue circles carry the BlackHole dust DNA: each is a small attractor so the ambient
       // dust field swirls into a tight accretion halo around it — the same "decorated with
       // the dust field" look the hole has, at circle scale (no satellite dots).

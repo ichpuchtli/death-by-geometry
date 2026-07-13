@@ -1,7 +1,8 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
 import type { Renderer } from '../../renderer/sprite-batch';
-import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_MAX_ABSORB, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS, SPAWN_DURATION_BLACKHOLE } from '../../config';
+import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_MAX_ABSORB, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS, SPAWN_DURATION_BLACKHOLE,
+         BH_DIFFRACTION_DISPERSION_BASE, BH_DIFFRACTION_DISPERSION_PER_MASS, BH_DIFFRACTION_RING_ALPHA } from '../../config';
 import { gameSettings } from '../../settings';
 
 export type BlackHoleVisualMode = 'dense' | 'haze' | 'corona' | 'molten';
@@ -252,33 +253,29 @@ export class BlackHole extends Enemy {
   }
 
   /**
-   * Prominent black-hole spawn telegraph. The generic gravity-well spawn was too subtle —
-   * players kept drifting onto a hole as it formed (harmless during spawn, but the lethal
-   * well appears the instant it finishes). This draws a loud, unmistakable "keep clear"
-   * warning: an amber danger footprint with radar-ping rings + a rotating reticle, imploding
-   * accretion rings, and a growing dark core that resolves into the singularity.
+   * Black-hole spawn telegraph. The heavy lifting — the accretion "ring" — is now done by the
+   * ambient dust field (Game.updateParticles registers a spawning hole as a dust attractor and
+   * rains motes onto its rim so they swirl inward into an organic, on-brand accretion disk),
+   * so this draws only the parts dust can't: a legible amber "keep clear" warning (a throbbing
+   * footprint ring + a rotating reticle) and the growing dark core that resolves into the
+   * singularity. No more perfect concentric accretion rings — the dust makes the ring.
    */
   override renderSpawn(renderer: Renderer): void {
     const progress = 1 - this.spawnTimer / this.spawnDuration; // 0→1 over spawn
     const cx = this.position.x;
     const cy = this.position.y;
+    // wobbleTime is frozen during spawn (update() is skipped for spawning enemies), so drive
+    // the reticle sweep off wall-clock time like the elite ring does.
     const t = Date.now() * 0.001;
-    const pulse = 0.5 + 0.5 * Math.sin(t * 7); // fast warning throb
+    const pulse = 0.5 + 0.5 * Math.sin(t * 7); // warning throb
 
     // Danger footprint — the exclusion zone the gravity well will occupy, grown with progress.
     const footprint = 70 + progress * 150; // → ~220px "stay clear" radius
     const W: [number, number, number] = [1.0, 0.55, 0.12]; // amber warning
 
-    // Radar-ping rings expanding out from the core (two staggered) — draw the eye in.
-    for (let i = 0; i < 2; i++) {
-      const ph = (t * 0.8 + i * 0.5) % 1;
-      const r = footprint * (0.25 + ph * 0.95);
-      renderer.drawCircle(cx, cy, r, W, 48, (1 - ph) * 0.55 * progress);
-    }
-
-    // Steady throbbing footprint ring (double line for weight).
-    renderer.drawCircle(cx, cy, footprint, W, 56, (0.28 + pulse * 0.4) * progress);
-    renderer.drawCircle(cx, cy, footprint - 3, [1, 0.9, 0.7], 56, (0.16 + pulse * 0.22) * progress);
+    // A single soft throbbing footprint ring (kept for legibility — dust alone doesn't read
+    // as a hard boundary; this is the functional "don't be here" signal).
+    renderer.drawCircle(cx, cy, footprint, W, 56, (0.22 + pulse * 0.28) * progress);
 
     // Rotating warning reticle — dashed arcs sweeping around the footprint.
     const arcs = 6;
@@ -291,15 +288,7 @@ export class BlackHole extends Enemy {
       renderer.drawLine(
         cx + Math.cos(a1) * rr, cy + Math.sin(a1) * rr,
         cx + Math.cos(a2) * rr, cy + Math.sin(a2) * rr,
-        W[0], W[1], W[2], 0.55 * progress);
-    }
-
-    // Imploding accretion rings — matter raining into the forming singularity.
-    const ringCount = 5;
-    for (let i = 0; i < ringCount; i++) {
-      const phase = (i / ringCount + progress * 1.3) % 1;
-      const ringR = footprint * 0.75 * (1 - phase) + 6;
-      renderer.drawCircle(cx, cy, ringR, this.color, 32, 0.5 * phase * (1 - phase) * (0.6 + progress * 0.4));
+        W[0], W[1], W[2], 0.5 * progress);
     }
 
     // Growing dark core + bright accretion rim resolving into the hole.
@@ -318,9 +307,54 @@ export class BlackHole extends Enemy {
       case 'corona': this.renderCorona(renderer); break;
       case 'molten': this.renderMolten(renderer); break;
     }
+    // Glass photon-ring: a bright refractive rim on every variant so even the dim ones
+    // (haze/corona draw a pure-black void over faint low-alpha clouds) read clearly.
+    this.renderGlassDiffraction(renderer);
     // Destabilize telegraph overlay
     if (this.destabilizing && !this.overloaded) {
       this.renderDestabilize(renderer);
+    }
+  }
+
+  /**
+   * "Glass" chromatic photon ring — light bent around the hole into a bright thin ring
+   * (Einstein/photon ring), split into R/G/B at offset radii so different wavelengths
+   * appear bent by different amounts (chromatic dispersion through the gravitational lens).
+   * Purpose: (a) interesting prismatic detail, (b) a luminous defining edge that makes the
+   * darkest variants visible, (c) sells the light-bending physics with a simple glass look.
+   * Dispersion widens with swallowed mass — a heavier hole bends light more.
+   */
+  private renderGlassDiffraction(renderer: Renderer): void {
+    const px = this.position.x;
+    const py = this.position.y;
+    const instability = this.absorbedCount / BlackHole.MAX_ABSORB;
+    const baseR = this.collisionRadius;
+    const t = this.wobbleTime * 0.001;
+
+    const ringR = baseR * (1.02 + Math.sin(this.breathPhase) * 0.03);
+    const disp = BH_DIFFRACTION_DISPERSION_BASE + instability * BH_DIFFRACTION_DISPERSION_PER_MASS;
+    const a = BH_DIFFRACTION_RING_ALPHA;
+
+    // Prismatic dispersion: red bent least (outer), blue bent most (inner) — like a lens edge.
+    renderer.drawCircle(px, py, ringR + disp, [1.0, 0.15, 0.25], 56, a);
+    renderer.drawCircle(px, py, ringR,        [0.55, 1.0, 0.7], 56, a * 1.15);
+    renderer.drawCircle(px, py, ringR - disp, [0.25, 0.5, 1.0], 56, a);
+    // Bright white specular core of the ring for punch (grows with mass).
+    renderer.drawCircle(px, py, ringR, [1, 1, 1], 56, 0.3 + instability * 0.25);
+
+    // Rotating specular glint — a short bright arc sweeping the ring like light catching glass.
+    const glintA = t * 1.1;
+    const glintSpan = 0.55;
+    const segs = 6;
+    const gr = ringR + disp * 0.5;
+    for (let i = 0; i < segs; i++) {
+      const b1 = glintA + (i / segs) * glintSpan;
+      const b2 = glintA + ((i + 1) / segs) * glintSpan;
+      const fade = 1 - i / segs;
+      renderer.drawLine(
+        px + Math.cos(b1) * gr, py + Math.sin(b1) * gr,
+        px + Math.cos(b2) * gr, py + Math.sin(b2) * gr,
+        1, 1, 1, 0.85 * fade);
     }
   }
 
