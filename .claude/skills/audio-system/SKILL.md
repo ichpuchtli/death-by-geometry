@@ -11,6 +11,8 @@ Use when working on sound effects, music, audio mixing, the ElevenLabs pipeline,
 - **SFX config source of truth:** `config.ts` `SFX_NAMES` lists only shipped `.wav` files in `sounds/`.
 - **Music:** 4-layer procedural synthwave (bass pad, rhythm, arpeggio, lead). Layers cross-fade based on 0-1 intensity from game state. Intensity = difficulty phase + enemy count + phase transition bump + heat (0.15 * heat).
 - Safari quirk: AudioContext must be created/resumed on user gesture.
+- **Music-start race (fixed):** the first game starts on the *same* gesture that kicks off the async `init()`, so `startGame()`→`startMusic()` runs before `this.music` exists. `startMusic()`/`stopMusic()` set a `wantMusic` flag; `init()` flushes it (`music.start()`) once ready. Without this, music never played on the first playthrough (only after a restart). Guard: `tests/flows/92-music-first-run.yml`.
+- **Total silence?** the audio graph itself (`masterGain` 0.5 → `sfxGain`/`musicGain` → destination) is robust; the usual cause of "no sound at all" is the **persisted mute** — `M` toggles `_muted` and writes `gg_muted` to localStorage, and `init()` restores it (`masterGain=0`). Clear it by pressing `M` again (or removing `gg_muted`).
 
 ## Procedural Kill SFX
 

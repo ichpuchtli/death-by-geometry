@@ -17,6 +17,7 @@ export class AudioManager {
   private _muted = false;
   private _initialized = false;
   private _loading = false;
+  private wantMusic = false; // startMusic() called before init() finished → start once ready
 
   get muted(): boolean { return this._muted; }
   get initialized(): boolean { return this._initialized; }
@@ -62,6 +63,12 @@ export class AudioManager {
       }
 
       this._initialized = true;
+
+      // If startMusic() was called before init finished (the normal first-run path — the game
+      // starts on the same gesture that kicks off init), start the music now that it exists.
+      if (this.wantMusic && !this._muted) {
+        this.music.start();
+      }
     } catch (e) {
       console.warn('Audio init failed:', e);
     }
@@ -501,10 +508,15 @@ export class AudioManager {
   }
 
   startMusic(): void {
+    // startGame() calls this synchronously right after kicking off the async init() on the
+    // first user gesture, so `this.music` isn't created yet — record the intent and let init()
+    // start it once ready. Without this, music never plays on the first playthrough.
+    this.wantMusic = true;
     if (this.music) this.music.start();
   }
 
   stopMusic(): void {
+    this.wantMusic = false;
     if (this.music) this.music.stop();
   }
 

@@ -1,0 +1,34 @@
+name: "Music starts on the FIRST playthrough (init-race regression)"
+tags: [audio, regression, smoke]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+  - action: wait
+    ms: 400
+
+  # Click the menu to start — this same gesture kicks off the async audio init AND calls
+  # startMusic() synchronously. The fix defers the actual music start until init finishes.
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  # Give audio init time to load buffers + flush the deferred music start.
+  - action: wait
+    ms: 2500
+
+  - action: evalCheck
+    description: "Game is playing and audio initialized (not muted)"
+    script: |
+      const g = window.game;
+      return g.state === 'playing' && g.audio.initialized === true && g.audio.muted === false;
+
+  - action: assertEval
+    description: "Procedural music is playing on the first run (was false before the race fix)"
+    script: |
+      const a = window.game.audio;
+      return a.music && a.music.playing === true;
+
+  - action: assertNoErrors
+    description: "Audio init + deferred music start run without JS errors"
