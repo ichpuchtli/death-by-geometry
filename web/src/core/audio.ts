@@ -105,60 +105,41 @@ export class AudioManager {
   }
 
   /**
-   * Procedural shotgun blast for the player's weapon. `pellets` is how many parallel
-   * bullets went out this trigger pull (2–6). More pellets → a lower, beefier, wider
-   * boom; fewer → a tight snappy crack. Short (~0.12s) and modest volume so the ~3/s
-   * cadence never fatigues.
+   * "Deep Thump" weapon blast (picked in the Player Design Lab) — a saturated sub-bass
+   * kick that drops in pitch, so every trigger pull lands like a heavy percussive hit
+   * rather than a bright crack. `pellets` (2–6) makes it a touch deeper, longer, and
+   * louder as the weapon ramps, so a 6-pellet Hex Storm feels heavier than the 2-pellet
+   * Twin. Saturated (tanh WaveShaper) so the low sub reads on laptop speakers.
    */
   playShoot(pellets: number): void {
     if (!this._initialized || !this.ctx || !this.sfxGain) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;
     const t = Math.max(0, Math.min(1, (pellets - 2) / 4)); // 2→0 .. 6→1
-    const dur = 0.11 + t * 0.06;
+    const dur = 0.2 + t * 0.06; // 0.20 → 0.26s
 
-    // 1. Punch — sine thump that drops in pitch; deeper with more pellets
-    const thump = ctx.createOscillator();
-    thump.type = 'sine';
-    const startF = 220 - t * 70; // 220 → 150 Hz
-    thump.frequency.setValueAtTime(startF, now);
-    thump.frequency.exponentialRampToValueAtTime(48, now + dur);
-    const tg = ctx.createGain();
-    tg.gain.setValueAtTime(0.26 + t * 0.14, now);
-    tg.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.03);
-    thump.connect(tg);
-    tg.connect(this.sfxGain);
-    thump.start(now);
-    thump.stop(now + dur + 0.06);
+    // Sub-bass thump: pitch drops from ~130→30 Hz; deeper/longer with more pellets.
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(130 - t * 20, now); // 130 → 110 Hz
+    o.frequency.exponentialRampToValueAtTime(32 - t * 6, now + dur); // 32 → 26 Hz
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.38 + t * 0.12, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.04);
+    const sat = this.makeSaturator(2.5 + t * 1.5); // harmonics so the sub cuts through
+    o.connect(sat);
+    sat.connect(g);
+    g.connect(this.sfxGain);
+    o.start(now);
+    o.stop(now + dur + 0.08);
 
-    // 2. Crack — bandpassed noise burst; center drops (beefier) with more pellets
-    const nlen = dur;
-    const nbuf = ctx.createBuffer(1, (ctx.sampleRate * nlen) | 0, ctx.sampleRate);
-    const nd = nbuf.getChannelData(0);
-    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-    const noise = ctx.createBufferSource();
-    noise.buffer = nbuf;
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    const cf = 1900 - t * 950; // 1900 → 950 Hz
-    bp.frequency.setValueAtTime(cf, now);
-    bp.frequency.exponentialRampToValueAtTime(cf * 0.4, now + nlen);
-    bp.Q.value = 1 + t * 1.5;
-    const ng = ctx.createGain();
-    ng.gain.setValueAtTime(0.16 + t * 0.1, now);
-    ng.gain.exponentialRampToValueAtTime(0.001, now + nlen);
-    noise.connect(bp);
-    bp.connect(ng);
-    ng.connect(this.sfxGain);
-    noise.start(now);
-
-    // 3. Snap transient — a tiny high click for the attack edge
+    // Tiny click transient for the attack edge so the hit reads at low volume.
     const click = ctx.createOscillator();
-    click.type = 'square';
-    click.frequency.setValueAtTime(520 - t * 120, now);
-    click.frequency.exponentialRampToValueAtTime(180, now + 0.03);
+    click.type = 'triangle';
+    click.frequency.setValueAtTime(320, now);
+    click.frequency.exponentialRampToValueAtTime(90, now + 0.03);
     const cg = ctx.createGain();
-    cg.gain.setValueAtTime(0.09, now);
+    cg.gain.setValueAtTime(0.07, now);
     cg.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
     click.connect(cg);
     cg.connect(this.sfxGain);

@@ -23,17 +23,18 @@ function lerpAngle(from: number, to: number, t: number): number {
   return from + diff * t;
 }
 
-// Same claw/pincer silhouette as the player ship (facing right at angle=0).
+// Same "Wraith" chevron silhouette as the player ship (facing right at angle=0).
 const SHIP_VERTS: [number, number][] = [
-  [ 1.4,  0.55],
-  [ 0.5,  0.85],
-  [-0.4,  0.6],
-  [-1.0,  0.3],
-  [-0.6,  0.0],
-  [-1.0, -0.3],
-  [-0.4, -0.6],
-  [ 0.5, -0.85],
-  [ 1.4, -0.55],
+  [ 1.55,  0.0 ],
+  [ 0.6,   0.15],
+  [-0.2,   0.55],
+  [-1.12,  0.88],
+  [-0.6,   0.2 ],
+  [-0.88,  0.0 ],
+  [-0.6,  -0.2 ],
+  [-1.12, -0.88],
+  [-0.2,  -0.55],
+  [ 0.6,  -0.15],
 ];
 
 /**
@@ -116,29 +117,35 @@ export class Wingman {
       wx.push(px + (lx * cos - ly * sin) * s);
       wy.push(py + (lx * sin + ly * cos) * s);
     }
+    const n = SHIP_VERTS.length;
 
-    // Fill: triangle fan from rear center (index 4)
-    const cx = wx[4], cy = wy[4];
-    for (let i = 0; i < SHIP_VERTS.length - 1; i++) {
+    // Fill: triangle fan from the centroid around the closed silhouette
+    let cx = 0, cy = 0;
+    for (let i = 0; i < n; i++) { cx += wx[i]; cy += wy[i]; }
+    cx /= n; cy /= n;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
       renderer.drawTriangle(
-        cx, cy, wx[i], wy[i], wx[i + 1], wy[i + 1],
+        cx, cy, wx[i], wy[i], wx[j], wy[j],
         WINGMAN_SHIP_FILL_COLOR[0], WINGMAN_SHIP_FILL_COLOR[1], WINGMAN_SHIP_FILL_COLOR[2],
         WINGMAN_SHIP_FILL_ALPHA,
       );
     }
 
-    // Outer line (darker)
-    for (let i = 0; i < SHIP_VERTS.length - 1; i++) {
+    // Outer line (darker) — closed loop
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
       renderer.drawLine(
-        wx[i], wy[i], wx[i + 1], wy[i + 1],
+        wx[i], wy[i], wx[j], wy[j],
         WINGMAN_SHIP_COLOR2[0], WINGMAN_SHIP_COLOR2[1], WINGMAN_SHIP_COLOR2[2],
       );
     }
 
-    // Bright outline
-    for (let i = 0; i < SHIP_VERTS.length - 1; i++) {
+    // Bright outline — closed loop
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
       renderer.drawLine(
-        wx[i], wy[i], wx[i + 1], wy[i + 1],
+        wx[i], wy[i], wx[j], wy[j],
         WINGMAN_SHIP_COLOR[0], WINGMAN_SHIP_COLOR[1], WINGMAN_SHIP_COLOR[2],
       );
     }

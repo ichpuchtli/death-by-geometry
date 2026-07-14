@@ -30,17 +30,19 @@ function lerpAngle(from: number, to: number, t: number): number {
   return from + diff * t;
 }
 
-// Claw/pincer vertices (unit scale, facing right at angle=0)
+// "Wraith" — stealth chevron silhouette (unit scale, facing right at angle=0).
+// Closed loop; picked in the Player Design Lab (?player=1) to replace the old claw.
 const SHIP_VERTS: [number, number][] = [
-  [ 1.4,  0.55],  // 0: left prong tip
-  [ 0.5,  0.85],  // 1: left prong outer
-  [-0.4,  0.6],   // 2: left body
-  [-1.0,  0.3],   // 3: left rear
-  [-0.6,  0.0],   // 4: rear center
-  [-1.0, -0.3],   // 5: right rear
-  [-0.4, -0.6],   // 6: right body
-  [ 0.5, -0.85],  // 7: right prong outer
-  [ 1.4, -0.55],  // 8: right prong tip
+  [ 1.55,  0.0 ],  // 0: nose
+  [ 0.6,   0.15],  // 1: fore shoulder
+  [-0.2,   0.55],  // 2: mid wing
+  [-1.12,  0.88],  // 3: swept wingtip
+  [-0.6,   0.2 ],  // 4: inner wing notch
+  [-0.88,  0.0 ],  // 5: rear center
+  [-0.6,  -0.2 ],  // 6: inner wing notch (mirror)
+  [-1.12, -0.88],  // 7: swept wingtip (mirror)
+  [-0.2,  -0.55],  // 8: mid wing (mirror)
+  [ 0.6,  -0.15],  // 9: fore shoulder (mirror)
 ];
 
 export class Player extends Entity {
@@ -185,18 +187,14 @@ export class Player extends Entity {
     const px = this.position.x - aimCos * recoil;
     const py = this.position.y - aimSin * recoil;
 
-    // Muzzle flash: a bright forward burst that blooms out of the barrel on each shot.
+    // Muzzle flash: a "Ring Pop" — an expanding ring at the barrel that blooms on each
+    // shot (chosen in the Player Design Lab). recoilFlashLen scales the ring with pellets.
     if (recoilFrac > 0) {
-      const mx = px + aimCos * s * 1.4;
-      const my = py + aimSin * s * 1.4;
-      const len = this.recoilFlashLen * recoilFrac;
-      const perpCos = -aimSin, perpSin = aimCos;
-      const spread = len * 0.5;
-      const tipX = mx + aimCos * len, tipY = my + aimSin * len;
-      // Central spike + two diverging sparks — bright cyan-white, picked up by bloom.
-      renderer.drawLine(mx, my, tipX, tipY, 1.0, 1.0, 0.9);
-      renderer.drawLine(mx, my, tipX + perpCos * spread, tipY + perpSin * spread, 0.7, 1.0, 0.8);
-      renderer.drawLine(mx, my, tipX - perpCos * spread, tipY - perpSin * spread, 0.7, 1.0, 0.8);
+      const bx = px + aimCos * s * 1.5;
+      const by = py + aimSin * s * 1.5;
+      const rad = (this.recoilFlashLen * 0.35) + (1 - recoilFrac) * this.recoilFlashLen;
+      renderer.drawCircle(bx, by, rad, [1.0, 1.0, 0.9], 18, recoilFrac);
+      renderer.drawCircle(bx, by, rad * 0.6, [0.7, 1.0, 0.8], 14, recoilFrac * 0.85);
     }
 
     // Transform local vertices to world space
@@ -206,29 +204,35 @@ export class Player extends Entity {
       wx.push(px + (lx * cos - ly * sin) * s);
       wy.push(py + (lx * sin + ly * cos) * s);
     }
+    const n = SHIP_VERTS.length;
 
-    // Fill: triangle fan from rear center (index 4) through all vertices
-    const cx = wx[4], cy = wy[4];
-    for (let i = 0; i < SHIP_VERTS.length - 1; i++) {
+    // Fill: triangle fan from the centroid around the closed silhouette
+    let cx = 0, cy = 0;
+    for (let i = 0; i < n; i++) { cx += wx[i]; cy += wy[i]; }
+    cx /= n; cy /= n;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
       renderer.drawTriangle(
-        cx, cy, wx[i], wy[i], wx[i + 1], wy[i + 1],
+        cx, cy, wx[i], wy[i], wx[j], wy[j],
         PLAYER_SHIP_FILL_COLOR[0], PLAYER_SHIP_FILL_COLOR[1], PLAYER_SHIP_FILL_COLOR[2],
         PLAYER_SHIP_FILL_ALPHA,
       );
     }
 
-    // Outer line (darker, slightly inward offset for depth)
-    for (let i = 0; i < SHIP_VERTS.length - 1; i++) {
+    // Outer line (darker, for depth) — closed loop
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
       renderer.drawLine(
-        wx[i], wy[i], wx[i + 1], wy[i + 1],
+        wx[i], wy[i], wx[j], wy[j],
         PLAYER_SHIP_COLOR2[0], PLAYER_SHIP_COLOR2[1], PLAYER_SHIP_COLOR2[2],
       );
     }
 
-    // Main bright outline — open polyline (gap between prong tips)
-    for (let i = 0; i < SHIP_VERTS.length - 1; i++) {
+    // Main bright outline — closed loop
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
       renderer.drawLine(
-        wx[i], wy[i], wx[i + 1], wy[i + 1],
+        wx[i], wy[i], wx[j], wy[j],
         PLAYER_SHIP_COLOR[0], PLAYER_SHIP_COLOR[1], PLAYER_SHIP_COLOR[2],
       );
     }

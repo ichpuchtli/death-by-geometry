@@ -26,7 +26,7 @@ Use when working on sound effects, music, audio mixing, the ElevenLabs pipeline,
 
 ## Weapon SFX
 
-- **Shoot:** `playShoot(pellets)` — procedural shotgun blast fired by `Game` each trigger pull (player only; the wingman is silent to avoid doubling). Three layers: a sine punch (220→48 Hz), a bandpassed noise crack (~1900→center scaled), and a short square-wave snap transient. `pellets` (2–6, = `shots.length`) is normalized `t=(pellets-2)/4`; higher `t` lowers pitch/center-freq and lengthens/loudens the blast, so a 6-pellet Hex Storm sounds beefier than a 2-pellet Twin. Short (~0.11–0.17s) and modest gain for the ~3/s cadence. Paired with ship recoil + camera punch (see combat-feedback skill).
+- **Shoot:** `playShoot(pellets)` — procedural **"Deep Thump"** weapon blast fired by `Game` each trigger pull (player only; the wingman is silent to avoid doubling). Picked in the Player Design Lab (`?player=1`), replacing the old bright shotgun crack. A saturated sub-bass sine kick that drops in pitch (~130→32 Hz) via `makeSaturator(2.5–4)` so the low sub reads on laptop speakers, plus a tiny triangle click transient (320→90 Hz) for the attack edge. `pellets` (2–6, = `shots.length`) is normalized `t=(pellets-2)/4`; higher `t` deepens/lengthens/loudens the thump, so a 6-pellet Hex Storm hits heavier than a 2-pellet Twin. ~0.2–0.26s, modest gain for the ~3/s cadence. Paired with ship recoil + a Ring-Pop muzzle flash (see combat-feedback skill).
 
 ## Supernova / BlackHole SFX
 
