@@ -1,9 +1,7 @@
 import { Enemy, EnemyDeathResult } from './enemy';
 import { Vec2 } from '../../core/vector';
 import type { Renderer } from '../../renderer/sprite-batch';
-import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_MAX_ABSORB, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS, SPAWN_DURATION_BLACKHOLE,
-         BH_DIFFRACTION_DISPERSION_BASE, BH_DIFFRACTION_DISPERSION_PER_MASS, BH_DIFFRACTION_RING_ALPHA,
-         BH_DIFFRACTION_BAND_THICKNESS_BASE, BH_DIFFRACTION_BAND_THICKNESS_PER_MASS, BH_DIFFRACTION_SPECTRUM } from '../../config';
+import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_MAX_ABSORB, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS, SPAWN_DURATION_BLACKHOLE } from '../../config';
 import { gameSettings } from '../../settings';
 
 export type BlackHoleVisualMode = 'dense' | 'haze' | 'corona' | 'molten';
@@ -308,71 +306,14 @@ export class BlackHole extends Enemy {
       case 'corona': this.renderCorona(renderer); break;
       case 'molten': this.renderMolten(renderer); break;
     }
-    // Glass photon-ring: a bright refractive rim on every variant so even the dim ones
-    // (haze/corona draw a pure-black void over faint low-alpha clouds) read clearly.
-    this.renderGlassDiffraction(renderer);
+    // (Glass photon-ring removed — the concave screen-space refraction in Game now provides the
+    //  "light-bending" read on holes; see RefractionPass / applyBlackHoleRefraction.)
     // Destabilize telegraph overlay
     if (this.destabilizing && !this.overloaded) {
       this.renderDestabilize(renderer);
     }
   }
 
-  /**
-   * "Glass" chromatic photon ring — light bent around the hole into a luminous ring
-   * (Einstein/photon ring) that disperses into a spectrum, like light through a lens.
-   * Look = Glass Lab "spectral thick" (user pick): 7 stacked ROYGBIV bands fanned across
-   * the dispersion width form a smooth rainbow gradient rim; red is bent least (outer),
-   * violet most (inner). Purpose: (a) rich prismatic detail, (b) a bright defining edge
-   * that makes even the dim variants visible, (c) the light-bending-physics look.
-   * Dispersion + band thickness widen with swallowed mass (a heavier hole bends more light).
-   */
-  private renderGlassDiffraction(renderer: Renderer): void {
-    const px = this.position.x;
-    const py = this.position.y;
-    const instability = this.absorbedCount / BlackHole.MAX_ABSORB;
-    const baseR = this.collisionRadius;
-    const t = this.wobbleTime * 0.001;
-
-    const ringR = baseR * (1.02 + Math.sin(this.breathPhase) * 0.03);
-    const disp = BH_DIFFRACTION_DISPERSION_BASE + instability * BH_DIFFRACTION_DISPERSION_PER_MASS;
-    const thick = BH_DIFFRACTION_BAND_THICKNESS_BASE + instability * BH_DIFFRACTION_BAND_THICKNESS_PER_MASS;
-    const a = BH_DIFFRACTION_RING_ALPHA;
-
-    // Spectral-thick dispersion: 7 stacked bands fanned across ±disp → smooth rainbow rim.
-    const n = BH_DIFFRACTION_SPECTRUM.length;
-    for (let i = 0; i < n; i++) {
-      const off = (i / (n - 1) - 0.5) * 2 * disp;
-      this.drawRingBand(renderer, px, py, ringR + off, BH_DIFFRACTION_SPECTRUM[i], thick, a);
-    }
-    // Bright white core keeps a crisp defining edge (grows with mass).
-    this.drawRingBand(renderer, px, py, ringR, [1, 1, 1], 1.5, 0.35 + instability * 0.25);
-
-    // Rotating specular glint — a short bright arc sweeping the ring like light catching glass.
-    const glintA = t * 1.1;
-    const glintSpan = 0.55;
-    const segs = 8;
-    for (let i = 0; i < segs; i++) {
-      const b1 = glintA + (i / segs) * glintSpan;
-      const b2 = glintA + ((i + 1) / segs) * glintSpan;
-      const fade = 1 - i / segs;
-      renderer.drawLine(
-        px + Math.cos(b1) * ringR, py + Math.sin(b1) * ringR,
-        px + Math.cos(b2) * ringR, py + Math.sin(b2) * ringR,
-        1, 1, 1, 0.85 * fade);
-    }
-  }
-
-  /** Thick ring band: `thick` px of stacked concentric strokes centered on `radius`. */
-  private drawRingBand(
-    renderer: Renderer, cx: number, cy: number, radius: number,
-    color: [number, number, number], thick: number, alpha: number,
-  ): void {
-    const steps = Math.max(1, Math.round(thick));
-    for (let i = 0; i < steps; i++) {
-      const rr = radius - thick / 2 + (steps === 1 ? thick / 2 : (i / (steps - 1)) * thick);
-      renderer.drawCircle(cx, cy, rr, color, 56, alpha);
-    }
-  }
 
   // ============================================================
   // Variant 1 — "Dense Core"

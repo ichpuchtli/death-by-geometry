@@ -67,6 +67,16 @@ export const PARTICLE_FIELD_BH_DETONATE_BURST = 160;   // motes erupted outward 
 export const GRAVITY_ENEMY_SWIRL = 0.35;               // baseline tangential swirl (now randomised per-hole via BlackHole.enemySwirl 0.1–0.7)
 export const SHATTER_IMPACT_SPEED = 0.3;               // px/ms momentum handed to geometry shards on a kill
 
+// --- BlackHole concave refraction (liquid-glass event horizon) ---
+// A screen-space GLSL pass (renderer/refraction.ts + shaders/liquid-glass.frag) that lenses
+// the rendered scene behind each BlackHole with a concave "pinch" — gravitational lensing.
+// Chosen + tuned in the Liquid Glass Lab (?liquid=1): concave variant, pinch ×2, no ring.
+export const BH_REFRACTION_ENABLED = true;
+export const BH_REFRACTION_PINCH = 2.0;            // concave magnify multiplier (user pick: 2× the base pinch)
+export const BH_REFRACTION_LENS_RADIUS_MULT = 2.4; // lens radius = collisionRadius × this (lensing reaches past the horizon)
+export const BH_REFRACTION_MAX_LENSES = 6;         // desktop cap on simultaneously-refracting holes
+export const BH_REFRACTION_MAX_LENSES_MOBILE = 3;  // mobile cap (the pass is one fullscreen shader; keep it cheap)
+
 // --- Camera ---
 export const CAMERA_LERP_SPEED = 0.08;
 export const SCREEN_SHAKE_SMALL = 5;

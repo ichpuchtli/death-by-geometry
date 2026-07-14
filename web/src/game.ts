@@ -1,5 +1,6 @@
 import { Renderer } from './renderer/sprite-batch';
 import { BloomPass } from './renderer/bloom';
+import { RefractionPass, Lens } from './renderer/refraction';
 import { SpringMassGrid } from './renderer/grid';
 import { Camera } from './core/camera';
 import { Input } from './core/input';
@@ -62,6 +63,11 @@ import {
   MedalDef,
   SUPERNOVA_HITSTOP,
   SUPERNOVA_FLASH_DURATION,
+  BH_REFRACTION_ENABLED,
+  BH_REFRACTION_PINCH,
+  BH_REFRACTION_LENS_RADIUS_MULT,
+  BH_REFRACTION_MAX_LENSES,
+  BH_REFRACTION_MAX_LENSES_MOBILE,
   DEATH_WARP_STRETCH,
   DEATH_WARP_TWIST,
   DEATH_WARP_REACH_MIN,
@@ -89,6 +95,7 @@ function isMobile(): boolean {
 export class Game {
   private renderer: Renderer;
   private bloom: BloomPass;
+  private refraction: RefractionPass;
   private grid: SpringMassGrid;
   private lifecycle: LifecycleSystem;
   private camera: Camera;
@@ -189,6 +196,7 @@ export class Game {
     this.bloom.intensity = gameSettings.bloomIntensity;
     this.bloom.blurPasses = this.mobile ? 2 : gameSettings.bloomBlurPasses;
     this.bloom.blurRadius = gameSettings.bloomBlurRadius;
+    this.refraction = new RefractionPass(gl);
 
     this.grid = new SpringMassGrid(gl, this.mobile);
     this.lifecycle = new LifecycleSystem(this.mobile);
@@ -430,6 +438,7 @@ export class Game {
     this.renderer.resize();
     this.camera.resize(this.renderer.width, this.renderer.height);
     this.bloom.resize(this.renderer.canvasWidth, this.renderer.canvasHeight);
+    this.refraction.resize(this.renderer.canvasWidth, this.renderer.canvasHeight);
     this.hud.resize();
     this.input.updateCanvasSize(this.gameCanvas.clientWidth);
     this.input.setZoom(this.renderer.zoom);
@@ -1280,6 +1289,11 @@ export class Game {
     this.renderer.setBlendMode('normal');
     this.renderer.end();
 
+    // --- Concave refraction: lens the scene behind each BlackHole (gravitational lensing) ---
+    // A screen-space pass reads the scene FBO and pinches it around each hole; bloom then
+    // extracts + composites the refracted image (via sceneTexOverride).
+    this.applyBlackHoleRefraction(cameraX, cameraY);
+
     // --- Bloom post-process: scene FBO -> screen ---
     this.bloom.apply(this.renderer.canvasWidth, this.renderer.canvasHeight);
 
@@ -1319,6 +1333,35 @@ export class Game {
         this.joystickRenderer.render(this.input);
       }
     }
+  }
+
+  /**
+   * Screen-space concave refraction: after the scene is drawn to the bloom FBO, lens it behind
+   * every active BlackHole with a concave "pinch" (gravitational lensing), then hand the
+   * refracted texture to bloom via `sceneTexOverride`. No holes → no-op (bloom uses raw scene).
+   */
+  private applyBlackHoleRefraction(cameraX: number, cameraY: number): void {
+    if (!BH_REFRACTION_ENABLED) return;
+    if (this.state !== 'playing' && this.state !== 'death_slowmo' && this.state !== 'gameover') return;
+
+    const w = this.renderer.width;
+    const h = this.renderer.height;
+    const cap = this.mobile ? BH_REFRACTION_MAX_LENSES_MOBILE : BH_REFRACTION_MAX_LENSES;
+    const lenses: Lens[] = [];
+    for (const e of this.enemies) {
+      if (!e.active || e.isSpawning || !(e instanceof BlackHole)) continue;
+      lenses.push({
+        cx: (e.position.x - cameraX) / w + 0.5,
+        cy: (e.position.y - cameraY) / h + 0.5,
+        r: (e.collisionRadius * BH_REFRACTION_LENS_RADIUS_MULT) / h,
+      });
+      if (lenses.length >= cap) break;
+    }
+    if (lenses.length === 0) return;
+
+    const aspect = this.renderer.canvasWidth / this.renderer.canvasHeight;
+    const tex = this.refraction.apply(this.bloom.sceneFBO.texture, aspect, this.totalTime, lenses, BH_REFRACTION_PINCH);
+    this.bloom.sceneTexOverride = tex;
   }
 
   /**

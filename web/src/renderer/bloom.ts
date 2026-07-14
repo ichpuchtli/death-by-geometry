@@ -36,6 +36,10 @@ export class BloomPass {
   shakeIntensity = 0; // 0-1, drives chromatic aberration + barrel warp
   time = 0;
 
+  // Optional: use this texture as the "scene" input instead of sceneFBO (set per-frame by the
+  // refraction pass so bloom extracts + composites the already-refracted image). Auto-cleared.
+  sceneTexOverride: WebGLTexture | null = null;
+
 
   constructor(gl: WebGLRenderingContext) {
     this.gl = gl;
@@ -107,12 +111,15 @@ export class BloomPass {
     // from the extract shader blend with old FBO data instead of overwriting
     gl.disable(gl.BLEND);
 
+    // Scene input: the refracted texture if the refraction pass ran this frame, else the raw scene.
+    const sceneTex = this.sceneTexOverride ?? this.sceneFBO.texture;
+
     // --- Step 1: Extract bright pixels ---
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.extractFBO.framebuffer);
     gl.viewport(0, 0, this.extractFBO.width, this.extractFBO.height);
     gl.useProgram(this.extractProgram);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.sceneFBO.texture);
+    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
     gl.uniform1i(gl.getUniformLocation(this.extractProgram, 'u_texture'), 0);
     gl.uniform1f(gl.getUniformLocation(this.extractProgram, 'u_threshold'), this.threshold);
     this.drawQuad(this.extractProgram);
@@ -152,7 +159,7 @@ export class BloomPass {
     gl.viewport(0, 0, canvasWidth, canvasHeight);
     gl.useProgram(this.compositeProgram);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.sceneFBO.texture);
+    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
     gl.uniform1i(gl.getUniformLocation(this.compositeProgram, 'u_scene'), 0);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, readFBO.texture);
@@ -165,5 +172,7 @@ export class BloomPass {
 
     // Re-enable blending for next frame's entity rendering
     gl.enable(gl.BLEND);
+    // Clear the override so a frame without refraction falls back to the raw scene.
+    this.sceneTexOverride = null;
   }
 }
