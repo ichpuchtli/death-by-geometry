@@ -6,6 +6,7 @@ import type { CircleLab as CircleLabType } from './circle-lab';
 import type { TaxonomyLab as TaxonomyLabType } from './taxonomy-lab';
 import type { GlassLab as GlassLabType } from './glass-lab';
 import type { LiquidGlassLab as LiquidGlassLabType } from './liquid-glass-lab';
+import type { PlayerDesignLab as PlayerDesignLabType } from './player-design-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -121,6 +122,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(liquidLoop);
     }
     requestAnimationFrame(liquidLoop);
+  });
+} else if (bootParams.has('player')) {
+  // Player Design Lab — 8 candidate ship silhouettes + firing sound/effect variants (`?player=1`)
+  import('./player-design-lab').then(({ PlayerDesignLab }) => {
+    const lab = new PlayerDesignLab(gameCanvas);
+    (window as unknown as { playerDesignLab: PlayerDesignLabType }).playerDesignLab = lab;
+    let last = performance.now();
+    function playerLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(playerLoop);
+    }
+    requestAnimationFrame(playerLoop);
   });
 } else {
   bootGame();

@@ -1,0 +1,92 @@
+name: "Player Design Lab — 8 ship candidates + firing sound/effect variants"
+tags: [lab, player, visual, ship]
+steps:
+  - action: launch
+    url: "/?player=1"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 1200
+
+  - action: evalCheck
+    description: "Lab booted with 8 ship designs + all variant sets"
+    script: |
+      const l = window.playerDesignLab;
+      if (!l) return false;
+      if (!Array.isArray(l.soundVariants) || l.soundVariants.length !== 6) return false;
+      if (l.muzzleVariants.length !== 4 || l.bulletVariants.length !== 4) return false;
+      // 8 ships laid out; grid view by default (focus === -1)
+      return l.focus === -1 && l.soundVariants.includes('Laser Zap');
+
+  - action: screenshot
+    name: "93-player-lab-grid"
+
+  # Focus a single ship large (Digit key), verify focus state.
+  - action: keyPress
+    key: "3"
+    duration: 60
+  - action: wait
+    ms: 400
+
+  - action: evalCheck
+    description: "Pressing 3 focuses ship index 2 (Interceptor), large single view"
+    script: |
+      return window.playerDesignLab.focus === 2;
+
+  - action: screenshot
+    name: "93-player-lab-focus"
+
+  # Cycle a fire-sound variant (] advances) — should not error, index moves.
+  - action: keyPress
+    key: "]"
+    duration: 60
+  - action: wait
+    ms: 200
+
+  - action: evalCheck
+    description: "] advanced the fire-sound variant"
+    script: |
+      return window.playerDesignLab.soundIndex === 1;
+
+  # Cycle muzzle + bullet variants.
+  - action: keyPress
+    key: "."
+    duration: 60
+  - action: keyPress
+    key: "'"
+    duration: 60
+  - action: wait
+    ms: 200
+
+  - action: evalCheck
+    description: "Muzzle + bullet variant indices advanced"
+    script: |
+      const l = window.playerDesignLab;
+      return l.muzzleIndex === 1 && l.bulletIndex === 1;
+
+  - action: screenshot
+    name: "93-player-lab-variants"
+
+  # Back to grid, toggle bloom/grid, audition fire — none should error.
+  - action: keyPress
+    key: "3"
+    duration: 60
+  - action: keyPress
+    key: "f"
+    duration: 60
+  - action: keyPress
+    key: "b"
+    duration: 60
+  - action: keyPress
+    key: "g"
+    duration: 60
+  - action: wait
+    ms: 300
+
+  - action: evalCheck
+    description: "Back in grid view after un-focusing"
+    script: |
+      return window.playerDesignLab.focus === -1;
+
+  - action: assertNoErrors
+    description: "Lab runs, fires, and cycles variants without JS errors"
