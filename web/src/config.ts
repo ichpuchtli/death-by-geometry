@@ -19,3 +19,4 @@ export * from './config/combat';
 export * from './config/boss';
 export * from './config/audio';
 export * from './config/medals';
+export * from './config/time-dilation';

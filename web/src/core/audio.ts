@@ -12,12 +12,14 @@ export class AudioManager {
   private masterGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
+  private musicFilter: BiquadFilterNode | null = null;
   private buffers = new Map<string, AudioBuffer>();
   private music: ProceduralMusic | null = null;
   private _muted = false;
   private _initialized = false;
   private _loading = false;
   private wantMusic = false; // startMusic() called before init() finished → start once ready
+  private timeScale = 1;
 
   get muted(): boolean { return this._muted; }
   get initialized(): boolean { return this._initialized; }
@@ -46,7 +48,11 @@ export class AudioManager {
 
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = MUSIC_VOLUME;
-      this.musicGain.connect(this.masterGain);
+      this.musicFilter = this.ctx.createBiquadFilter();
+      this.musicFilter.type = 'lowpass';
+      this.musicFilter.frequency.value = 18000;
+      this.musicGain.connect(this.musicFilter);
+      this.musicFilter.connect(this.masterGain);
 
       // Load all SFX (WAV + generated MP3)
       await this.loadAllSFX();
@@ -54,6 +60,7 @@ export class AudioManager {
 
       // Create procedural music
       this.music = new ProceduralMusic(this.ctx, this.musicGain);
+      this.music.setTimeScale(this.timeScale);
 
       // Restore mute state from localStorage
       const stored = localStorage.getItem('gg_muted');
@@ -154,6 +161,7 @@ export class AudioManager {
     if (!buf) return;
     const source = this.ctx.createBufferSource();
     source.buffer = buf;
+    source.playbackRate.value = this.timeScale;
     source.connect(this.sfxGain);
     source.start(0);
   }
@@ -165,6 +173,7 @@ export class AudioManager {
     if (!buf) return;
     const source = this.ctx.createBufferSource();
     source.buffer = buf;
+    source.playbackRate.value = this.timeScale;
     const gain = this.ctx.createGain();
     gain.gain.value = 0.7;
     source.connect(gain);
@@ -179,6 +188,7 @@ export class AudioManager {
 
     const source = this.ctx.createBufferSource();
     source.buffer = buf;
+    source.playbackRate.value = this.timeScale;
     source.connect(this.sfxGain);
     source.start(0);
   }
@@ -191,6 +201,7 @@ export class AudioManager {
 
     const source = this.ctx.createBufferSource();
     source.buffer = buf;
+    source.playbackRate.value = this.timeScale;
     const gain = this.ctx.createGain();
     gain.gain.value = volume;
     source.connect(gain);
@@ -486,6 +497,81 @@ export class AudioManager {
   /** Update music intensity (0 = ambient/menu, 1 = max chaos) */
   setMusicIntensity(intensity: number): void {
     if (this.music) this.music.setIntensity(intensity);
+  }
+
+  /** Apply the current universe time scale to procedural music pitch/tempo and its mix. */
+  setTimeScale(scale: number): void {
+    this.timeScale = Math.max(0.2, Math.min(1, scale));
+    if (this.music) this.music.setTimeScale(this.timeScale);
+    if (this.ctx && this.musicFilter) {
+      const cutoff = 900 + 17100 * this.timeScale * this.timeScale;
+      this.musicFilter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, 0.04);
+    }
+  }
+
+  /** Real-clock transition cue: a heavy descending gravitational fall. */
+  playTimeDilationEnter(): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(105, now);
+    sub.frequency.exponentialRampToValueAtTime(24, now + 0.32);
+    const sg = ctx.createGain();
+    sg.gain.setValueAtTime(0.7, now);
+    sg.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    const sat = this.makeSaturator(3);
+    sub.connect(sat);
+    sat.connect(sg);
+    sg.connect(this.sfxGain);
+    sub.start(now);
+    sub.stop(now + 0.6);
+
+    const fall = this.makeNoiseSource(0.48);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 4;
+    bp.frequency.setValueAtTime(4200, now);
+    bp.frequency.exponentialRampToValueAtTime(180, now + 0.42);
+    const fg = ctx.createGain();
+    fg.gain.setValueAtTime(0.28, now);
+    fg.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+    fall.connect(bp);
+    bp.connect(fg);
+    fg.connect(this.sfxGain);
+    fall.start(now);
+  }
+
+  /** Real-clock transition cue: accelerating tape-spool wind-up and a clean snap. */
+  playTimeDilationExit(): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const rise = ctx.createOscillator();
+    rise.type = 'sawtooth';
+    rise.frequency.setValueAtTime(55, now);
+    rise.frequency.exponentialRampToValueAtTime(1300, now + 0.38);
+    const rg = ctx.createGain();
+    rg.gain.setValueAtTime(0.06, now);
+    rg.gain.linearRampToValueAtTime(0.26, now + 0.3);
+    rg.gain.exponentialRampToValueAtTime(0.001, now + 0.43);
+    rise.connect(rg);
+    rg.connect(this.sfxGain);
+    rise.start(now);
+    rise.stop(now + 0.45);
+    const snap = this.makeNoiseSource(0.05);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 2500;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.001, now);
+    ng.gain.setValueAtTime(0.45, now + 0.39);
+    ng.gain.exponentialRampToValueAtTime(0.001, now + 0.44);
+    snap.connect(hp);
+    hp.connect(ng);
+    ng.connect(this.sfxGain);
+    snap.start(now + 0.39);
   }
 
   startMusic(): void {
@@ -1534,6 +1620,7 @@ class ProceduralMusic {
   private output: GainNode;
   private playing = false;
   private intensity = 0;
+  private timeScale = 1;
 
   // Layers
   private bassOsc: OscillatorNode | null = null;
@@ -1693,13 +1780,23 @@ class ProceduralMusic {
     }
   }
 
+  setTimeScale(scale: number): void {
+    const next = Math.max(0.2, Math.min(1, scale));
+    const ratio = next / this.timeScale;
+    this.timeScale = next;
+    const now = this.ctx.currentTime;
+    for (const osc of [this.bassOsc, this.padOsc, this.padOsc2, this.arpOsc, this.leadOsc]) {
+      if (osc) osc.frequency.setTargetAtTime(Math.max(12, osc.frequency.value * ratio), now, 0.03);
+    }
+  }
+
   private startRhythm(): void {
     const kick = () => {
       if (!this.playing || !this.ctx || !this.rhythmGain) return;
       // Create a quick noise burst for percussion
       const osc = this.ctx.createOscillator();
       osc.type = 'sine';
-      osc.frequency.value = 80;
+      osc.frequency.value = 80 * this.timeScale;
       const env = this.ctx.createGain();
       env.gain.value = 0.8;
       env.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
@@ -1708,7 +1805,7 @@ class ProceduralMusic {
       osc.start();
       osc.stop(this.ctx.currentTime + 0.12);
       // Frequency drop for kick feel
-      osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.08);
+      osc.frequency.exponentialRampToValueAtTime(30 * this.timeScale, this.ctx.currentTime + 0.08);
     };
 
     // Tempo varies with intensity (120-160 BPM)
@@ -1716,7 +1813,7 @@ class ProceduralMusic {
     const scheduleNext = () => {
       if (!this.playing) return;
       kick();
-      this.rhythmInterval = window.setTimeout(scheduleNext, 60000 / bpm());
+      this.rhythmInterval = window.setTimeout(scheduleNext, 60000 / bpm() / this.timeScale);
     };
     scheduleNext();
   }
@@ -1725,7 +1822,7 @@ class ProceduralMusic {
     const step = () => {
       if (!this.playing || !this.arpOsc) return;
       const note = this.arpNotes[this.arpNoteIndex % this.arpNotes.length];
-      this.arpOsc.frequency.setValueAtTime(note, this.ctx.currentTime);
+      this.arpOsc.frequency.setValueAtTime(note * this.timeScale, this.ctx.currentTime);
       this.arpNoteIndex++;
     };
 
@@ -1734,7 +1831,7 @@ class ProceduralMusic {
     const scheduleNext = () => {
       if (!this.playing) return;
       step();
-      this.arpInterval = window.setTimeout(scheduleNext, 60000 / bpm() / 2);
+      this.arpInterval = window.setTimeout(scheduleNext, 60000 / bpm() / 2 / this.timeScale);
     };
     scheduleNext();
   }
@@ -1743,7 +1840,7 @@ class ProceduralMusic {
     const step = () => {
       if (!this.playing || !this.leadOsc) return;
       const note = this.leadNotes[this.leadNoteIndex % this.leadNotes.length];
-      this.leadOsc.frequency.setValueAtTime(note, this.ctx.currentTime);
+      this.leadOsc.frequency.setValueAtTime(note * this.timeScale, this.ctx.currentTime);
       this.leadNoteIndex++;
     };
 
@@ -1751,7 +1848,7 @@ class ProceduralMusic {
     const scheduleNext = () => {
       if (!this.playing) return;
       step();
-      this.leadInterval = window.setTimeout(scheduleNext, 60000 / bpm());
+      this.leadInterval = window.setTimeout(scheduleNext, 60000 / bpm() / this.timeScale);
     };
     scheduleNext();
   }

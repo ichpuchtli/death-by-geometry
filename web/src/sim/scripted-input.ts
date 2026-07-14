@@ -32,4 +32,8 @@ export class ScriptedInput implements InputSource {
   isMouseDown(): boolean {
     return this.firing;
   }
+
+  isTimeDilationHeld(): boolean {
+    return false;
+  }
 }

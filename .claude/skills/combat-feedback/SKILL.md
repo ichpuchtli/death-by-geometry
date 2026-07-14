@@ -7,6 +7,10 @@ Use when working on hitstop, kill effects, heat system, recovery window, phase t
 
 > **System ownership:** Kill processing, kill signatures, hitstop accumulation, and the heat value live in `CombatSystem` (`web/src/systems/combat-system.ts`). Spawn telegraphs live in `SpawnSystem` (`web/src/systems/spawn-system.ts`). Boss encounters (warning/HP/defeated banners, stage-break hitstop) live in `BossSystem` (`web/src/systems/boss-system.ts`). `Game` applies the hitstop timer, drives heat→bloom/border/music, and renders phase banners + recovery shield.
 
+## Dark Matter Time Dilation
+
+`TimeDilationSystem` owns the 0–100 resource, BlackHole-proximity harvesting, unscaled drain, 0.28x target, and smooth 180ms/400ms entry/exit ramps. `Game` applies its scale to the whole normal-playing simulation only; hitstop, pause, visibility suspension, and death slowmo take precedence. The HUD draws a bottom-centre violet/cyan meter (center-collapse depletion), harvesting/core pulses, insufficient-charge flash, restrained vignette/spectral border, and a mobile TIME target. Additive inward streaks around the ship teach harvesting. Deterministic coverage: `tests/flows/94-dark-matter-time-dilation.yml`.
+
 ## Hitstop
 
 Freezes gameplay simulation (enemies, bullets, spawner) while visuals keep running (explosions, grid, camera shake). Accumulated in `CombatSystem` (and `GravitySystem`/`BossSystem` via callbacks); consumed and applied by `Game`.

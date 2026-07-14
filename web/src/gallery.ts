@@ -65,6 +65,7 @@ const stubInput: InputSource = {
   updateAimFromPlayer: () => {},
   getAimAngle: () => 0,
   isMouseDown: () => false,
+  isTimeDilationHeld: () => false,
 };
 
 export class Gallery {

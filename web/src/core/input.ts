@@ -1,6 +1,6 @@
 import { Vec2 } from './vector';
 import type { Camera } from './camera';
-import { JOYSTICK_MAX_RADIUS, JOYSTICK_DEAD_ZONE } from '../config';
+import { JOYSTICK_MAX_RADIUS, JOYSTICK_DEAD_ZONE, TIME_BUTTON_BOTTOM, TIME_BUTTON_RADIUS, TIME_BUTTON_RIGHT } from '../config';
 
 export type InputMode = 'keyboard' | 'touch';
 
@@ -14,6 +14,7 @@ export interface InputSource {
   updateAimFromPlayer(playerPos: Vec2): void;
   getAimAngle(): number;
   isMouseDown(): boolean;
+  isTimeDilationHeld(): boolean;
 }
 
 interface TouchStick {
@@ -45,6 +46,7 @@ export class Input implements InputSource {
   mode: InputMode = 'keyboard';
   private leftStick: TouchStick = { active: false, touchId: -1, origin: new Vec2(), current: new Vec2() };
   private rightStick: TouchStick = { active: false, touchId: -1, origin: new Vec2(), current: new Vec2() };
+  private timeTouchId = -1;
   private canvasWidth = 0;
   private canvasHeight = 0;
   private zoom = 1;
@@ -52,6 +54,8 @@ export class Input implements InputSource {
   // Expose stick positions for joystick rendering
   get leftStickState() { return this.leftStick; }
   get rightStickState() { return this.rightStick; }
+  get timeButtonPressed() { return this.timeTouchId >= 0 || (!this.botControl && this.isKeyDown('Space')); }
+  get timeButtonCenter() { return { x: this.canvasWidth - TIME_BUTTON_RIGHT, y: this.canvasHeight - TIME_BUTTON_BOTTOM }; }
 
   constructor(private canvas: HTMLCanvasElement) {
     this.canvasWidth = canvas.clientWidth;
@@ -98,6 +102,11 @@ export class Input implements InputSource {
 
     for (let i = 0; i < e.changedTouches.length; i++) {
       const t = e.changedTouches[i];
+      const tc = this.timeButtonCenter;
+      if (this.timeTouchId < 0 && Math.hypot(t.clientX - tc.x, t.clientY - tc.y) <= TIME_BUTTON_RADIUS * 1.25) {
+        this.timeTouchId = t.identifier;
+        continue;
+      }
       const stick = t.clientX < half ? this.leftStick : this.rightStick;
       if (!stick.active) {
         stick.active = true;
@@ -112,6 +121,7 @@ export class Input implements InputSource {
     e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
       const t = e.changedTouches[i];
+      if (this.timeTouchId === t.identifier) continue;
       if (this.leftStick.active && this.leftStick.touchId === t.identifier) {
         this.leftStick.current.set(t.clientX, t.clientY);
       }
@@ -125,6 +135,10 @@ export class Input implements InputSource {
     e.preventDefault();
     for (let i = 0; i < e.changedTouches.length; i++) {
       const t = e.changedTouches[i];
+      if (this.timeTouchId === t.identifier) {
+        this.timeTouchId = -1;
+        continue;
+      }
       if (this.leftStick.active && this.leftStick.touchId === t.identifier) {
         this.leftStick.active = false;
         this.leftStick.touchId = -1;
@@ -173,6 +187,16 @@ export class Input implements InputSource {
       return rv.magnitudeSq() > 0;
     }
     return this.mouseDown || this.autoFire;
+  }
+
+  isTimeDilationHeld(): boolean {
+    if (this.botControl) return false;
+    return this.isKeyDown('Space') || this.timeTouchId >= 0;
+  }
+
+  releaseTimeDilationAction(): void {
+    this.keys.set('Space', false);
+    this.timeTouchId = -1;
   }
 
   isTouchActive(): boolean {

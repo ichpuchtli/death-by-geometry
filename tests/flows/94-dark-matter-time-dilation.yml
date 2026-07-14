@@ -1,0 +1,180 @@
+name: "Dark Matter — harvest, slow time, drain, pause, depletion, and reset"
+tags: [dark-matter, time-dilation, regression]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: evalCheck
+    description: "Make the deterministic harvest arena non-lethal"
+    script: |
+      const settings = JSON.parse(localStorage.getItem('gg_settings') || '{}');
+      settings.startingLives = 99;
+      settings.spawnRateMultiplier = 0.01;
+      settings.enemySpeedMultiplier = 0.01;
+      settings.bhPlayerPull = 0;
+      localStorage.setItem('gg_settings', JSON.stringify(settings));
+      return true;
+
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  - action: assertEval
+    description: "A fresh run starts empty at normal time"
+    script: |
+      const s = window.game.timeDilationState;
+      return s.charge === 0 && s.timeScale === 1 && !s.active;
+
+  - action: evalCheck
+    description: "Place a fully spawned BlackHole near the outer harvest radius"
+    script: |
+      window.__harvestHole = window.game.debugSpawnHarvestBlackHole(440);
+      return window.__harvestHole.active && !window.__harvestHole.isSpawning;
+
+  - action: wait
+    ms: 900
+
+  - action: assertEval
+    description: "Outer attraction range provides a faint real-time trickle"
+    script: |
+      const s = window.game.timeDilationState;
+      window.__outerCharge = s.charge;
+      return s.harvesting && s.charge > 0.5 && s.charge < 8 && s.harvestRate > 2;
+
+  - action: evalCheck
+    description: "Move the hole into its gravity core"
+    script: |
+      const g = window.game;
+      window.__harvestHole.position.set(g.player.position.x + 60, g.player.position.y);
+      return true;
+
+  - action: wait
+    ms: 700
+
+  - action: assertEval
+    description: "Core proximity harvests materially faster"
+    script: |
+      const s = window.game.timeDilationState;
+      return s.coreHarvesting && s.harvestRate > 18 && s.charge - window.__outerCharge > 10;
+
+  - action: evalCheck
+    description: "Set below-minimum charge for activation feedback"
+    script: |
+      window.game.debugSetDarkMatterCharge(5);
+      return true;
+
+  - action: keyPress
+    key: "Space"
+    duration: 120
+
+  - action: assertEval
+    description: "Below minimum does not slow time and flashes the meter"
+    script: |
+      const s = window.game.timeDilationState;
+      return s.timeScale === 1 && !s.active && s.insufficientFlash > 0;
+
+  - action: wait
+    ms: 80
+
+  - action: evalCheck
+    description: "Give sufficient charge and move outside harvest range"
+    script: |
+      window.game.debugSetDarkMatterCharge(60);
+      window.__harvestHole.position.set(5000, 5000);
+      window.__beforeSlowCharge = window.game.timeDilationState.charge;
+      return true;
+
+  - action: keyPress
+    key: "Space"
+    duration: 650
+
+  - action: assertEval
+    description: "Holding reaches deep slow motion and drains against real time"
+    script: |
+      const s = window.game.timeDilationState;
+      const drained = window.__beforeSlowCharge - s.charge;
+      return s.timeScale < 0.5 && drained > 9 && drained < 18;
+
+  - action: wait
+    ms: 500
+
+  - action: assertEval
+    description: "Release winds smoothly back to normal time"
+    script: |
+      const s = window.game.timeDilationState;
+      return Math.abs(s.timeScale - 1) < 0.01 && !s.active;
+
+  - action: evalCheck
+    description: "Enter time dilation, then pause via the real keyboard path"
+    script: |
+      window.game.debugSetDarkMatterCharge(50);
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
+      return true;
+
+  - action: wait
+    ms: 250
+
+  - action: keyPress
+    key: "p"
+
+  - action: evalCheck
+    description: "Snapshot charge while paused"
+    script: |
+      window.__pausedCharge = window.game.timeDilationState.charge;
+      return window.game.timeDilationState.timeScale < 0.5;
+
+  - action: wait
+    ms: 500
+
+  - action: assertEval
+    description: "Pause does not drain Dark Matter"
+    script: |
+      return Math.abs(window.game.timeDilationState.charge - window.__pausedCharge) < 0.05;
+
+  - action: evalCheck
+    description: "Release while paused"
+    script: |
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space' }));
+      return true;
+
+  - action: keyPress
+    key: "p"
+
+  - action: wait
+    ms: 500
+
+  - action: evalCheck
+    description: "Force a near-empty activation for depletion"
+    script: |
+      window.game.enemies.filter(e => e.family === 'blackhole').forEach(e => { e.active = false; });
+      window.game.debugSetDarkMatterCharge(11);
+      return true;
+
+  - action: keyPress
+    key: "Space"
+    duration: 750
+
+  - action: wait
+    ms: 450
+
+  - action: assertEval
+    description: "Depletion exits automatically and locks at zero"
+    script: |
+      const s = window.game.timeDilationState;
+      return s.charge === 0 && Math.abs(s.timeScale - 1) < 0.01 && !s.active;
+
+  - action: evalCheck
+    description: "A new run resets charge and all audio/game time treatment"
+    script: |
+      window.game.debugSetDarkMatterCharge(80);
+      window.game.startGame();
+      const s = window.game.timeDilationState;
+      return s.charge === 0 && s.timeScale === 1 && !s.active;
+
+  - action: assertNoErrors

@@ -24,6 +24,8 @@ import { CombatSystem } from './systems/combat-system';
 import { SpawnSystem } from './systems/spawn-system';
 import { GravitySystem } from './systems/gravity-system';
 import { BossSystem } from './systems/boss-system';
+import { TimeDilationSystem } from './systems/time-dilation-system';
+import type { TimeDilationSnapshot } from './systems/time-dilation-system';
 import { separateEnemies as runSeparation } from './systems/separation';
 import { Bot } from './ai/bot';
 import { Wingman } from './entities/wingman';
@@ -130,6 +132,7 @@ export class Game {
 
   // Gravity system (BlackHole attraction, absorption/supernova, player pull, grid wells, circle flocks)
   private gravity: GravitySystem;
+  private timeDilation: TimeDilationSystem;
 
   // Combat feedback: hitstop timer applied by Game
   private hitstopTimer = 0;
@@ -199,6 +202,11 @@ export class Game {
     this.input.setCamera(this.camera);
     this.input.setZoom(this.renderer.zoom);
     this.audio = new AudioManager();
+    this.timeDilation = new TimeDilationSystem({
+      onEnter: () => this.audio.playTimeDilationEnter(),
+      onExit: () => this.audio.playTimeDilationExit(),
+      onScale: (scale) => this.audio.setTimeScale(scale),
+    });
     this.player = new Player(this.input);
     this.bullets = new BulletPool();
     this.explosions = new ExplosionPool();
@@ -472,6 +480,7 @@ export class Game {
     this.bullets.clear();
     this.enemies.length = 0;
     this.gravity.clear();
+    this.timeDilation.reset();
     this.explosions.clear();
     this.debris.clear();
     this.field.reseed();
@@ -601,31 +610,35 @@ export class Game {
   }
 
   update(dt: number): void {
-    this.totalTime += dt / 1000;
     this.hud.updateFps(dt);
-
-    this.camera.updateShake(dt);
 
     // Update touch mode on HUD
     this.hud.setTouchMode(this.input.mode === 'touch');
 
     if (this.state === 'design_lab') {
+      this.totalTime += dt / 1000;
+      this.camera.updateShake(dt);
       this.designLab!.update(dt);
       return;
     }
 
     if (this.state === 'gameover') {
+      this.totalTime += dt / 1000;
+      this.camera.updateShake(dt);
       this.grid.update(dt);
       this.updateGameOver(dt);
       return;
     }
 
     if (this.state === 'death_slowmo') {
+      this.totalTime += dt * DEATH_SLOWMO_TIME_SCALE / 1000;
       this.updateDeathSlowmo(dt);
       return;
     }
 
     if (this.state !== 'playing') {
+      this.totalTime += dt / 1000;
+      this.camera.updateShake(dt);
       this.grid.update(dt);
       return;
     }
@@ -644,11 +657,13 @@ export class Game {
     }
 
     // Update combat feedback timers (always, even during hitstop)
-    this.updateCombatFeedback(dt);
+    this.updateCombatFeedback(dt * this.timeDilation.timeScale);
 
     // Hitstop: freeze gameplay, keep visuals alive
     if (this.hitstopTimer > 0) {
       this.hitstopTimer -= dt;
+      this.totalTime += dt / 1000;
+      this.camera.updateShake(dt);
       this.explosions.update(dt);
       this.debris.update(dt);
       this.gravity.updateGravityWells();
@@ -657,14 +672,27 @@ export class Game {
       return;
     }
 
-    this.gameTime += dt / 1000;
+    const holes = this.enemies.filter((e): e is BlackHole => e instanceof BlackHole);
+    const timeScale = this.timeDilation.update(
+      dt,
+      this.input.isTimeDilationHeld(),
+      !this.botEnabled,
+      holes,
+      this.player.position.x,
+      this.player.position.y,
+    );
+    const gameDt = dt * timeScale;
+    this.totalTime += gameDt / 1000;
+    this.camera.updateShake(gameDt);
+
+    this.gameTime += gameDt / 1000;
 
     // AI agent decision for this frame (writes into the input layer)
     this.driveBot();
 
     // Player
-    this.player.update(dt);
-    this.gravity.applyPlayerPull(dt);
+    this.player.update(gameDt);
+    this.gravity.applyPlayerPull(gameDt);
 
     // Shooting
     const shots = this.player.tryShoot();
@@ -683,7 +711,7 @@ export class Game {
     // AI wingman: an ally that observes + acts from its own position, sharing bullet pool + score
     this.syncWingman();
     if (this.wingman) {
-      this.wingman.update(dt, this.enemies, gameSettings.arenaWidth, gameSettings.arenaHeight);
+      this.wingman.update(gameDt, this.enemies, gameSettings.arenaWidth, gameSettings.arenaHeight);
       const wShots = this.wingman.tryShoot(this.player.getWeaponStage());
       if (wShots) {
         for (const angle of wShots) {
@@ -694,16 +722,16 @@ export class Game {
     }
 
     // Bullets
-    this.bullets.update(dt);
+    this.bullets.update(gameDt);
 
     // Update bullet trails + clean up inactive
     this.lifecycle.updateBulletTrails(this.bullets);
 
     // BlackHole attraction — pull nearby non-blackhole enemies toward black holes
-    this.gravity.applyAttraction(dt);
+    this.gravity.applyAttraction(gameDt);
 
     // Shockwave ring effects + BlackHole stress-wobble audio level
-    this.gravity.update(dt);
+    this.gravity.update(gameDt);
 
     // Update circle flock centroids (shared Vec2 refs held by each CircleEnemy)
     this.gravity.updateFlocks();
@@ -712,18 +740,18 @@ export class Game {
     for (const e of this.enemies) {
       if (!e.active) continue;
       if (e.isSpawning) {
-        e.spawnTimer = Math.max(0, e.spawnTimer - dt / 1000);
+        e.spawnTimer = Math.max(0, e.spawnTimer - gameDt / 1000);
         continue; // skip movement/AI during spawn
       }
       (e as { update(dt: number, playerPos?: Vec2, playerVel?: Vec2): void })
-        .update(dt, this.player.position, this.player.velocity);
+        .update(gameDt, this.player.position, this.player.velocity);
     }
 
     // Enemies — Pass 2: Separation (push overlapping enemies apart)
     this.separateEnemies();
 
     // Spawn — WaveManager execution, caps, spawn SFX, formation telegraphs
-    this.spawn.update(dt);
+    this.spawn.update(gameDt);
 
     // Collision
     const result = checkCollisions(
@@ -752,13 +780,13 @@ export class Game {
     }
 
     // Process staggered child spawns, heat decay, and kill effect timers
-    this.combat.update(dt, this.gameTime);
+    this.combat.update(gameDt, this.gameTime);
 
     // Update trails for active enemies and clean up inactive ones
     this.lifecycle.cleanupEnemies(this.enemies);
 
     // Explosions
-    this.explosions.update(dt);
+    this.explosions.update(gameDt);
 
     // Update gravity wells for grid warping during gameplay
     this.gravity.updateGravityWells();
@@ -785,22 +813,22 @@ export class Game {
     }
 
     // Run spring-mass physics
-    this.grid.update(dt);
+    this.grid.update(gameDt);
 
     // Camera
     this.camera.follow(this.player.position);
 
     // Ambient dust field + thruster wake + debris shards
-    this.updateParticles(dt);
+    this.updateParticles(gameDt);
 
     // --- Heat system update ---
-    this.updateHeat(dt);
+    this.updateHeat(gameDt);
 
     // --- Recovery window update ---
-    this.updateRecovery(dt);
+    this.updateRecovery(gameDt);
 
     // --- Boss encounter updates ---
-    this.boss.update(dt);
+    this.boss.update(gameDt);
 
     // Track weapon stage for run stats
     const wStage = this.player.getWeaponStage();
@@ -1021,6 +1049,8 @@ export class Game {
   }
 
   private onPlayerDeath(): void {
+    this.timeDilation.cancel(false);
+    this.input.releaseTimeDilationAction();
     // Reuse the death slowmo shockwave animation for game over
     this.state = 'death_slowmo';
     this.slowmoTimer = 0;
@@ -1062,6 +1092,8 @@ export class Game {
   }
 
   private onPlayerRespawn(): void {
+    this.timeDilation.cancel(false);
+    this.input.releaseTimeDilationAction();
     // Enter death slowmo — time slows, shockwave expands, enemies explode on contact
     this.state = 'death_slowmo';
     this.slowmoTimer = 0;
@@ -1271,6 +1303,7 @@ export class Game {
     // 4. Switch to additive blend for dust, trails, debris, explosions, glow, kill signatures
     this.renderer.setBlendMode('additive');
     this.field.render(this.renderer);
+    this.renderDarkMatterHarvest();
     this.lifecycle.trailSystem.render(this.renderer);
     this.debris.render(this.renderer);
     this.explosions.render(this.renderer);
@@ -1299,6 +1332,7 @@ export class Game {
     // --- HUD (drawn on separate 2D canvas, unaffected by bloom) ---
     if (this.state === 'playing' || this.state === 'death_slowmo') {
       this.hud.drawPlaying(this.player.score, this.player.lives, this.audio.muted, this.enemies.length, this.input.autoFire);
+      this.hud.drawTimeDilation(this.timeDilation.snapshot, this.input.timeButtonPressed);
 
       // Recovery banner
       if (this.recoveryActive && this.state === 'playing') {
@@ -1352,6 +1386,25 @@ export class Game {
       e.render(this.renderer);
     }
     this.renderer.clearWarp();
+  }
+
+  private renderDarkMatterHarvest(): void {
+    const state = this.timeDilation.snapshot;
+    if (!state.harvesting || this.state !== 'playing') return;
+    const px = this.player.position.x;
+    const py = this.player.position.y;
+    const count = state.coreHarvesting ? 12 : 7;
+    const time = performance.now() * 0.001;
+    for (let i = 0; i < count; i++) {
+      const angle = i / count * Math.PI * 2 + time * (i % 2 ? 0.6 : -0.45);
+      const phase = (time * (state.coreHarvesting ? 1.8 : 1.1) + i / count) % 1;
+      const radius = 18 + (1 - phase) * (state.coreHarvesting ? 62 : 42);
+      const x = px + Math.cos(angle) * radius;
+      const y = py + Math.sin(angle) * radius;
+      const nx = px + Math.cos(angle) * Math.max(12, radius - 9);
+      const ny = py + Math.sin(angle) * Math.max(12, radius - 9);
+      this.renderer.drawLine(x, y, nx, ny, 0.42, 0.75, 1, 0.18 + phase * 0.5);
+    }
   }
 
   /** Render recovery shield ring around player */
@@ -1455,7 +1508,9 @@ export class Game {
 
   /** Called when tab is hidden */
   onPause(): void {
-    // Nothing special needed — game loop already stops
+    // Visibility pauses must never leave the music/gameplay graph stuck below 1x.
+    this.timeDilation.cancel(false);
+    this.input.releaseTimeDilationAction();
   }
 
   /** Called when tab is visible again */
@@ -1465,7 +1520,8 @@ export class Game {
 
   /** Called when device rotates to portrait */
   onOrientationPause(): void {
-    // Game loop stops via index.ts — game state stays intact
+    this.timeDilation.cancel(false);
+    this.input.releaseTimeDilationAction();
   }
 
   /** Called when device rotates back to landscape */
@@ -1481,5 +1537,21 @@ export class Game {
     this.bloom.blurPasses = this.mobile ? Math.min(gameSettings.bloomBlurPasses, 2) : gameSettings.bloomBlurPasses;
     this.bloom.blurRadius = gameSettings.bloomBlurRadius;
     this.lifecycle.applyVisualSettings(this.mobile);
+  }
+
+  /** Stable read-only browser surface used by deterministic feature flows. */
+  get timeDilationState(): TimeDilationSnapshot { return this.timeDilation.snapshot; }
+
+  /** Deterministic test hook; never used by normal gameplay. */
+  debugSetDarkMatterCharge(value: number): void { this.timeDilation.debugSetCharge(value); }
+
+  /** Deterministic test hook: place a fully active BlackHole at a known player distance. */
+  debugSpawnHarvestBlackHole(distance: number): BlackHole {
+    const bh = createEnemy('blackhole', new Vec2(this.player.position.x + distance, this.player.position.y)) as BlackHole;
+    bh.spawnTimer = 0;
+    bh.active = true;
+    this.enemies.push(bh);
+    this.lifecycle.spawnEnemy(bh);
+    return bh;
   }
 }

@@ -1,5 +1,6 @@
-import { HUD_FONT, HUD_COLOR, MedalDef, PHASE_DISPLAY_NAMES, WEAPON_STAGES } from '../config';
+import { DARK_MATTER_CORE_PULSE_MS, HUD_FONT, HUD_COLOR, MedalDef, PHASE_DISPLAY_NAMES, TIME_BUTTON_BOTTOM, TIME_BUTTON_RADIUS, TIME_BUTTON_RIGHT, WEAPON_STAGES } from '../config';
 import { RunStats } from '../core/run-stats';
+import type { TimeDilationSnapshot } from '../systems/time-dilation-system';
 
 export class HUD {
   private ctx: CanvasRenderingContext2D;
@@ -86,6 +87,80 @@ export class HUD {
       const color = muted ? '#aa3030' : '#30aa30';
       this.drawGlowText(text, this.canvas.clientWidth / 2, 20, '14px monospace', color, color, 5);
     }
+  }
+
+  /** Dark Matter meter + unscaled full-screen time-dilation treatment. */
+  drawTimeDilation(state: TimeDilationSnapshot, buttonPressed = false): void {
+    const ctx = this.ctx;
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
+    const strength = Math.max(0, Math.min(1, (1 - state.timeScale) / 0.72));
+
+    if (strength > 0.001) {
+      const vignette = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.2, w / 2, h / 2, Math.max(w, h) * 0.68);
+      vignette.addColorStop(0, 'rgba(18, 6, 34, 0)');
+      vignette.addColorStop(0.72, `rgba(24, 4, 45, ${0.09 * strength})`);
+      vignette.addColorStop(1, `rgba(2, 0, 10, ${0.48 * strength})`);
+      ctx.save();
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = `rgba(110, 70, 255, ${0.28 * strength})`;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(2, 2, w - 4, h - 4);
+      ctx.restore();
+    }
+
+    const barW = Math.min(260, Math.max(170, w * 0.24));
+    const barH = 10;
+    const x = (w - barW) / 2;
+    const y = h - 39;
+    const frac = Math.max(0, Math.min(1, state.charge / state.capacity));
+    const pulsePeriod = state.coreHarvesting ? DARK_MATTER_CORE_PULSE_MS : DARK_MATTER_CORE_PULSE_MS * 2;
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / pulsePeriod * Math.PI * 2);
+    const flash = state.insufficientFlash > 0 && Math.sin(Date.now() * 0.035) > 0;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    const label = this.touchMode ? 'DARK MATTER  HOLD TIME' : 'DARK MATTER  [SPACE]';
+    const labelColor = flash ? '#ff506e' : state.harvesting ? '#a8f4ff' : '#9278d8';
+    this.drawGlowText(label, w / 2, y - 5, 'bold 12px monospace', labelColor, labelColor, state.harvesting ? 10 : 5);
+    ctx.fillStyle = 'rgba(4, 1, 12, 0.88)';
+    ctx.fillRect(x - 2, y - 2, barW + 4, barH + 4);
+    ctx.strokeStyle = flash ? '#ff506e' : 'rgba(126, 90, 220, 0.75)';
+    ctx.lineWidth = flash ? 2 : 1;
+    ctx.strokeRect(x - 2, y - 2, barW + 4, barH + 4);
+
+    if (frac > 0) {
+      const fillW = barW * frac;
+      const grad = ctx.createLinearGradient(x, y, x + barW, y);
+      grad.addColorStop(0, '#5020a8');
+      grad.addColorStop(0.42, '#35ccea');
+      grad.addColorStop(0.5, state.harvesting ? `rgba(255,255,255,${0.75 + pulse * 0.25})` : '#d9faff');
+      grad.addColorStop(0.58, '#35ccea');
+      grad.addColorStop(1, '#5020a8');
+      ctx.fillStyle = grad;
+      ctx.shadowColor = state.coreHarvesting ? '#ffffff' : '#6b35ff';
+      ctx.shadowBlur = state.harvesting ? 9 + pulse * 7 : 5;
+      // Centered fill makes depletion visibly eat inward from both ends.
+      ctx.fillRect(w / 2 - fillW / 2, y, fillW, barH);
+      ctx.shadowBlur = 0;
+    }
+
+    if (this.touchMode) {
+      const bx = w - TIME_BUTTON_RIGHT;
+      const by = h - TIME_BUTTON_BOTTOM;
+      ctx.beginPath();
+      ctx.arc(bx, by, TIME_BUTTON_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = buttonPressed ? 'rgba(130, 75, 235, 0.7)' : state.active ? 'rgba(105, 55, 210, 0.58)' : 'rgba(14, 5, 32, 0.58)';
+      ctx.fill();
+      ctx.strokeStyle = state.active ? '#d8c5ff' : '#7954bd';
+      ctx.lineWidth = buttonPressed || state.active ? 3 : 2;
+      ctx.stroke();
+      ctx.textBaseline = 'middle';
+      this.drawGlowText('TIME', bx, by, 'bold 11px monospace', '#d8c5ff', '#7040cc', buttonPressed || state.active ? 12 : 5);
+    }
+    ctx.restore();
   }
 
   /** Draw phase transition banner with fade-in/out animation */
