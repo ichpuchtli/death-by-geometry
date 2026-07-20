@@ -1,0 +1,84 @@
+name: "Boss damage feedback — per-hit bite + milestone chunks + diegetic heat body"
+tags: [boss, combat, feedback, visual]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+  - action: click
+    selector: "canvas#game"
+  - action: wait
+    ms: 500
+
+  # A tier-0 Sierpinski boss (12 HP) is flagged for the shared Boss Damage Feedback;
+  # a tier-2 leaf (1 HP) is not.
+  - action: evalCheck
+    description: "bossFeedback flag is data-driven (multi-HP bosses only)"
+    script: |
+      const g = window.game;
+      const boss = g.debugSpawnSierpinski(0);
+      window.__boss = boss;
+      const leaf = g.debugSpawnSierpinski(2, boss.position.x - 300, boss.position.y);
+      const ok = boss.bossFeedback === true
+        && leaf.bossFeedback === false
+        && boss.damageFraction === 0;
+      // Tidy up the leaf so it doesn't wander into the boss.
+      g.debugKillEnemy(leaf, 0);
+      return ok;
+
+  # Spy the two boss-hit sounds, then feed the boss a run of non-killing hits through the
+  # real combat pipeline. Damage must accumulate, a soft tick must fire, and crossing a
+  # milestone (25%) must fire the heavier "chunk" — without ever throwing.
+  - action: evalCheck
+    description: "Non-killing hits drive tick + milestone chunk + rising damage"
+    script: |
+      const g = window.game;
+      const boss = window.__boss;
+      const combat = g['combat'];
+      const audio = g['audio'];
+      let ticks = 0, chunks = 0;
+      audio.playBossHit = () => { ticks++; };
+      audio.playBossHitMilestone = () => { chunks++; };
+
+      // 5 non-killing hits (12 HP → 7 HP): mirrors collision.ts building a bossHits entry.
+      for (let i = 0; i < 5; i++) {
+        const fracBefore = boss.hp / boss.maxHp;
+        boss.hit(); // survives (hp stays > 0)
+        combat.processKills({
+          killedEnemies: [],
+          bossHits: [{
+            enemy: boss,
+            position: boss.position.clone(),
+            bulletAngle: 0,
+            fracBefore,
+          }],
+          playerHit: false,
+        });
+      }
+
+      window.__boss = boss;
+      // hp 12 → 7 ⇒ damageFraction ~0.417, crossed the 25% milestone.
+      if (!(boss.damageFraction > 0.4)) throw new Error('damageFraction did not rise: ' + boss.damageFraction);
+      if (ticks < 1) throw new Error('no per-hit tick fired');
+      if (chunks < 1) throw new Error('no milestone chunk fired');
+      // Sierpinski accumulates a fracture line per survived hit (diegetic HP readout).
+      if (boss['crackAngles'].length < 5) throw new Error('cracks not accumulated: ' + boss['crackAngles'].length);
+      return true;
+
+  - action: screenshot
+    name: "100-boss-damaged-heat-body"
+
+  # A damaged boss glows hotter — damageHeatColor blends toward amber/white.
+  - action: evalCheck
+    description: "damageHeatColor blends the body toward hot as damage rises"
+    script: |
+      const g = window.game;
+      const boss = window.__boss;
+      // Sierpinski is gold [1,0.843,0]; heat pulls it toward amber [1,0.55,0.15] then
+      // white-hot — so a damaged body reads warmer: green drops, blue rises.
+      const clean = boss['damageHeatColor'](boss.color, 0);
+      const hot = boss['damageHeatColor'](boss.color, 0.42);
+      const cleanUnchanged = clean[0] === boss.color[0] && clean[1] === boss.color[1] && clean[2] === boss.color[2];
+      return cleanUnchanged && hot[1] < boss.color[1] - 0.05 && hot[2] > boss.color[2] + 0.02;
+
+  - action: assertNoErrors
+    description: "Boss damage feedback runs without JS errors"

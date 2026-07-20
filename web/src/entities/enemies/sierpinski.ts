@@ -20,6 +20,8 @@ export class Sierpinski extends Enemy {
   private crackVx = 0;
   private crackVy = 0;
   private crackTime = 0;
+  // Accumulating fracture lines from bullet damage (diegetic HP readout — see Boss Damage Feedback).
+  private crackAngles: number[] = [];
 
   constructor(tier = 0, pos?: Vec2) {
     super();
@@ -39,6 +41,9 @@ export class Sierpinski extends Enemy {
       this.gravityImmune = true;
       this.separationWeight = 0.25;
     }
+    // Tiers 0 & 1 soak multiple hits → shared Boss Damage Feedback (spark/tick/milestones
+    // + diegetic damage escalation). Tier 2 is a 1-HP leaf, so no feedback.
+    this.bossFeedback = this.hp > 1;
 
     // Precompute outer triangle as shape points for collision
     const size = this.collisionRadius;
@@ -52,7 +57,11 @@ export class Sierpinski extends Enemy {
 
   hit(): boolean {
     this.hitFlash = 0.15;
-    return super.hit();
+    const dead = super.hit();
+    // Leave a permanent fracture line for each hit survived — the triangle visibly
+    // accumulates damage before it finally cracks apart.
+    if (!dead && this.bossFeedback) this.crackAngles.push(Math.random() * Math.PI * 2);
+    return dead;
   }
 
   /** Impart an outward crack impulse (px/ms) as this fragment splits off its parent. */
@@ -91,13 +100,17 @@ export class Sierpinski extends Enemy {
 
     const cos = Math.cos(this.rotation);
     const sin = Math.sin(this.rotation);
-    const px = this.position.x;
-    const py = this.position.y;
-    const drawColor: [number, number, number] = this.hitFlash > 0 ? [1, 1, 1] : this.color;
+    const time = Date.now() * 0.001;
+    // Diegetic damage: the body trembles harder + glows hotter as it nears death.
+    const [sx, sy] = this.damageShudder(time);
+    const px = this.position.x + sx;
+    const py = this.position.y + sy;
+    const drawColor: [number, number, number] = this.hitFlash > 0
+      ? [1, 1, 1]
+      : this.damageHeatColor(this.color);
 
     // Draw all triangles of the Sierpinski at current depth
     const triangles = generateSierpinskiTriangles(this.depth, this.collisionRadius);
-    const time = Date.now() * 0.001;
 
     for (let t = 0; t < triangles.length; t++) {
       const tri = triangles[t];
@@ -121,6 +134,21 @@ export class Sierpinski extends Enemy {
         drawColor[2] * pulse,
       ];
       renderer.drawLineLoop(points, col);
+    }
+
+    // Accumulated fracture lines from damage — hot cracks splitting inward from the rim.
+    const d = this.damageFraction;
+    if (this.crackAngles.length > 0) {
+      for (let i = 0; i < this.crackAngles.length; i++) {
+        const a = this.crackAngles[i] + this.rotation;
+        const r0 = this.collisionRadius * (0.85 - (i % 3) * 0.12);
+        const r1 = this.collisionRadius * (0.25 + (i % 2) * 0.1);
+        renderer.drawLine(
+          px + Math.cos(a) * r0, py + Math.sin(a) * r0,
+          px + Math.cos(a) * r1, py + Math.sin(a) * r1,
+          1, 0.5 - d * 0.3, 0.15, 0.35 + d * 0.4,
+        );
+      }
     }
   }
 

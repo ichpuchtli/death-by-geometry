@@ -29,6 +29,7 @@ export class Mandelbrot extends Enemy {
   constructor() {
     super();
     this.gravityImmune = true;
+    this.bossFeedback = true; // shared Boss Damage Feedback (spark/tick/milestones + heat body)
     this.color = COLORS.mandelbrot.color;
     this.color2 = COLORS.mandelbrot.color2;
     this.speed = MINIBOSS_SPEED[0];
@@ -168,15 +169,17 @@ export class Mandelbrot extends Enemy {
     if (!this.active) return;
     if (this.isSpawning) { this.renderSpawn(renderer); return; }
 
-    const px = this.position.x;
-    const py = this.position.y;
+    // Diegetic damage: the cardioid trembles harder + glows hotter toward death.
+    const [shx, shy] = this.damageShudder(this.tendrilPhase * 0.5);
+    const px = this.position.x + shx;
+    const py = this.position.y + shy;
     const isHit = this.hitFlash > 0;
     const isTransition = this.stageTransitionFlash > 0;
     const drawColor: [number, number, number] = isHit ? [1, 1, 1]
-      : isTransition ? [1, 0.5, 0.2] : this.color;
+      : isTransition ? [1, 0.5, 0.2] : this.damageHeatColor(this.color);
 
-    // Double-line cardioid for thickness
-    const points = this.getWorldPoints();
+    // Double-line cardioid for thickness (shuddering with damage)
+    const points = this.getWorldPoints().map(([x, y]) => [x + shx, y + shy]);
     renderer.drawLineLoop(points.map(([x, y]) => [x - 1.5, y]), this.color2);
     renderer.drawLineLoop(points.map(([x, y]) => [x + 0.5, y - 0.5]), this.color2, 0.4);
     renderer.drawLineLoop(points, drawColor);

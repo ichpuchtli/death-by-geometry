@@ -62,6 +62,13 @@ export abstract class Enemy extends Entity {
   isBouncer = false;
   /** Separation push weight: 0 = immovable (BlackHole), 0.25 = resists (miniboss), 1 = normal. */
   separationWeight = 1;
+  /**
+   * Whether this enemy is a multi-hit "boss" that gets the shared Boss Damage Feedback
+   * (per-hit contact spark + tick + tiny grid dimple; milestone "chunk" on damage thresholds;
+   * diegetic damage escalation on its own body). Set true on bosses (Sierpinski tiers 0/1,
+   * Mandelbrot, future bosses). Drives CombatSystem — no per-boss wiring needed.
+   */
+  bossFeedback = false;
 
   constructor() {
     super();
@@ -133,6 +140,50 @@ export abstract class Enemy extends Entity {
       this.velocity.y *= -1;
       this.position.y *= 0.99;
     }
+  }
+
+  /**
+   * Damage progress for diegetic boss feedback: 0 = pristine, 1 = one hit from death.
+   * Only meaningful for multi-HP units; single-HP enemies always report 0.
+   */
+  get damageFraction(): number {
+    return this.maxHp > 1 ? Math.min(1, Math.max(0, 1 - this.hp / this.maxHp)) : 0;
+  }
+
+  /**
+   * Blend a base colour toward hot amber → white as damage rises, so a boss visibly
+   * "heats up" and glows near-white just before it breaks. Shared by all boss bodies.
+   */
+  protected damageHeatColor(
+    base: [number, number, number], d = this.damageFraction,
+  ): [number, number, number] {
+    if (d <= 0) return base;
+    // First half: slide toward amber. Second half: blow out toward white-hot.
+    const amber: [number, number, number] = [1, 0.55, 0.15];
+    const toAmber = Math.min(1, d * 1.4);
+    const r = base[0] + (amber[0] - base[0]) * toAmber;
+    const g = base[1] + (amber[1] - base[1]) * toAmber;
+    const b = base[2] + (amber[2] - base[2]) * toAmber;
+    const white = Math.max(0, (d - 0.5) * 2); // 0 until half, → 1 at death
+    return [
+      r + (1 - r) * white,
+      g + (1 - g) * white,
+      b + (1 - b) * white,
+    ];
+  }
+
+  /**
+   * A small render-space shudder offset (px) that grows as the boss nears death — the
+   * body trembles/flickers under fire. Applied in render only, never to `position`
+   * (so collision + AI stay stable). `time` in seconds (Date.now()*0.001 by convention).
+   */
+  protected damageShudder(time: number, d = this.damageFraction): [number, number] {
+    if (d < 0.5) return [0, 0];
+    const amp = (d - 0.5) * 2 * 3.5; // up to ~3.5px right before death
+    return [
+      Math.sin(time * 47 + this.displacer.x) * amp,
+      Math.cos(time * 53 + this.displacer.y) * amp,
+    ];
   }
 
   /** Get the rotated shape points at world position */

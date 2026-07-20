@@ -36,6 +36,22 @@ export const HEAT_BORDER_BRIGHTNESS_MAX = 0.5;   // extra border brightness at m
 export const HEAT_BLOOM_BOOST_MAX = 0.5;         // extra bloom intensity at max heat
 export const HEAT_GRID_TURBULENCE_MAX = 60;      // max random grid impulse from heat
 
+// --- Boss Damage Feedback ---
+// Shared, data-driven feedback for any multi-hit boss (Sierpinski tiers 0/1, Mandelbrot,
+// and future bosses via `Enemy.bossFeedback = true`). Non-killing hits get a "subtle bite"
+// (contact spark + tiny grid dimple + a soft, pitch-rising tick); crossing a damage
+// milestone gets a heavier "chunk" (bigger flash + shake + hitstop + deeper sound).
+export const BOSS_HIT_SPARK_COUNT = 5;              // contact-spark motes per non-killing hit
+export const BOSS_HIT_GRID_IMPULSE = 130;           // grid dimple strength per hit
+export const BOSS_HIT_GRID_RADIUS = 90;             // grid dimple radius per hit
+export const BOSS_HIT_SOUND_COOLDOWN_MS = 45;       // min gap between per-hit ticks (rate-limit spam)
+// Damage fractions (0 = pristine → 1 = dead) at which a milestone "chunk" fires.
+export const BOSS_MILESTONE_FRACTIONS = [0.25, 0.5, 0.75];
+export const BOSS_MILESTONE_SHAKE = 6;              // screen shake on a damage milestone
+export const BOSS_MILESTONE_HITSTOP = 30;           // ms hitstop on a damage milestone
+export const BOSS_MILESTONE_SPARK_COUNT = 16;       // spark motes on a milestone chunk
+export const BOSS_MILESTONE_GRID_IMPULSE = 380;     // grid punch on a milestone chunk
+
 // --- Recovery Window ---
 export const RECOVERY_DURATION = 3500;           // ms
 export const RECOVERY_FIRE_RATE_MULT = 1.8;      // fire rate multiplier during recovery

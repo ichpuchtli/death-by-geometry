@@ -15,6 +15,17 @@ export interface CollisionResult {
      *  momentum on contact kills). Death fragments fan forward along it. Undefined → radial. */
     impactAngle?: number;
   }[];
+  /** Non-killing hits on multi-hit bosses (`Enemy.bossFeedback`) — drive damage feedback.
+   *  Optional so callers that build a result by hand (debug kill hooks) can omit it. */
+  bossHits?: {
+    enemy: Enemy;
+    /** Bullet contact point (where the spark should erupt). */
+    position: Vec2;
+    /** Bullet travel direction (rad) — sparks fan off the far side of the impact. */
+    bulletAngle: number;
+    /** Boss HP fraction (hp/maxHp) BEFORE this hit — for milestone-crossing detection. */
+    fracBefore: number;
+  }[];
   playerHit: boolean;
 }
 
@@ -25,6 +36,7 @@ export function checkCollisions(
 ): CollisionResult {
   const result: CollisionResult = {
     killedEnemies: [],
+    bossHits: [],
     playerHit: false,
   };
 
@@ -53,6 +65,10 @@ export function checkCollisions(
 
         // reaction === 'damage' — normal behavior
         b.active = false;
+        const fracBefore = e.maxHp > 1 ? e.hp / e.maxHp : 0;
+        const contactX = b.position.x;
+        const contactY = b.position.y;
+        const travelAngle = Math.atan2(b.velocity.y, b.velocity.x);
         const killed = e.hit();
         if (killed) {
           result.killedEnemies.push({
@@ -61,7 +77,15 @@ export function checkCollisions(
             color: e.color,
             scoreValue: e.scoreValue,
             // Fragments inherit the bullet's momentum — shatter away from the shooter
-            impactAngle: Math.atan2(b.velocity.y, b.velocity.x),
+            impactAngle: travelAngle,
+          });
+        } else if (e.bossFeedback) {
+          // Survived the hit — feed the shared boss damage-feedback layer.
+          result.bossHits!.push({
+            enemy: e,
+            position: new Vec2(contactX, contactY),
+            bulletAngle: travelAngle,
+            fracBefore,
           });
         }
         break;

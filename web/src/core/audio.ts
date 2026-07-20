@@ -154,6 +154,91 @@ export class AudioManager {
     click.stop(now + 0.05);
   }
 
+  /**
+   * Boss "subtle bite" — a soft, short tick played on each non-killing hit to a boss.
+   * `intensity` (0 pristine → 1 near death) climbs the pitch + brightness so a boss
+   * audibly "rings higher" as it takes damage, telegraphing that it's close to breaking.
+   * Deliberately quiet + brief so it layers under the weapon fire without fatigue.
+   */
+  playBossHit(intensity: number): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const t = Math.min(1, Math.max(0, intensity));
+
+    // Bright filtered blip whose pitch rises with damage.
+    const osc = ctx.createOscillator();
+    osc.type = 'triangle';
+    const base = 420 + t * 520; // 420 → 940 Hz
+    osc.frequency.setValueAtTime(base, now);
+    osc.frequency.exponentialRampToValueAtTime(base * 0.55, now + 0.06);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = base;
+    bp.Q.value = 1.4;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.05 + t * 0.05, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    osc.connect(bp);
+    bp.connect(g);
+    g.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.1);
+
+    // Tiny noise transient for a crisp "chip off" edge.
+    const chip = this.makeNoiseSource(0.03);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 2600;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(0.04 + t * 0.03, now);
+    cg.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    chip.connect(hp);
+    hp.connect(cg);
+    cg.connect(this.sfxGain);
+    chip.start(now);
+  }
+
+  /**
+   * Boss damage "chunk" — heavier punctuation when a boss crosses a damage milestone
+   * (¼/½/¾ HP). A short cracked thud + a rising shard so a slab of the boss visibly and
+   * audibly gives way. `intensity` (0→1) deepens/brightens it toward the final break.
+   */
+  playBossHitMilestone(intensity: number): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const t = Math.min(1, Math.max(0, intensity));
+
+    // Low cracked thud — the structural give.
+    const thud = ctx.createOscillator();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(180 - t * 40, now); // deeper as it nears death
+    thud.frequency.exponentialRampToValueAtTime(48, now + 0.22);
+    const sat = this.makeSaturator(2.5);
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(0.32 + t * 0.12, now);
+    tg.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    thud.connect(sat);
+    sat.connect(tg);
+    tg.connect(this.sfxGain);
+    thud.start(now);
+    thud.stop(now + 0.34);
+
+    // Bright shard crack — a rising sliver on top so it reads as fracturing, not just bass.
+    const shard = ctx.createOscillator();
+    shard.type = 'triangle';
+    shard.frequency.setValueAtTime(700 + t * 500, now);
+    shard.frequency.exponentialRampToValueAtTime(1500 + t * 700, now + 0.09);
+    const sg = ctx.createGain();
+    sg.gain.setValueAtTime(0.1, now);
+    sg.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    shard.connect(sg);
+    sg.connect(this.sfxGain);
+    shard.start(now);
+    shard.stop(now + 0.16);
+  }
+
   /** Play the game over transition sound */
   playGameOver(): void {
     if (!this._initialized || !this.ctx || !this.sfxGain) return;

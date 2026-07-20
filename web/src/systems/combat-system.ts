@@ -45,6 +45,15 @@ import {
   MINIBOSS_HITSTOP_DEATH,
   DIFFICULTY_PHASES,
   SHATTER_IMPACT_SPEED,
+  BOSS_HIT_SPARK_COUNT,
+  BOSS_HIT_GRID_IMPULSE,
+  BOSS_HIT_GRID_RADIUS,
+  BOSS_HIT_SOUND_COOLDOWN_MS,
+  BOSS_MILESTONE_FRACTIONS,
+  BOSS_MILESTONE_SHAKE,
+  BOSS_MILESTONE_HITSTOP,
+  BOSS_MILESTONE_SPARK_COUNT,
+  BOSS_MILESTONE_GRID_IMPULSE,
 } from '../config';
 
 interface KillEffect {
@@ -103,6 +112,7 @@ export class CombatSystem {
 
   private heat = 0;
   private timeSinceLastKill = 0;
+  private bossHitSoundCooldown = 0; // ms — rate-limits the per-hit "tick" so rapid fire doesn't spam it
 
   constructor(mobile: boolean, deps: CombatSystemDeps) {
     this.mobile = mobile;
@@ -118,6 +128,12 @@ export class CombatSystem {
   processKills(result: CollisionResult): void {
     let frameKillCount = 0;
     let maxHitstop = 0;
+
+    // Boss damage feedback fires first: a boss killed this frame should not also emit a
+    // lingering "damage" tick, but survivors get the subtle bite + milestone chunks.
+    if (result.bossHits && result.bossHits.length > 0) {
+      maxHitstop = Math.max(maxHitstop, this.processBossHits(result.bossHits));
+    }
 
     for (const kill of result.killedEnemies) {
       this.deps.player.score += kill.scoreValue;
@@ -335,8 +351,67 @@ export class CombatSystem {
     }
   }
 
+  /**
+   * Shared Boss Damage Feedback — runs for every non-killing hit on a `bossFeedback` enemy.
+   * "Subtle bite" per hit: a contact spark at the impact point, a tiny grid dimple, and a
+   * soft pitch-rising tick (rate-limited). Crossing a damage milestone (¼/½/¾) escalates to
+   * a heavier "chunk": bigger spark, grid punch, screen shake, hitstop and a deeper sound.
+   * The boss's own body renders the continuous damage state (heat tint, cracks, shudder),
+   * so nothing here needs per-boss wiring. Returns the hitstop to fold into the frame max.
+   */
+  private processBossHits(hits: NonNullable<CollisionResult['bossHits']>): number {
+    let hitstop = 0;
+    for (const h of hits) {
+      const enemy = h.enemy;
+      const maxHp = enemy.maxHp || 1;
+      const fracAfter = enemy.hp / maxHp;
+      const dmg = 1 - fracAfter; // 0 → 1 damage progress
+      const spark = enemy.color;
+      const hue = rgbToHue(spark[0], spark[1], spark[2]);
+
+      // Milestone crossing: any threshold now passed that wasn't before this hit.
+      let milestone = false;
+      for (const th of BOSS_MILESTONE_FRACTIONS) {
+        if ((1 - h.fracBefore) < th && dmg >= th) { milestone = true; break; }
+      }
+
+      // Contact spark — velocity-stretched motes fanning off the far side of the hit.
+      const count = milestone ? BOSS_MILESTONE_SPARK_COUNT : BOSS_HIT_SPARK_COUNT;
+      this.deps.field.spawnBurst(
+        h.position.x, h.position.y, h.bulletAngle,
+        milestone ? 2.4 : 1.4, this.mobile ? Math.ceil(count * 0.6) : count,
+        milestone ? 5.5 : 3.6, hue, milestone ? 0.7 : 0.45,
+      );
+
+      // Grid reaction: a dimple per hit, a punch on a milestone.
+      this.deps.grid.applyImpulse(
+        h.position.x, h.position.y,
+        milestone ? BOSS_MILESTONE_GRID_IMPULSE : BOSS_HIT_GRID_IMPULSE,
+        milestone ? 200 : BOSS_HIT_GRID_RADIUS,
+      );
+
+      if (milestone) {
+        // Heavier "chunk" — a chunk of the boss just gave way.
+        this.deps.camera.shake(BOSS_MILESTONE_SHAKE);
+        this.deps.audio.playBossHitMilestone(dmg);
+        this.deps.explosions.spawn(
+          h.position.x, h.position.y, [1, 0.85, 0.5],
+          this.mobile ? 8 : 16, EXPLOSION_DURATION_DEFAULT * 0.6, 1, h.bulletAngle,
+        );
+        hitstop = Math.max(hitstop, BOSS_MILESTONE_HITSTOP);
+        this.bossHitSoundCooldown = BOSS_HIT_SOUND_COOLDOWN_MS; // milestone counts as the tick
+      } else if (this.bossHitSoundCooldown <= 0) {
+        // Soft pitch-rising tick — pitch climbs with damage so you HEAR it nearing death.
+        this.deps.audio.playBossHit(dmg);
+        this.bossHitSoundCooldown = BOSS_HIT_SOUND_COOLDOWN_MS;
+      }
+    }
+    return hitstop;
+  }
+
   /** Update timers: kill effects, heat decay/survival, and process ready staggered spawns. */
   update(dt: number, gameTime: number): void {
+    if (this.bossHitSoundCooldown > 0) this.bossHitSoundCooldown -= dt;
     // Kill effects
     const dtSec = dt / 1000;
     for (const ke of this.killEffects) {
@@ -467,6 +542,7 @@ export class CombatSystem {
     this.hitstopTimer = 0;
     this.heat = 0;
     this.timeSinceLastKill = 0;
+    this.bossHitSoundCooldown = 0;
   }
 
   /** Consume current hitstop and reset it. Game applies the value to its own timer. */
