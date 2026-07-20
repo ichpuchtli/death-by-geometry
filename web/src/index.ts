@@ -8,6 +8,7 @@ import type { GlassLab as GlassLabType } from './glass-lab';
 import type { LiquidGlassLab as LiquidGlassLabType } from './liquid-glass-lab';
 import type { PlayerDesignLab as PlayerDesignLabType } from './player-design-lab';
 import type { HudLab as HudLabType } from './hud-lab';
+import type { HudJuiceLab as HudJuiceLabType } from './hud-juice-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -154,6 +155,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(hudLoop);
     }
     requestAnimationFrame(hudLoop);
+  });
+} else if (bootParams.has('juice')) {
+  // HUD Juice Lab — aliveness/gamification pass on the chosen HUD (`?juice=1`).
+  import('./hud-juice-lab').then(({ HudJuiceLab }) => {
+    const lab = new HudJuiceLab(hudCanvas);
+    (window as unknown as { hudJuiceLab: HudJuiceLabType }).hudJuiceLab = lab;
+    let last = performance.now();
+    function juiceLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(juiceLoop);
+    }
+    requestAnimationFrame(juiceLoop);
   });
 } else {
   bootGame();

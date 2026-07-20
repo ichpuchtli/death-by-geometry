@@ -1,0 +1,73 @@
+name: "HUD Juice Lab — aliveness/gamification sandbox boots and animates"
+tags: [lab, hud, juice, ui, visual]
+steps:
+  - action: launch
+    url: "/?juice=1"
+    waitFor: "canvas#hud"
+
+  - action: wait
+    ms: 500
+
+  - action: evalCheck
+    description: "Lab booted with juice layers and auto-demo on"
+    script: |
+      const l = window.hudJuiceLab;
+      if (!l) return false;
+      if (!l.layers || l.layers.combo !== true) return false;
+      return l.autoDemo === true;
+
+  # Auto-demo should be driving score + combo upward on its own.
+  - action: wait
+    ms: 1400
+  - action: evalCheck
+    description: "Auto-demo raised the score (HUD is alive on open)"
+    script: |
+      return window.hudJuiceLab['targetScore'] > 0;
+  - action: screenshot
+    name: "96-juice-autodemo"
+
+  # Manual kills should build a combo multiplier.
+  - action: evalCheck
+    description: "Rapid kills raise the combo multiplier above 1"
+    script: |
+      const l = window.hudJuiceLab;
+      for (let i = 0; i < 12; i++) l.kill();
+      return l['mult'] > 1;
+  - action: screenshot
+    name: "96-juice-combo"
+
+  # Damage breaks the chain and flashes the life vignette.
+  - action: evalCheck
+    description: "Taking damage drops a life and resets the multiplier"
+    script: |
+      const l = window.hudJuiceLab;
+      const before = l['lives'];
+      l.damage();
+      return l['lives'] === before - 1 && l['mult'] === 1;
+  - action: screenshot
+    name: "96-juice-damage"
+
+  # Dark matter: charge to ready, then engage time dilation.
+  - action: evalCheck
+    description: "Charge above activation then engage — active overlay on"
+    script: |
+      const l = window.hudJuiceLab;
+      for (let i = 0; i < 12; i++) window.dispatchEvent(new KeyboardEvent('keydown', {key: ']'}));
+      window.dispatchEvent(new KeyboardEvent('keydown', {key: ' '}));
+      return l['charge'] >= 10 && l['active'] === true;
+  - action: wait
+    ms: 200
+  - action: screenshot
+    name: "96-juice-timedilation"
+
+  # Toggle a layer off (combo) to prove layers are independent.
+  - action: keyPress
+    key: "3"
+    duration: 60
+  - action: evalCheck
+    description: "Digit 3 toggles the combo layer off"
+    script: |
+      return window.hudJuiceLab.layers.combo === false;
+
+  - action: assertNoErrors
+    description: "Events, layer toggles, and animation run without JS errors"
