@@ -7,6 +7,7 @@ import type { TaxonomyLab as TaxonomyLabType } from './taxonomy-lab';
 import type { GlassLab as GlassLabType } from './glass-lab';
 import type { LiquidGlassLab as LiquidGlassLabType } from './liquid-glass-lab';
 import type { PlayerDesignLab as PlayerDesignLabType } from './player-design-lab';
+import type { HudLab as HudLabType } from './hud-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -137,6 +138,22 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(playerLoop);
     }
     requestAnimationFrame(playerLoop);
+  });
+} else if (bootParams.has('hud')) {
+  // HUD Lab — full-screen chooser for a coherent in-game HUD (`?hud=1`).
+  // Draws on the HUD canvas (2D) — its own faux background, so no WebGL is involved.
+  import('./hud-lab').then(({ HudLab }) => {
+    const lab = new HudLab(hudCanvas);
+    (window as unknown as { hudLab: HudLabType }).hudLab = lab;
+    let last = performance.now();
+    function hudLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(hudLoop);
+    }
+    requestAnimationFrame(hudLoop);
   });
 } else {
   bootGame();

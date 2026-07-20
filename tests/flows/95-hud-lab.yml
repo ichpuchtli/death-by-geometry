@@ -1,0 +1,84 @@
+name: "HUD Lab — coherent-HUD candidate chooser boots and renders"
+tags: [lab, hud, ui, visual]
+steps:
+  - action: launch
+    url: "/?hud=1"
+    waitFor: "canvas#hud"
+
+  - action: wait
+    ms: 400
+
+  - action: evalCheck
+    description: "Lab booted with candidate layouts and default state"
+    script: |
+      const l = window.hudLab;
+      if (!l) return false;
+      if (typeof l.focus !== 'number') return false;
+      const s = l.state;
+      return s && s.capacity === 100 && s.minActivation === 10 && s.charge > 0;
+
+  - action: screenshot
+    name: "95-hud-lab-candidate1"
+
+  # Cycle to candidate 2 (Bottom Cockpit)
+  - action: keyPress
+    key: "2"
+    duration: 60
+  - action: wait
+    ms: 200
+  - action: evalCheck
+    description: "Digit 2 selects candidate index 1"
+    script: |
+      return window.hudLab.focus === 1;
+  - action: screenshot
+    name: "95-hud-lab-candidate2"
+
+  - action: keyPress
+    key: "3"
+    duration: 60
+  - action: wait
+    ms: 200
+  - action: screenshot
+    name: "95-hud-lab-candidate3"
+
+  - action: keyPress
+    key: "4"
+    duration: 60
+  - action: wait
+    ms: 200
+  - action: screenshot
+    name: "95-hud-lab-candidate4"
+
+  # Mobile chrome + charge below activation: TIME button must gate off.
+  - action: keyPress
+    key: "t"
+    duration: 60
+  - action: keyPress
+    key: "1"
+    duration: 60
+  - action: wait
+    ms: 150
+  - action: evalCheck
+    description: "Touch mode on; drain charge below activation minimum"
+    script: |
+      const l = window.hudLab;
+      for (let i = 0; i < 20; i++) { const e = new KeyboardEvent('keydown', {key: '['}); window.dispatchEvent(e); }
+      return l.state.touchMode === true && l.state.charge < l.state.minActivation;
+  - action: screenshot
+    name: "95-hud-lab-mobile-nocharge"
+
+  # Refill above activation + engage time dilation
+  - action: evalCheck
+    description: "Refill charge above activation and harvest"
+    script: |
+      const l = window.hudLab;
+      for (let i = 0; i < 12; i++) window.dispatchEvent(new KeyboardEvent('keydown', {key: ']'}));
+      window.dispatchEvent(new KeyboardEvent('keydown', {key: 'h'}));
+      return l.state.charge >= l.state.minActivation && l.state.harvesting === true;
+  - action: wait
+    ms: 200
+  - action: screenshot
+    name: "95-hud-lab-mobile-ready"
+
+  - action: assertNoErrors
+    description: "All candidate draws + state toggles run without JS errors"
