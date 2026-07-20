@@ -1,6 +1,17 @@
-import { DARK_MATTER_CORE_PULSE_MS, HUD_FONT, HUD_COLOR, MedalDef, PHASE_DISPLAY_NAMES, TIME_BUTTON_BOTTOM, TIME_BUTTON_RADIUS, TIME_BUTTON_RIGHT, WEAPON_STAGES } from '../config';
+import { DARK_MATTER_MIN_ACTIVATION, HUD_ACCENT, HUD_ACCENT_DIM, HUD_MILESTONE_INTERVAL, MedalDef, PHASE_DISPLAY_NAMES, TIME_BUTTON_BOTTOM, TIME_BUTTON_RADIUS, TIME_BUTTON_RIGHT, WEAPON_STAGES } from '../config';
 import { RunStats } from '../core/run-stats';
+import type { Camera } from '../core/camera';
 import type { TimeDilationSnapshot } from '../systems/time-dilation-system';
+
+// Dark-matter dial palette (shared with the Diegetic Ring HUD).
+const DM = '#9a7cff';
+const DM_HOT = '#d9faff';
+const DM_DIM = '#5a4b8a';
+const DM_WARN = '#ff5a6e';
+
+interface Floater { x: number; y: number; vx: number; vy: number; life: number; max: number; text: string; size: number; }
+interface Frag { x: number; y: number; vx: number; vy: number; rot: number; vr: number; life: number; max: number; }
+interface Mote { x: number; y: number; life: number; max: number; }
 
 export class HUD {
   private ctx: CanvasRenderingContext2D;
@@ -9,6 +20,28 @@ export class HUD {
   private fpsFrames = 0;
   private fpsTime = 0;
   private fpsDisplay = 0;
+
+  // --- juice state (Diegetic Ring HUD) ---
+  private juiceNow = 0;          // last performance.now() for internal dt
+  private displayScore = 0;      // eased count-up value
+  private lastScore = 0;
+  private scorePunch = 0;
+  private lastLives = -1;
+  private maxLives = 0;
+  private pipPop: number[] = [];
+  private lifeVignette = 0;
+  private lowLifeT = 0;
+  private nextMilestone = HUD_MILESTONE_INTERVAL;
+  private milestoneText = '';
+  private milestoneT = 0;
+  private floaters: Floater[] = [];
+  private frags: Frag[] = [];
+  // dark-matter juice
+  private dmWasUsable = false;
+  private dmWasActive = false;
+  private dmReadyFlash = 0;
+  private dmEngageBurst = 0;
+  private dmMotes: Mote[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -19,6 +52,105 @@ export class HUD {
 
   setTouchMode(touch: boolean): void {
     this.touchMode = touch;
+  }
+
+  /** Reset per-run juice state (called on game start). */
+  resetJuice(): void {
+    this.displayScore = 0; this.lastScore = 0; this.scorePunch = 0;
+    this.lastLives = -1; this.maxLives = 0; this.pipPop = [];
+    this.lifeVignette = 0; this.nextMilestone = HUD_MILESTONE_INTERVAL;
+    this.milestoneText = ''; this.milestoneT = 0;
+    this.floaters.length = 0; this.frags.length = 0; this.dmMotes.length = 0;
+    this.dmWasUsable = false; this.dmWasActive = false;
+    this.dmReadyFlash = 0; this.dmEngageBurst = 0;
+  }
+
+  /** Boss defeat → a big floating "+N" at the boss's world position (projected to screen). */
+  spawnBossHit(worldX: number, worldY: number, camera: Camera, scoreValue: number): void {
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    const f = w / camera.viewportWidth; // equals zoom; corrects dpr/resScale/zoom
+    const sx = w / 2 + (worldX - camera.renderX) * f;
+    const sy = h / 2 + (worldY - camera.renderY) * f;
+    this.floaters.push({ x: sx, y: sy, vx: (Math.random() - 0.5) * 0.03, vy: -0.06, life: 0, max: 1100, text: `+${scoreValue}`, size: 30 });
+  }
+
+  /** Player took a hit → red vignette flash (pip shatter is driven by the lives diff). */
+  onPlayerHit(): void {
+    this.lifeVignette = 1;
+  }
+
+  // --- juice helpers ---
+
+  private chip(x: number, y: number, w: number, h: number, r: number, stroke: string): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(6, 10, 14, 0.62)'; ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = stroke; ctx.stroke();
+  }
+
+  private chevron(cx: number, cy: number, size: number, filled: boolean, color: string, glow: number): void {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.beginPath();
+    ctx.moveTo(0, -size);
+    ctx.lineTo(size * 0.8, size * 0.7);
+    ctx.lineTo(0, size * 0.35);
+    ctx.lineTo(-size * 0.8, size * 0.7);
+    ctx.closePath();
+    if (filled) { ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = glow; ctx.fill(); }
+    else { ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(150,170,180,0.35)'; ctx.stroke(); }
+    ctx.restore();
+  }
+
+  private pipScreenPos(idx: number): { x: number; y: number } {
+    const w = this.canvas.clientWidth;
+    const cw = 320;
+    const rightX = (w + cw) / 2 - 22;
+    return { x: rightX - idx * (6 * 1.9), y: 31 };
+  }
+
+  private spawnPipShatter(idx: number): void {
+    const p = this.pipScreenPos(idx);
+    for (let i = 0; i < 9; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 0.08 + Math.random() * 0.14;
+      this.frags.push({ x: p.x, y: p.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.05, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.02, life: 0, max: 600 });
+    }
+  }
+
+  /** Advance all time-based juice; returns the internal dt (ms). */
+  private stepJuice(): void {
+    const now = performance.now();
+    let dt = this.juiceNow > 0 ? now - this.juiceNow : 16;
+    this.juiceNow = now;
+    dt = Math.min(dt, 50);
+    const s = dt / 1000;
+    // score count-up
+    const diff = this.lastScore - this.displayScore;
+    if (Math.abs(diff) < 1) this.displayScore = this.lastScore;
+    else this.displayScore += diff * Math.min(1, s * 8) + Math.sign(diff);
+    // decays
+    this.scorePunch = Math.max(0, this.scorePunch - s * 4);
+    this.lifeVignette = Math.max(0, this.lifeVignette - s * 2);
+    this.milestoneT = Math.max(0, this.milestoneT - s * 0.7);
+    this.dmReadyFlash = Math.max(0, this.dmReadyFlash - s * 2);
+    this.dmEngageBurst = Math.max(0, this.dmEngageBurst - s * 1.6);
+    this.lowLifeT += dt;
+    for (let i = 0; i < this.pipPop.length; i++) if (this.pipPop[i] < 1) this.pipPop[i] = Math.min(1, this.pipPop[i] + s * 4);
+    // particles
+    for (const f of this.floaters) { f.life += dt; f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 0.00004 * dt; }
+    this.floaters = this.floaters.filter(f => f.life < f.max);
+    for (const fr of this.frags) { fr.life += dt; fr.x += fr.vx * dt; fr.y += fr.vy * dt; fr.vy += 0.0003 * dt; fr.rot += fr.vr * dt; }
+    this.frags = this.frags.filter(fr => fr.life < fr.max);
+    for (const m of this.dmMotes) m.life += dt;
+    this.dmMotes = this.dmMotes.filter(m => m.life < m.max);
   }
 
   resize(): void {
@@ -58,44 +190,153 @@ export class HUD {
 
   drawPlaying(score: number, lives: number, muted?: boolean, enemyCount?: number, autoFire?: boolean): void {
     this.clear();
-    this.ctx.textBaseline = 'top';
+    const ctx = this.ctx;
+    const w = this.canvas.clientWidth;
+    const h = this.canvas.clientHeight;
 
-    // Score top-left with glow
-    this.ctx.textAlign = 'left';
-    this.drawGlowText(`SCORE: ${score}`, 20, 20, HUD_FONT, HUD_COLOR, '#0a550a', 8);
+    // --- detect changes (drives count-up, punch, milestones, life juice) ---
+    if (this.lastLives < 0) { this.lastLives = lives; this.maxLives = lives; }
+    this.maxLives = Math.max(this.maxLives, lives);
+    while (this.pipPop.length < this.maxLives) this.pipPop.push(1);
+    if (score > this.lastScore) {
+      this.scorePunch = Math.min(1, this.scorePunch + 0.5);
+      while (score >= this.nextMilestone) {
+        this.milestoneText = `${this.nextMilestone.toLocaleString()}`;
+        this.milestoneT = 1;
+        this.nextMilestone += HUD_MILESTONE_INTERVAL;
+      }
+    }
+    this.lastScore = score;
+    if (lives < this.lastLives) { for (let i = lives; i < this.lastLives; i++) this.spawnPipShatter(i); }
+    else if (lives > this.lastLives) { for (let i = this.lastLives; i < lives; i++) this.pipPop[i] = 0; }
+    this.lastLives = lives;
 
-    // Lives top-right with glow
-    this.ctx.textAlign = 'right';
-    this.drawGlowText(`LIVES: ${lives}`, this.canvas.clientWidth - 20, 20, HUD_FONT, HUD_COLOR, '#0a550a', 8);
+    this.stepJuice();
 
-    // FPS + enemy count bottom-left
-    this.ctx.textAlign = 'left';
-    this.ctx.textBaseline = 'bottom';
-    const fpsColor = this.fpsDisplay >= 55 ? '#20ff20' : this.fpsDisplay >= 30 ? '#ffff20' : '#ff3030';
+    // --- score + lives cluster: Diegetic Ring top-center chip ---
+    const cw = 320;
+    const x0 = (w - cw) / 2;
+    const breathe = 0.5 + 0.5 * Math.sin(this.juiceNow / 900);
+    this.chip(x0, 14, cw, 34, 8, `rgba(120,200,190,${0.22 + breathe * 0.1})`);
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const scoreStr = Math.floor(this.displayScore).toString().padStart(6, '0');
+    const sx = x0 + 18, sy = 31;
+    ctx.save();
+    if (this.scorePunch > 0) { const sc = 1 + this.scorePunch * 0.22; ctx.translate(sx, sy); ctx.scale(sc, sc); ctx.translate(-sx, -sy); }
+    this.drawGlowText(scoreStr, sx, sy, `bold 18px monospace`, HUD_ACCENT, HUD_ACCENT, 8 + this.scorePunch * 10);
+    ctx.restore();
+
+    // lives pips (right-aligned in chip) with breathing + low-life heartbeat + gain pop
+    const lowLife = lives <= 1;
+    const lifePulse = lowLife ? 0.5 + 0.5 * Math.sin(this.lowLifeT / 180) : 0;
+    for (let i = 0; i < this.maxLives; i++) {
+      const p = this.pipScreenPos(i);
+      const filled = i < lives;
+      const pop = this.pipPop[i] ?? 1;
+      let color = HUD_ACCENT, glow = filled ? 6 + Math.sin(this.juiceNow / 700 + i) * 2 : 0;
+      if (filled && lowLife) { const c = Math.round(90 + lifePulse * 60); color = `rgb(255,${c},${c})`; glow = 6 + lifePulse * 10; }
+      ctx.save();
+      if (pop < 1) { const sc = pop < 0.5 ? pop * 2 * 1.4 : 1.4 + (1 - 1.4) * ((pop - 0.5) * 2); ctx.translate(p.x, p.y); ctx.scale(sc, sc); ctx.translate(-p.x, -p.y); }
+      this.chevron(p.x, p.y, 6, filled, color, glow);
+      if (pop < 1) { ctx.globalAlpha = 1 - pop; ctx.strokeStyle = HUD_ACCENT; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(p.x, p.y, 4 + pop * 14, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore();
+    }
+
+    // --- pip shatter fragments ---
+    for (const fr of this.frags) {
+      const t = fr.life / fr.max;
+      ctx.save();
+      ctx.globalAlpha = 1 - t;
+      ctx.translate(fr.x, fr.y); ctx.rotate(fr.rot);
+      ctx.strokeStyle = HUD_ACCENT; ctx.lineWidth = 1.5; ctx.shadowColor = HUD_ACCENT; ctx.shadowBlur = 4;
+      ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(3, 0); ctx.stroke();
+      ctx.restore();
+    }
+
+    // --- boss floating "+N" ---
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const f of this.floaters) {
+      const t = f.life / f.max;
+      ctx.save();
+      ctx.globalAlpha = t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85;
+      this.drawGlowText(f.text, f.x, f.y, `bold ${f.size}px monospace`, '#ffe8a8', '#ffb020', 12);
+      ctx.restore();
+    }
+
+    // --- milestone celebration ---
+    if (this.milestoneT > 0.01) {
+      const t = 1 - this.milestoneT;
+      const my = h * 0.28;
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      // a small HUD-local shake for punch
+      ctx.translate((Math.random() - 0.5) * this.milestoneT * 5, (Math.random() - 0.5) * this.milestoneT * 5);
+      ctx.strokeStyle = HUD_ACCENT; ctx.lineWidth = 2; ctx.globalAlpha = this.milestoneT * 0.6;
+      ctx.beginPath(); ctx.arc(w / 2, my, 30 + t * 160, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = this.milestoneT;
+      this.drawGlowText(this.milestoneText, w / 2, my, `bold 40px monospace`, '#ffffff', HUD_ACCENT, 20);
+      ctx.restore();
+    }
+
+    // --- FPS + enemy count (debug, bottom-left) ---
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    const fpsColor = this.fpsDisplay >= 55 ? HUD_ACCENT : this.fpsDisplay >= 30 ? '#ffff20' : '#ff3030';
     let debugText = `FPS: ${this.fpsDisplay}`;
     if (enemyCount !== undefined) debugText += `  ENEMIES: ${enemyCount}`;
-    this.drawGlowText(debugText, 20, this.canvas.clientHeight - 10, '14px monospace', fpsColor, fpsColor, 5);
-    this.ctx.textBaseline = 'top';
+    this.drawGlowText(debugText, 20, h - 10, '14px monospace', fpsColor, fpsColor, 5);
 
-    // Status indicators (top-center)
-    this.ctx.textAlign = 'center';
+    // --- status indicators (bottom-center, out of the play space) ---
+    ctx.textAlign = 'center';
     const indicators: string[] = [];
     if (muted) indicators.push('MUTED [M]');
     if (autoFire) indicators.push('AUTO-FIRE [F]');
     if (indicators.length > 0) {
-      const text = indicators.join('  ');
-      const color = muted ? '#aa3030' : '#30aa30';
-      this.drawGlowText(text, this.canvas.clientWidth / 2, 20, '14px monospace', color, color, 5);
+      this.drawGlowText(indicators.join('  '), w / 2, h - 10, '13px monospace', muted ? '#aa3030' : HUD_ACCENT_DIM, muted ? '#aa3030' : HUD_ACCENT_DIM, 5);
+    }
+    ctx.textBaseline = 'top';
+
+    // --- damage vignette (over everything in the playing pass) ---
+    if (this.lifeVignette > 0.01) {
+      const vig = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.7);
+      vig.addColorStop(0, 'rgba(255,40,60,0)');
+      vig.addColorStop(1, `rgba(255,20,40,${0.42 * this.lifeVignette})`);
+      ctx.save(); ctx.fillStyle = vig; ctx.fillRect(0, 0, w, h); ctx.restore();
     }
   }
 
-  /** Dark Matter meter + unscaled full-screen time-dilation treatment. */
+  /**
+   * Dark-matter dial (Diegetic Ring) + unscaled full-screen time-dilation treatment.
+   * Desktop: a compact bottom-right charge dial. Mobile: the TIME hold button, gated so it
+   * only appears once charge is (nearly) spendable. Ready ping / engage warp / harvest stream
+   * are self-driven by diffing the snapshot each frame.
+   */
   drawTimeDilation(state: TimeDilationSnapshot, buttonPressed = false): void {
     const ctx = this.ctx;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
-    const strength = Math.max(0, Math.min(1, (1 - state.timeScale) / 0.72));
+    const frac = Math.max(0, Math.min(1, state.charge / state.capacity));
+    const usable = state.charge >= DARK_MATTER_MIN_ACTIVATION;
+    const pulse = 0.5 + 0.5 * Math.sin(this.juiceNow / 320);
+    const flash = state.insufficientFlash > 0 && Math.sin(Date.now() * 0.035) > 0;
 
+    // ready ping on crossing the activation threshold; engage burst on activation
+    if (usable && !this.dmWasUsable) this.dmReadyFlash = 1;
+    this.dmWasUsable = usable;
+    if (state.active && !this.dmWasActive) this.dmEngageBurst = 1;
+    this.dmWasActive = state.active;
+    // harvest motes streaming in
+    if (state.harvesting && Math.random() < 0.4) {
+      const cx = this.touchMode ? w - TIME_BUTTON_RIGHT : w - 60;
+      const cy = this.touchMode ? h - TIME_BUTTON_BOTTOM : h - 60;
+      const a = Math.random() * Math.PI * 2, r = 70 + Math.random() * 60;
+      this.dmMotes.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, life: 0, max: 500 });
+    }
+
+    // --- full-screen time-dilation treatment (vignette + warp streaks) ---
+    const strength = Math.max(0, Math.min(1, (1 - state.timeScale) / 0.72));
     if (strength > 0.001) {
       const vignette = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.2, w / 2, h / 2, Math.max(w, h) * 0.68);
       vignette.addColorStop(0, 'rgba(18, 6, 34, 0)');
@@ -104,63 +345,82 @@ export class HUD {
       ctx.save();
       ctx.fillStyle = vignette;
       ctx.fillRect(0, 0, w, h);
-      ctx.strokeStyle = `rgba(110, 70, 255, ${0.28 * strength})`;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(2, 2, w - 4, h - 4);
+      // radiating warp streaks
+      ctx.globalCompositeOperation = 'lighter';
+      const n = 18;
+      for (let i = 0; i < n; i++) {
+        const ang = (i / n) * Math.PI * 2 + this.juiceNow / 4000;
+        const r0 = Math.min(w, h) * 0.3, r1 = Math.min(w, h) * 0.46;
+        ctx.strokeStyle = `rgba(150,110,255,${0.05 * strength})`; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(w / 2 + Math.cos(ang) * r0, h / 2 + Math.sin(ang) * r0);
+        ctx.lineTo(w / 2 + Math.cos(ang) * r1, h / 2 + Math.sin(ang) * r1);
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
-    const barW = Math.min(260, Math.max(170, w * 0.24));
-    const barH = 10;
-    const x = (w - barW) / 2;
-    const y = h - 39;
-    const frac = Math.max(0, Math.min(1, state.charge / state.capacity));
-    const pulsePeriod = state.coreHarvesting ? DARK_MATTER_CORE_PULSE_MS : DARK_MATTER_CORE_PULSE_MS * 2;
-    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / pulsePeriod * Math.PI * 2);
-    const flash = state.insufficientFlash > 0 && Math.sin(Date.now() * 0.035) > 0;
+    const color = state.active ? DM_HOT : state.harvesting ? '#a8f4ff' : usable ? DM : DM_DIM;
+    let alpha = 0.14;
+    if (state.active) alpha = 1; else if (state.harvesting) alpha = 0.95; else if (usable) alpha = 0.85; else if (frac > 0) alpha = 0.42;
+
+    const mobile = this.touchMode;
+    const dx = mobile ? w - TIME_BUTTON_RIGHT : w - 60;
+    const dy = mobile ? h - TIME_BUTTON_BOTTOM : h - 60;
+    const r = mobile ? TIME_BUTTON_RADIUS : 30;
+
+    // harvest motes (draw under the dial)
+    for (const m of this.dmMotes) {
+      const t = m.life / m.max;
+      const mx = m.x + (dx - m.x) * t, my = m.y + (dy - m.y) * t;
+      ctx.save(); ctx.globalAlpha = (1 - t) * 0.8; ctx.fillStyle = '#a8f4ff'; ctx.shadowColor = '#a8f4ff'; ctx.shadowBlur = 5;
+      ctx.beginPath(); ctx.arc(mx, my, 1.6, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+
+    // mobile: gate the whole button below activation (fade in as charge approaches ready)
+    if (mobile && !state.active && !usable) {
+      alpha = frac > 0.4 ? (frac - 0.4) / 0.6 * 0.5 : 0;
+      if (alpha <= 0.01) return;
+    }
 
     ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    const label = this.touchMode ? 'DARK MATTER  HOLD TIME' : 'DARK MATTER  [SPACE]';
-    const labelColor = flash ? '#ff506e' : state.harvesting ? '#a8f4ff' : '#9278d8';
-    this.drawGlowText(label, w / 2, y - 5, 'bold 12px monospace', labelColor, labelColor, state.harvesting ? 10 : 5);
-    ctx.fillStyle = 'rgba(4, 1, 12, 0.88)';
-    ctx.fillRect(x - 2, y - 2, barW + 4, barH + 4);
-    ctx.strokeStyle = flash ? '#ff506e' : 'rgba(126, 90, 220, 0.75)';
-    ctx.lineWidth = flash ? 2 : 1;
-    ctx.strokeRect(x - 2, y - 2, barW + 4, barH + 4);
-
-    if (frac > 0) {
-      const fillW = barW * frac;
-      const grad = ctx.createLinearGradient(x, y, x + barW, y);
-      grad.addColorStop(0, '#5020a8');
-      grad.addColorStop(0.42, '#35ccea');
-      grad.addColorStop(0.5, state.harvesting ? `rgba(255,255,255,${0.75 + pulse * 0.25})` : '#d9faff');
-      grad.addColorStop(0.58, '#35ccea');
-      grad.addColorStop(1, '#5020a8');
-      ctx.fillStyle = grad;
-      ctx.shadowColor = state.coreHarvesting ? '#ffffff' : '#6b35ff';
-      ctx.shadowBlur = state.harvesting ? 9 + pulse * 7 : 5;
-      // Centered fill makes depletion visibly eat inward from both ends.
-      ctx.fillRect(w / 2 - fillW / 2, y, fillW, barH);
-      ctx.shadowBlur = 0;
-    }
-
-    if (this.touchMode) {
-      const bx = w - TIME_BUTTON_RIGHT;
-      const by = h - TIME_BUTTON_BOTTOM;
-      ctx.beginPath();
-      ctx.arc(bx, by, TIME_BUTTON_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = buttonPressed ? 'rgba(130, 75, 235, 0.7)' : state.active ? 'rgba(105, 55, 210, 0.58)' : 'rgba(14, 5, 32, 0.58)';
+    ctx.globalAlpha = alpha;
+    if (mobile) {
+      // filled hold button
+      ctx.beginPath(); ctx.arc(dx, dy, r, 0, Math.PI * 2);
+      ctx.fillStyle = buttonPressed ? 'rgba(150,95,245,0.72)' : state.active ? 'rgba(120,70,225,0.55)' : 'rgba(40,24,70,0.5)';
       ctx.fill();
-      ctx.strokeStyle = state.active ? '#d8c5ff' : '#7954bd';
-      ctx.lineWidth = buttonPressed || state.active ? 3 : 2;
-      ctx.stroke();
-      ctx.textBaseline = 'middle';
-      this.drawGlowText('TIME', bx, by, 'bold 11px monospace', '#d8c5ff', '#7040cc', buttonPressed || state.active ? 12 : 5);
+    } else {
+      // desktop dial track
+      ctx.beginPath(); ctx.arc(dx, dy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 5; ctx.stroke();
     }
+    // charge arc
+    ctx.beginPath(); ctx.arc(dx, dy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
+    ctx.strokeStyle = flash ? DM_WARN : color; ctx.lineWidth = mobile ? 4 : 5;
+    ctx.shadowColor = ctx.strokeStyle as string; ctx.shadowBlur = state.active || state.harvesting ? 8 + pulse * 6 : 2; ctx.stroke(); ctx.shadowBlur = 0;
+    // activation tick
+    const a = -Math.PI / 2 + Math.PI * 2 * (DARK_MATTER_MIN_ACTIVATION / state.capacity);
+    ctx.strokeStyle = flash ? DM_WARN : usable ? 'rgba(120,200,190,0.28)' : DM_WARN; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(dx + Math.cos(a) * (r - 6), dy + Math.sin(a) * (r - 6)); ctx.lineTo(dx + Math.cos(a) * (r + 6), dy + Math.sin(a) * (r + 6)); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    this.drawGlowText(state.active ? 'TIME' : mobile ? 'TIME' : 'DM', dx, dy, `bold ${mobile ? 11 : 10}px monospace`, color, color, usable ? 6 : 0);
+    if (!mobile) { ctx.globalAlpha = alpha * 0.8; this.drawGlowText('[SPACE]', dx, dy + r + 12, '8px monospace', DM_DIM, DM_DIM, 0); }
     ctx.restore();
+
+    // ready ping
+    if (this.dmReadyFlash > 0.01) {
+      ctx.save(); ctx.globalAlpha = this.dmReadyFlash; ctx.strokeStyle = DM; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(dx, dy, r + (1 - this.dmReadyFlash) * 30, 0, Math.PI * 2); ctx.stroke();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      this.drawGlowText('READY', dx, dy - r - 12, 'bold 10px monospace', DM_HOT, DM, 10);
+      ctx.restore();
+    }
+    // engage burst
+    if (this.dmEngageBurst > 0.01) {
+      ctx.save(); ctx.globalAlpha = this.dmEngageBurst * 0.7; ctx.strokeStyle = DM_HOT; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(dx, dy, r + (1 - this.dmEngageBurst) * 80, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
   }
 
   /** Draw phase transition banner with fade-in/out animation */

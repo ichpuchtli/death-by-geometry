@@ -505,6 +505,7 @@ export class Game {
     this.gameOverMedals = [];
     this.medalRevealPlayed = false;
     this.supernovaFlashTimer = 0;
+    this.hud.resetJuice();
     this.boss.reset();
     // Drop any existing wingman so it re-spawns beside the fresh player (syncWingman recreates it)
     this.wingman = null;
@@ -767,10 +768,19 @@ export class Game {
       this.hitstopTimer = combatHitstop;
     }
 
+    // Boss defeat → floating "+N" celebration at the boss's world position
+    for (const kill of result.killedEnemies) {
+      if (kill.enemy.isMiniboss && kill.scoreValue > 0) {
+        this.hud.spawnBossHit(kill.position.x, kill.position.y, this.camera, kill.scoreValue);
+      }
+    }
+
     // Player hit
     if (result.playerHit) {
       this.player.lives--;
       this.runStats.livesUsed++;
+      this.hud.onPlayerHit();
+      this.camera.shake(12, 0.3);
       if (this.player.lives <= 0) {
         this.onPlayerDeath();
         return;

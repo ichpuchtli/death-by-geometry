@@ -1,0 +1,80 @@
+name: "In-game HUD — Diegetic Ring layout + juice ported to the real game"
+tags: [hud, ui, visual, phase1]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+  - action: wait
+    ms: 300
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+  - action: wait
+    ms: 600
+
+  - action: evalCheck
+    description: "Game is playing and the HUD juice API is wired"
+    script: |
+      const g = window.game;
+      if (!g) return false;
+      const hud = g['hud'];
+      return typeof hud.spawnBossHit === 'function'
+        && typeof hud.onPlayerHit === 'function'
+        && typeof hud.resetJuice === 'function';
+
+  - action: screenshot
+    name: "97-hud-baseline"
+
+  # Drive score up to cross a milestone (count-up + milestone celebration).
+  - action: evalCheck
+    description: "Bumping score crosses a milestone threshold"
+    script: |
+      const g = window.game;
+      g['player'].score = 10500;
+      return g['player'].score === 10500;
+  - action: wait
+    ms: 250
+  - action: screenshot
+    name: "97-hud-milestone"
+
+  # Boss floating +N at the player's world position.
+  - action: evalCheck
+    description: "spawnBossHit projects and queues a floating +N without error"
+    script: |
+      const g = window.game;
+      const p = g['player'].position;
+      g['hud'].spawnBossHit(p.x, p.y, g['camera'], 5000);
+      return true;
+  - action: wait
+    ms: 200
+  - action: screenshot
+    name: "97-hud-bossfloater"
+
+  # Life juice: drop a life → pip shatter + damage vignette.
+  - action: evalCheck
+    description: "Losing a life triggers the vignette flash"
+    script: |
+      const g = window.game;
+      g['hud'].onPlayerHit();
+      g['player'].lives = Math.max(0, g['player'].lives - 1);
+      return true;
+  - action: wait
+    ms: 120
+  - action: screenshot
+    name: "97-hud-damage"
+
+  # Dark matter: charge to full → the dial fills and the READY ping fires.
+  - action: evalCheck
+    description: "Charging dark matter to full makes it spendable"
+    script: |
+      const g = window.game;
+      g.debugSetDarkMatterCharge(100);
+      return g.timeDilationState.charge >= 100;
+  - action: wait
+    ms: 200
+  - action: screenshot
+    name: "97-hud-darkmatter-ready"
+
+  - action: assertNoErrors
+    description: "New HUD renders and all juice hooks run without JS errors"
