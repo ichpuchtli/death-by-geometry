@@ -75,8 +75,22 @@ import {
   PARTICLE_FIELD_CIRCLE_RADIUS,
   PARTICLE_FIELD_CIRCLE_SWIRL,
   PARTICLE_FIELD_CIRCLE_SHED,
+  PARTICLE_FIELD_BH_EMIT_BASE,
   PARTICLE_FIELD_BH_EMIT_RATE,
   PARTICLE_FIELD_BH_EMIT_CRITICAL,
+  PARTICLE_FIELD_BH_HIT_EJECTA,
+  PARTICLE_FIELD_BH_HIT_EJECTA_MOBILE,
+  PARTICLE_FIELD_BH_HIT_MATTER,
+  PARTICLE_FIELD_BH_HIT_MATTER_MOBILE,
+  BULLET_WAKE_LEAD,
+  BULLET_WAKE_LEAD_RADIUS,
+  BULLET_WAKE_BOW_WELL,
+  BULLET_WAKE_BOW_WELL_RADIUS,
+  BULLET_WAKE_TRAIL,
+  BULLET_WAKE_TRAIL_RADIUS,
+  BULLET_WAKE_AHEAD_MS,
+  BULLET_WAKE_BEHIND_MS,
+  BULLET_WAKE_MIN_SCALE,
 } from './config';
 import { gameSettings } from './settings';
 import { showDesktopSettings, hideDesktopSettings } from './ui/settings-panel';
@@ -816,10 +830,24 @@ export class Game {
       this.grid.applyImpulse(this.player.position.x, this.player.position.y, pSpeed * 3, 60);
     }
 
-    // Bullet grid ripples (very subtle)
+    // Bullet ↔ spacetime-fabric wake (Geometry Wars bow wave — Player Design Lab v2 pick).
+    // A push impulse ahead of the bullet parts the fabric, a negative well at the bow
+    // feeds the shader bulge, and a gentle inward pull behind closes the V. Strength
+    // ramps with the weapon stage: subtle at the starting pellet count, full at max.
+    const wakeStageIdx = WEAPON_STAGES.indexOf(this.player.getWeaponStage());
+    const wakeT = WEAPON_STAGES.length > 1 ? wakeStageIdx / (WEAPON_STAGES.length - 1) : 1;
+    const wakeScale = BULLET_WAKE_MIN_SCALE + (1 - BULLET_WAKE_MIN_SCALE) * wakeT;
     for (const b of this.bullets.bullets) {
       if (!b.active) continue;
-      this.grid.applyImpulse(b.position.x, b.position.y, 0.5, 40);
+      const bowX = b.position.x + b.velocity.x * BULLET_WAKE_AHEAD_MS;
+      const bowY = b.position.y + b.velocity.y * BULLET_WAKE_AHEAD_MS;
+      this.grid.applyImpulse(bowX, bowY, BULLET_WAKE_LEAD * wakeScale, BULLET_WAKE_LEAD_RADIUS);
+      this.grid.applyGravityWell(bowX, bowY, BULLET_WAKE_BOW_WELL * wakeScale, BULLET_WAKE_BOW_WELL_RADIUS);
+      this.grid.applyImpulse(
+        b.position.x - b.velocity.x * BULLET_WAKE_BEHIND_MS,
+        b.position.y - b.velocity.y * BULLET_WAKE_BEHIND_MS,
+        BULLET_WAKE_TRAIL * wakeScale, BULLET_WAKE_TRAIL_RADIUS,
+      );
     }
 
     // Run spring-mass physics
@@ -936,10 +964,27 @@ export class Game {
         heat,
         swirl: e.dustSwirl,
       });
+      // Bullet-impact ejecta — every bullet that hit the hole this frame kicks dust and
+      // matter out of the disk: a fast hot jet along the impact direction plus a slower
+      // fan of colorful matter motes.
+      if (e.impactEjecta.length > 0) {
+        const ejectaCount = this.mobile ? PARTICLE_FIELD_BH_HIT_EJECTA_MOBILE : PARTICLE_FIELD_BH_HIT_EJECTA;
+        const matterCount = this.mobile ? PARTICLE_FIELD_BH_HIT_MATTER_MOBILE : PARTICLE_FIELD_BH_HIT_MATTER;
+        for (const hitAngle of e.impactEjecta) {
+          const hx = e.position.x + Math.cos(hitAngle) * e.collisionRadius * 0.9;
+          const hy = e.position.y + Math.sin(hitAngle) * e.collisionRadius * 0.9;
+          // Hot fast jet (amber-white) shooting back out along the impact direction
+          this.field.spawnBurst(hx, hy, hitAngle, 1.5, ejectaCount, 5.5, 35, 0.55);
+          // Slower colorful matter flung wider — rides the disk's swirl afterwards
+          this.field.spawnBurst(hx, hy, hitAngle, 2.6, matterCount, 2.0, 190 + Math.random() * 130, 1.1);
+        }
+        e.impactEjecta.length = 0;
+      }
       // Life-stage dust EMISSION — the hole actively sheds dust that rides its life cycle:
-      // a trickle scaling with swallowed mass that becomes a hot inrushing storm as it
-      // destabilizes toward supernova. Motes appear on the rim and rain inward (hue slides
-      // cool-blue → amber-hot with heat), so the disk visibly thickens + heats as it fills.
+      // a steady trickle that thickens with swallowed mass and becomes a hot inrushing
+      // storm as it destabilizes toward supernova. Motes appear on the rim and rain inward
+      // (hue slides cool-blue → amber-hot with heat), so the disk visibly thickens + heats
+      // as it fills.
       const rimBase = e.collisionRadius * 1.6;
       const emitHue = 210 - heat * 180;
       const emit = (count: number, speed: number, life: number): void => {
@@ -953,9 +998,9 @@ export class Game {
         }
       };
       if (e.destabilizing && !e.overloaded) {
-        emit(this.mobile ? 2 : PARTICLE_FIELD_BH_EMIT_CRITICAL, 0.25 + Math.random() * 0.2, 0.8);
-      } else if (Math.random() < inst * PARTICLE_FIELD_BH_EMIT_RATE) {
-        emit(this.mobile ? 1 : 2, 0.12 + Math.random() * 0.14, 0.95);
+        emit(this.mobile ? 3 : PARTICLE_FIELD_BH_EMIT_CRITICAL, 0.25 + Math.random() * 0.2, 0.8);
+      } else if (Math.random() < PARTICLE_FIELD_BH_EMIT_BASE + inst * PARTICLE_FIELD_BH_EMIT_RATE) {
+        emit(this.mobile ? 1 : 3, 0.12 + Math.random() * 0.14, 0.95);
       }
     }
     this.field.brightness = destabilizing ? 1.4 : 1;

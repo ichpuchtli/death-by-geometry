@@ -77,6 +77,9 @@ export class BlackHole extends Enemy {
   // Hit feedback: a ring pulse + a puff of emitted sparks (replaces the old white overlay)
   private hitPulse = 0;
   private hitSparks: { x: number; y: number; vx: number; vy: number; life: number; maxLife: number }[] = [];
+  /** Bullet angles of recent impacts awaiting a dust-ejecta burst. Drained every frame by
+   *  Game.updateParticles, which owns the ambient dust field this entity can't reach. */
+  readonly impactEjecta: number[] = [];
 
   // Shared swirl state
   private swirlParticles: SwirlParticle[] = [];
@@ -750,9 +753,12 @@ export class BlackHole extends Enemy {
   /** Register a bullet hit: kick a ring pulse and emit a puff of sparks from the impact. */
   private registerHit(bulletAngle: number): void {
     this.hitPulse = 1;
+    // Queue dust ejecta — Game.updateParticles turns this into a dust-field burst.
+    this.impactEjecta.push(bulletAngle);
+    if (this.impactEjecta.length > 8) this.impactEjecta.shift();
     const ox = this.position.x + Math.cos(bulletAngle) * this.collisionRadius;
     const oy = this.position.y + Math.sin(bulletAngle) * this.collisionRadius;
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 18; i++) {
       const a = bulletAngle + (Math.random() - 0.5) * 1.7;
       const sp = 0.16 + Math.random() * 0.32; // px/ms — fast enough to clearly shoot out past the disk
       const life = 0.35 + Math.random() * 0.3;

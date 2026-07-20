@@ -1,4 +1,4 @@
-name: "Player Design Lab — 8 ship candidates + firing sound/effect variants"
+name: "Player Design Lab v2 — 8 claw ships + engine tails + bullet grid wakes"
 tags: [lab, player, visual, ship]
 steps:
   - action: launch
@@ -6,87 +6,114 @@ steps:
     waitFor: "canvas#game"
 
   - action: wait
-    ms: 1200
+    ms: 2000
 
   - action: evalCheck
-    description: "Lab booted with 8 ship designs + all variant sets"
+    description: "Lab booted with 8 claw designs, GRID FX wake variants, Wake default, tails emitting"
     script: |
       const l = window.playerDesignLab;
       if (!l) return false;
       if (!Array.isArray(l.soundVariants) || l.soundVariants.length !== 6) return false;
       if (l.muzzleVariants.length !== 4 || l.bulletVariants.length !== 4) return false;
-      // 8 ships laid out; grid view by default (focus === -1)
-      return l.focus === -1 && l.soundVariants.includes('Laser Zap');
+      if (!Array.isArray(l.gridFxVariants) || l.gridFxVariants.length !== 5) return false;
+      if (l.gridFxVariants[l.gridFxIndex] !== 'Wake') return false;
+      if (l.focus !== -1) return false;
+      // tail particle system is live
+      if (!Array.isArray(l.tail) || l.tail.length < 20) return false;
+      return l.soundVariants.includes('Laser Zap');
 
+  # (a) Grid overview — 8 fully-rendered claw ships on patrol with tails + wakes
   - action: screenshot
     name: "93-player-lab-grid"
 
-  # Focus a single ship large (Digit key), verify focus state.
+  # (b) Focus ship 2 (Talon) — big figure-eight patrol, camera follows, tail streams
   - action: keyPress
-    key: "3"
+    key: "2"
     duration: 60
   - action: wait
-    ms: 400
+    ms: 3000
 
   - action: evalCheck
-    description: "Pressing 3 focuses ship index 2 (Interceptor), large single view"
-    script: |
-      return window.playerDesignLab.focus === 2;
-
-  - action: screenshot
-    name: "93-player-lab-focus"
-
-  # Cycle a fire-sound variant (] advances) — should not error, index moves.
-  - action: keyPress
-    key: "]"
-    duration: 60
-  - action: wait
-    ms: 200
-
-  - action: evalCheck
-    description: "] advanced the fire-sound variant"
-    script: |
-      return window.playerDesignLab.soundIndex === 1;
-
-  # Cycle muzzle + bullet variants.
-  - action: keyPress
-    key: "."
-    duration: 60
-  - action: keyPress
-    key: "'"
-    duration: 60
-  - action: wait
-    ms: 200
-
-  - action: evalCheck
-    description: "Muzzle + bullet variant indices advanced"
+    description: "Pressing 2 focuses ship index 1 (Talon), patrolling with a rich tail"
     script: |
       const l = window.playerDesignLab;
-      return l.muzzleIndex === 1 && l.bulletIndex === 1;
+      return l.focus === 1 && l.tail.length > 40;
 
   - action: screenshot
-    name: "93-player-lab-variants"
+    name: "93-player-lab-focus-tail"
 
-  # Back to grid, toggle bloom/grid, audition fire — none should error.
+  # (c) Wake (default) — bullets part the fabric with a leading bow wave
+  - action: evalCheck
+    description: "Wake active with live bullets warping the grid"
+    script: |
+      const l = window.playerDesignLab;
+      return l.gridFxVariants[l.gridFxIndex] === 'Wake' && l.bullets.length > 0;
+
+  - action: screenshot
+    name: "93-player-lab-wake"
+
+  # (d) Wake Heavy variant
   - action: keyPress
-    key: "3"
-    duration: 60
-  - action: keyPress
-    key: "f"
-    duration: 60
-  - action: keyPress
-    key: "b"
-    duration: 60
-  - action: keyPress
-    key: "g"
+    key: "x"
     duration: 60
   - action: wait
-    ms: 300
+    ms: 1500
 
   - action: evalCheck
-    description: "Back in grid view after un-focusing"
+    description: "X advanced grid FX to Wake Heavy"
     script: |
-      return window.playerDesignLab.focus === -1;
+      return window.playerDesignLab.gridFxVariants[window.playerDesignLab.gridFxIndex] === 'Wake Heavy';
+
+  - action: screenshot
+    name: "93-player-lab-wake-heavy"
+
+  # (e) Rip Trail variant
+  - action: keyPress
+    key: "x"
+    duration: 60
+  - action: wait
+    ms: 1500
+
+  - action: evalCheck
+    description: "X advanced grid FX to Rip Trail"
+    script: |
+      return window.playerDesignLab.gridFxVariants[window.playerDesignLab.gridFxIndex] === 'Rip Trail';
+
+  - action: screenshot
+    name: "93-player-lab-rip-trail"
+
+  # Z cycles backwards
+  - action: keyPress
+    key: "z"
+    duration: 60
+  - action: wait
+    ms: 200
+
+  - action: evalCheck
+    description: "Z cycled grid FX back to Wake Heavy"
+    script: |
+      return window.playerDesignLab.gridFxVariants[window.playerDesignLab.gridFxIndex] === 'Wake Heavy';
+
+  # Reset: back to grid, grid FX back to Wake default (checked synchronously —
+  # tail/bullets refill within a frame or two, so they're not asserted here)
+  - action: keyPress
+    key: "0"
+    duration: 60
+  - action: keyPress
+    key: "r"
+    duration: 60
+
+  - action: evalCheck
+    description: "R reset: grid view restored and grid FX back to Wake default"
+    script: |
+      const l = window.playerDesignLab;
+      return l.focus === -1 && l.gridFxVariants[l.gridFxIndex] === 'Wake';
+
+  - action: wait
+    ms: 2500
+
+  - action: screenshot
+    name: "93-player-lab-after-reset"
 
   - action: assertNoErrors
-    description: "Lab runs, fires, and cycles variants without JS errors"
+    description: "Lab v2 runs, patrols, fires, and cycles grid FX without JS errors"

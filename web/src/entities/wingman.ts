@@ -9,12 +9,24 @@ import {
   PLAYER_ROTATION_LERP,
   WINGMAN_SHIP_COLOR,
   WINGMAN_SHIP_COLOR2,
-  WINGMAN_SHIP_FILL_COLOR,
-  WINGMAN_SHIP_FILL_ALPHA,
+  WINGMAN_SHIP_HULL,
+  WINGMAN_SHIP_HULL_DARK,
+  WINGMAN_SHIP_HULL_LIGHT,
+  WINGMAN_SHIP_HULL_ALPHA,
   WINGMAN_SPAWN_OFFSET,
   WEAPON_STAGES,
 } from '../config';
 import { gameSettings } from '../settings';
+import { drawShip } from './ship-render';
+
+const WINGMAN_PALETTE = {
+  line: WINGMAN_SHIP_COLOR,
+  line2: WINGMAN_SHIP_COLOR2,
+  hull: WINGMAN_SHIP_HULL,
+  hullDark: WINGMAN_SHIP_HULL_DARK,
+  hullLight: WINGMAN_SHIP_HULL_LIGHT,
+  hullAlpha: WINGMAN_SHIP_HULL_ALPHA,
+};
 
 function lerpAngle(from: number, to: number, t: number): number {
   let diff = to - from;
@@ -22,20 +34,6 @@ function lerpAngle(from: number, to: number, t: number): number {
   while (diff < -Math.PI) diff += Math.PI * 2;
   return from + diff * t;
 }
-
-// Same "Wraith" chevron silhouette as the player ship (facing right at angle=0).
-const SHIP_VERTS: [number, number][] = [
-  [ 1.55,  0.0 ],
-  [ 0.6,   0.15],
-  [-0.2,   0.55],
-  [-1.12,  0.88],
-  [-0.6,   0.2 ],
-  [-0.88,  0.0 ],
-  [-0.6,  -0.2 ],
-  [-1.12, -0.88],
-  [-0.2,  -0.55],
-  [ 0.6,  -0.15],
-];
 
 /**
  * An AI-controlled ally that fights beside the human player. It runs the same trained
@@ -104,50 +102,7 @@ export class Wingman {
 
   render(renderer: Renderer): void {
     if (!this.active) return;
-
-    const s = PLAYER_SHIP_SCALE;
-    const cos = Math.cos(this.facingAngle);
-    const sin = Math.sin(this.facingAngle);
-    const px = this.position.x;
-    const py = this.position.y;
-
-    const wx: number[] = [];
-    const wy: number[] = [];
-    for (const [lx, ly] of SHIP_VERTS) {
-      wx.push(px + (lx * cos - ly * sin) * s);
-      wy.push(py + (lx * sin + ly * cos) * s);
-    }
-    const n = SHIP_VERTS.length;
-
-    // Fill: triangle fan from the centroid around the closed silhouette
-    let cx = 0, cy = 0;
-    for (let i = 0; i < n; i++) { cx += wx[i]; cy += wy[i]; }
-    cx /= n; cy /= n;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      renderer.drawTriangle(
-        cx, cy, wx[i], wy[i], wx[j], wy[j],
-        WINGMAN_SHIP_FILL_COLOR[0], WINGMAN_SHIP_FILL_COLOR[1], WINGMAN_SHIP_FILL_COLOR[2],
-        WINGMAN_SHIP_FILL_ALPHA,
-      );
-    }
-
-    // Outer line (darker) — closed loop
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      renderer.drawLine(
-        wx[i], wy[i], wx[j], wy[j],
-        WINGMAN_SHIP_COLOR2[0], WINGMAN_SHIP_COLOR2[1], WINGMAN_SHIP_COLOR2[2],
-      );
-    }
-
-    // Bright outline — closed loop
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      renderer.drawLine(
-        wx[i], wy[i], wx[j], wy[j],
-        WINGMAN_SHIP_COLOR[0], WINGMAN_SHIP_COLOR[1], WINGMAN_SHIP_COLOR[2],
-      );
-    }
+    // Same "Scythe" hull as the player, cyan palette
+    drawShip(renderer, this.position.x, this.position.y, this.facingAngle, PLAYER_SHIP_SCALE, WINGMAN_PALETTE);
   }
 }

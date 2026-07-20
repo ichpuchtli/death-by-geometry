@@ -45,6 +45,8 @@ import {
   MINIBOSS_HITSTOP_DEATH,
   DIFFICULTY_PHASES,
   SHATTER_IMPACT_SPEED,
+  PARTICLE_FIELD_BH_DEATH_BURST,
+  PARTICLE_FIELD_BH_DEATH_FIZZ,
   BOSS_HIT_SPARK_COUNT,
   BOSS_HIT_GRID_IMPULSE,
   BOSS_HIT_GRID_RADIUS,
@@ -213,9 +215,23 @@ export class CombatSystem {
         case 'blackhole': {
           const absorbed = kill.enemy instanceof BlackHole ? kill.enemy.absorbedCount : 0;
           this.deps.audio.playBlackHoleDeath(absorbed);
+          // Noisy, multi-color explosion stack — the stored accretion disk blows out in
+          // every hue it was made of, not just the hole's base color.
           this.deps.explosions.spawn(
             kill.position.x, kill.position.y, kill.color,
             this.mobile ? 60 : 120, EXPLOSION_DURATION_DEFAULT,
+          );
+          this.deps.explosions.spawn(
+            kill.position.x, kill.position.y, [0.65, 0.45, 1], // violet
+            this.mobile ? 25 : 50, EXPLOSION_DURATION_DEFAULT * 1.1, 0.8,
+          );
+          this.deps.explosions.spawn(
+            kill.position.x, kill.position.y, [0.35, 0.8, 1], // cyan
+            this.mobile ? 25 : 50, EXPLOSION_DURATION_DEFAULT * 0.9, 1.1,
+          );
+          this.deps.explosions.spawn(
+            kill.position.x, kill.position.y, [1, 1, 1], // white-hot core flash
+            this.mobile ? 20 : 40, EXPLOSION_DURATION_DEFAULT * 0.6, 1.4,
           );
           if (absorbed > 0) {
             this.deps.explosions.spawn(
@@ -229,6 +245,19 @@ export class CombatSystem {
             this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 500, 250);
             this.deps.camera.shake(SCREEN_SHAKE_LARGE);
           }
+          // Dust eruption + fizz-out — the accreted dust blows outward hot and fast, then
+          // a huge slow cloud of colorful matter hangs behind and fizzles out over seconds.
+          const deathBurst = this.mobile ? 60 : PARTICLE_FIELD_BH_DEATH_BURST;
+          const fizzCount = this.mobile ? 45 : PARTICLE_FIELD_BH_DEATH_FIZZ;
+          // Fast hot eruption (amber-white), radial
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, 0, Math.PI * 2, deathBurst, 4.5, 32, 1.2);
+          // Mid-speed colorful shells — blue, violet, teal
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, 0, Math.PI * 2, Math.floor(deathBurst * 0.4), 2.4, 210, 1.7);
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, 0, Math.PI * 2, Math.floor(deathBurst * 0.4), 2.0, 285, 1.9);
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, 0, Math.PI * 2, Math.floor(deathBurst * 0.3), 1.7, 165, 2.1);
+          // The fizz-out: a very slow, very long-lived sparkling cloud that drifts and fades
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, 0, Math.PI * 2, fizzCount, 0.55, 250, 3.2);
+          this.deps.field.spawnBurst(kill.position.x, kill.position.y, 0, Math.PI * 2, Math.floor(fizzCount * 0.6), 0.4, 45, 3.8);
           maxHitstop = Math.max(maxHitstop, HITSTOP_BLACKHOLE);
           break;
         }

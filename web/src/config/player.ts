@@ -7,14 +7,19 @@ export const PLAYER_SHIP_SCALE = 18;
 export const PLAYER_ROTATION_LERP = 0.012; // per-ms lerp factor for facing angle
 export const PLAYER_SHIP_COLOR: [number, number, number] = [0.1, 1.0, 0.1];
 export const PLAYER_SHIP_COLOR2: [number, number, number] = [0.05, 0.6, 0.05];
-export const PLAYER_SHIP_FILL_COLOR: [number, number, number] = [0.15, 0.8, 0.15];
-export const PLAYER_SHIP_FILL_ALPHA = 0.7;
+// "Scythe" hull palette (Player Design Lab v2 pick) — faceted plating, player-green family
+export const PLAYER_SHIP_HULL: [number, number, number] = [0.1, 0.38, 0.12];
+export const PLAYER_SHIP_HULL_DARK: [number, number, number] = [0.02, 0.12, 0.04];
+export const PLAYER_SHIP_HULL_LIGHT: [number, number, number] = [0.45, 1.0, 0.5];
+export const PLAYER_SHIP_HULL_ALPHA = 0.95;
 
 // --- AI Wingman (co-op ally driven by the trained policy — cyan, to contrast the green player) ---
 export const WINGMAN_SHIP_COLOR: [number, number, number] = [0.25, 0.9, 1.0];
 export const WINGMAN_SHIP_COLOR2: [number, number, number] = [0.1, 0.5, 0.65];
-export const WINGMAN_SHIP_FILL_COLOR: [number, number, number] = [0.2, 0.7, 0.95];
-export const WINGMAN_SHIP_FILL_ALPHA = 0.55;
+export const WINGMAN_SHIP_HULL: [number, number, number] = [0.08, 0.32, 0.42];
+export const WINGMAN_SHIP_HULL_DARK: [number, number, number] = [0.02, 0.1, 0.14];
+export const WINGMAN_SHIP_HULL_LIGHT: [number, number, number] = [0.4, 0.9, 1.0];
+export const WINGMAN_SHIP_HULL_ALPHA = 0.95;
 export const WINGMAN_SPAWN_OFFSET = 90; // px to the side of the player when it (re)spawns
 
 // --- Weapon recoil / muzzle feedback (a subtle "kick" on the player only) ---

@@ -11,8 +11,10 @@ import {
   PLAYER_ROTATION_LERP,
   PLAYER_SHIP_COLOR,
   PLAYER_SHIP_COLOR2,
-  PLAYER_SHIP_FILL_COLOR,
-  PLAYER_SHIP_FILL_ALPHA,
+  PLAYER_SHIP_HULL,
+  PLAYER_SHIP_HULL_DARK,
+  PLAYER_SHIP_HULL_LIGHT,
+  PLAYER_SHIP_HULL_ALPHA,
   PLAYER_RECOIL_BASE,
   PLAYER_RECOIL_PER_PELLET,
   PLAYER_RECOIL_DECAY,
@@ -21,6 +23,16 @@ import {
   WEAPON_STAGES,
 } from '../config';
 import { gameSettings } from '../settings';
+import { drawShip } from './ship-render';
+
+const PLAYER_PALETTE = {
+  line: PLAYER_SHIP_COLOR,
+  line2: PLAYER_SHIP_COLOR2,
+  hull: PLAYER_SHIP_HULL,
+  hullDark: PLAYER_SHIP_HULL_DARK,
+  hullLight: PLAYER_SHIP_HULL_LIGHT,
+  hullAlpha: PLAYER_SHIP_HULL_ALPHA,
+};
 
 function lerpAngle(from: number, to: number, t: number): number {
   let diff = to - from;
@@ -29,21 +41,6 @@ function lerpAngle(from: number, to: number, t: number): number {
   while (diff < -Math.PI) diff += Math.PI * 2;
   return from + diff * t;
 }
-
-// "Wraith" — stealth chevron silhouette (unit scale, facing right at angle=0).
-// Closed loop; picked in the Player Design Lab (?player=1) to replace the old claw.
-const SHIP_VERTS: [number, number][] = [
-  [ 1.55,  0.0 ],  // 0: nose
-  [ 0.6,   0.15],  // 1: fore shoulder
-  [-0.2,   0.55],  // 2: mid wing
-  [-1.12,  0.88],  // 3: swept wingtip
-  [-0.6,   0.2 ],  // 4: inner wing notch
-  [-0.88,  0.0 ],  // 5: rear center
-  [-0.6,  -0.2 ],  // 6: inner wing notch (mirror)
-  [-1.12, -0.88],  // 7: swept wingtip (mirror)
-  [-0.2,  -0.55],  // 8: mid wing (mirror)
-  [ 0.6,  -0.15],  // 9: fore shoulder (mirror)
-];
 
 export class Player extends Entity {
   lives = PLAYER_STARTING_LIVES;
@@ -176,8 +173,6 @@ export class Player extends Entity {
     if (this.isInvulnerable && Math.floor(this.invulnTimer / 100) % 2 === 0) return;
 
     const s = PLAYER_SHIP_SCALE;
-    const cos = Math.cos(this.facingAngle);
-    const sin = Math.sin(this.facingAngle);
 
     // Recoil: displace the whole ship backward along the aim vector, springing back.
     const recoilFrac = this.recoilTimer > 0 ? this.recoilTimer / PLAYER_RECOIL_DECAY : 0;
@@ -197,44 +192,7 @@ export class Player extends Entity {
       renderer.drawCircle(bx, by, rad * 0.6, [0.7, 1.0, 0.8], 14, recoilFrac * 0.85);
     }
 
-    // Transform local vertices to world space
-    const wx: number[] = [];
-    const wy: number[] = [];
-    for (const [lx, ly] of SHIP_VERTS) {
-      wx.push(px + (lx * cos - ly * sin) * s);
-      wy.push(py + (lx * sin + ly * cos) * s);
-    }
-    const n = SHIP_VERTS.length;
-
-    // Fill: triangle fan from the centroid around the closed silhouette
-    let cx = 0, cy = 0;
-    for (let i = 0; i < n; i++) { cx += wx[i]; cy += wy[i]; }
-    cx /= n; cy /= n;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      renderer.drawTriangle(
-        cx, cy, wx[i], wy[i], wx[j], wy[j],
-        PLAYER_SHIP_FILL_COLOR[0], PLAYER_SHIP_FILL_COLOR[1], PLAYER_SHIP_FILL_COLOR[2],
-        PLAYER_SHIP_FILL_ALPHA,
-      );
-    }
-
-    // Outer line (darker, for depth) — closed loop
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      renderer.drawLine(
-        wx[i], wy[i], wx[j], wy[j],
-        PLAYER_SHIP_COLOR2[0], PLAYER_SHIP_COLOR2[1], PLAYER_SHIP_COLOR2[2],
-      );
-    }
-
-    // Main bright outline — closed loop
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      renderer.drawLine(
-        wx[i], wy[i], wx[j], wy[j],
-        PLAYER_SHIP_COLOR[0], PLAYER_SHIP_COLOR[1], PLAYER_SHIP_COLOR[2],
-      );
-    }
+    // "Scythe" hull — faceted plating + glass canopy (shared ship-render module)
+    drawShip(renderer, px, py, this.facingAngle, s, PLAYER_PALETTE);
   }
 }

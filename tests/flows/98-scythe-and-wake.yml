@@ -1,0 +1,56 @@
+name: "Scythe ship + bullet spacetime wake in game"
+tags: [gameplay, visual, player]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#game"
+
+  - action: wait
+    ms: 300
+
+  # Start game
+  - action: click
+    selector: "canvas#game"
+    x: 0.5
+    y: 0.5
+
+  - action: wait
+    ms: 1500
+
+  # (a) Scythe hull at spawn (invuln blink may hide it — wait for a visible frame)
+  - action: wait
+    ms: 1200
+  - action: screenshot
+    name: "98-scythe-spawn"
+
+  # Hold fire toward the right — bullets should part the grid ahead of themselves
+  - action: mouseMove
+    x: 1000
+    y: 400
+  - action: mouseDown
+  - action: wait
+    ms: 900
+  - action: screenshot
+    name: "98-bullet-wake"
+
+  - action: evalCheck
+    description: "Bullets are live in the shared pool while firing"
+    script: |
+      const g = window.game;
+      return g && g.bullets && g.bullets.activeCount > 0;
+
+  - action: wait
+    ms: 800
+  - action: mouseUp
+  - action: screenshot
+    name: "98-wake-recovering"
+
+  - action: evalCheck
+    description: "GL context intact after wake-warped shooting"
+    script: |
+      const c = document.getElementById('game');
+      const gl = c.getContext('webgl', {alpha: false, antialias: true});
+      return gl && gl.getError() === gl.NO_ERROR;
+
+  - action: assertNoErrors
+    description: "Scythe render + bullet wake run without JS errors"
