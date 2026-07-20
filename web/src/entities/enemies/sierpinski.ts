@@ -15,6 +15,11 @@ export class Sierpinski extends Enemy {
   readonly tier: number;
   private depth: number;
   private hitFlash = 0;
+  // Outward "crack" momentum (px/ms) imparted when this fragment splits off its parent.
+  // Decays quickly so the fragment pops apart, then resumes its normal tracking AI.
+  private crackVx = 0;
+  private crackVy = 0;
+  private crackTime = 0;
 
   constructor(tier = 0, pos?: Vec2) {
     super();
@@ -50,12 +55,29 @@ export class Sierpinski extends Enemy {
     return super.hit();
   }
 
+  /** Impart an outward crack impulse (px/ms) as this fragment splits off its parent. */
+  applyCrack(vx: number, vy: number): void {
+    this.crackVx = vx;
+    this.crackVy = vy;
+    this.crackTime = 260; // ms of pop-apart before it settles into tracking
+  }
+
   update(dt: number, playerPos?: Vec2): void {
     if (!this.active || !playerPos) return;
     if (this.hitFlash > 0) this.hitFlash -= dt / 1000;
     this.follow(playerPos);
     this.rotation += dt * 0.001;
     this.move(dt);
+    // Crack momentum: added on top of the tracking motion, decaying so the fresh
+    // fragments visibly split apart before their AI reels them back toward the player.
+    if (this.crackTime > 0) {
+      this.position.x += this.crackVx * dt;
+      this.position.y += this.crackVy * dt;
+      const decay = Math.exp(-dt / 90);
+      this.crackVx *= decay;
+      this.crackVy *= decay;
+      this.crackTime -= dt;
+    }
     this.bounce();
   }
 
@@ -128,16 +150,27 @@ export class Sierpinski extends Enemy {
     ];
 
     const childTier = this.tier + 1;
-    const spawns: { type: EnemyType; position: Vec2; tier: number }[] = [];
+    const spawns: NonNullable<EnemyDeathResult['spawnEnemies']> = [];
+
+    // Crack impulse (px/ms): each fragment pops outward from the parent centre so the
+    // triangle visibly splits along its own void instead of vanishing.
+    const CRACK_SPEED = 0.16;
 
     for (const [ox, oy] of offsets) {
       // Rotate offset by parent rotation
       const rx = ox * cos - oy * sin;
       const ry = ox * sin + oy * cos;
+      const om = Math.hypot(rx, ry) || 1;
       spawns.push({
         type: 'sierpinski',
         position: new Vec2(this.position.x + rx, this.position.y + ry),
         tier: childTier,
+        // Inherit the parent's orientation so the sub-triangles line up exactly where
+        // they sat inside the parent — the split reads as a crack, not a respawn.
+        rotation: this.rotation,
+        instant: true,
+        crackVx: (rx / om) * CRACK_SPEED,
+        crackVy: (ry / om) * CRACK_SPEED,
       });
     }
 

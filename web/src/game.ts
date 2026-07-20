@@ -1564,4 +1564,30 @@ export class Game {
     this.lifecycle.spawnEnemy(bh);
     return bh;
   }
+
+  /** Deterministic test hook: place a fully active Sierpinski of the given tier. */
+  debugSpawnSierpinski(tier: number, x = this.player.position.x + 200, y = this.player.position.y): Enemy {
+    const s = createEnemy('sierpinski', new Vec2(x, y), false, tier);
+    s.spawnTimer = 0;
+    s.active = true;
+    this.enemies.push(s);
+    this.lifecycle.spawnEnemy(s);
+    return s;
+  }
+
+  /** Deterministic test hook: run a single enemy through the real kill/crack pipeline. */
+  debugKillEnemy(enemy: Enemy, impactAngle = 0): void {
+    enemy.active = false;
+    this.combat.processKills({
+      killedEnemies: [{
+        enemy,
+        position: enemy.position.clone(),
+        color: enemy.color,
+        scoreValue: enemy.scoreValue,
+        impactAngle,
+      }],
+      playerHit: false,
+    });
+    this.lifecycle.cleanupEnemies(this.enemies);
+  }
 }
