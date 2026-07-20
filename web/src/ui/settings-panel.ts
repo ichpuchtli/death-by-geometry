@@ -226,16 +226,18 @@ export function initSettingsPanel(desktopMount?: HTMLElement | null): void {
         width: 100%;
         max-width: 320px;
         font-family: monospace;
-        color: #20ff20;
+        color: #38f2c8;
         font-size: 13px;
         padding: 0 16px;
       }
       .settings-panel h2 {
         font-size: 14px;
-        margin: 0 0 10px;
+        margin: 0 0 12px;
+        padding-bottom: 8px;
         text-transform: uppercase;
         letter-spacing: 2px;
-        opacity: 0.7;
+        opacity: 0.85;
+        border-bottom: 1px solid rgba(120,200,190,0.28);
       }
       .sp-row {
         margin-bottom: 8px;
@@ -248,7 +250,7 @@ export function initSettingsPanel(desktopMount?: HTMLElement | null): void {
       }
       .sp-label { opacity: 0.8; }
       .sp-desc { font-size: 10px; opacity: 0.45; margin-bottom: 2px; }
-      .sp-value { color: #60ff60; font-weight: bold; }
+      .sp-value { color: #7dffea; font-weight: bold; }
       .sp-checkbox-row { margin-bottom: 12px; }
       .sp-checkbox-label {
         display: flex;
@@ -258,7 +260,7 @@ export function initSettingsPanel(desktopMount?: HTMLElement | null): void {
         opacity: 0.9;
       }
       .sp-checkbox-label input[type="checkbox"] {
-        accent-color: #20ff20;
+        accent-color: #38f2c8;
         width: 14px;
         height: 14px;
         cursor: pointer;
@@ -266,15 +268,15 @@ export function initSettingsPanel(desktopMount?: HTMLElement | null): void {
       .sp-row input[type="range"] {
         width: 100%;
         height: 20px;
-        accent-color: #20ff20;
+        accent-color: #38f2c8;
         background: transparent;
         cursor: pointer;
       }
       .sp-row select {
         width: 100%;
-        background: #111;
-        color: #20ff20;
-        border: 1px solid #20ff2040;
+        background: rgba(6,10,14,0.8);
+        color: #38f2c8;
+        border: 1px solid rgba(120,200,190,0.3);
         font-family: monospace;
         font-size: 13px;
         padding: 4px;
@@ -283,16 +285,19 @@ export function initSettingsPanel(desktopMount?: HTMLElement | null): void {
       .sp-reset {
         margin-top: 12px;
         background: transparent;
-        color: #20ff20;
-        border: 1px solid #20ff2060;
+        color: #38f2c8;
+        border: 1px solid rgba(56,242,200,0.5);
+        border-radius: 6px;
         font-family: monospace;
         font-size: 12px;
         padding: 6px 16px;
         cursor: pointer;
         text-transform: uppercase;
         letter-spacing: 1px;
+        transition: background 0.12s;
       }
-      .sp-reset:active { background: #20ff2020; }
+      .sp-reset:hover { background: rgba(56,242,200,0.12); }
+      .sp-reset:active { background: rgba(56,242,200,0.2); }
     `;
     document.head.appendChild(style);
     styleAppended = true;

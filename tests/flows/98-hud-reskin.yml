@@ -1,0 +1,47 @@
+name: "Menu / Game Over / Settings reskinned to the Diegetic Ring aesthetic"
+tags: [hud, ui, visual]
+steps:
+  - action: launch
+    url: "/"
+    waitFor: "canvas#hud"
+  - action: wait
+    ms: 500
+
+  # Menu screen (teal title + play pill)
+  - action: screenshot
+    name: "98-reskin-menu"
+
+  # Desktop settings panel (teal restyle) — force it visible for the shot.
+  - action: evalCheck
+    description: "Reveal the desktop settings panel"
+    script: |
+      const el = document.getElementById('desktop-settings');
+      if (!el) return false;
+      el.style.display = 'block';
+      return el.querySelector('.settings-panel') !== null;
+  - action: wait
+    ms: 200
+  - action: screenshot
+    name: "98-reskin-settings"
+
+  # Game over card (teal data, red header, chip frame) — force the state.
+  - action: evalCheck
+    description: "Force the game-over summary card"
+    script: |
+      const g = window.game;
+      if (!g) return false;
+      document.getElementById('desktop-settings').style.display = 'none';
+      g['runStats'].score = 42850;
+      g['runStats'].kills = 137;
+      g['runStats'].timeSurvived = 154;
+      g['gameOverMedals'] = [];
+      g['gameOverTime'] = 3;
+      g['state'] = 'gameover';
+      return g['state'] === 'gameover';
+  - action: wait
+    ms: 300
+  - action: screenshot
+    name: "98-reskin-gameover"
+
+  - action: assertNoErrors
+    description: "Reskinned menu, settings, and game-over render without JS errors"

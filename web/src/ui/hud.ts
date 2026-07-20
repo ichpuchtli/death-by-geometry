@@ -1,4 +1,4 @@
-import { DARK_MATTER_MIN_ACTIVATION, HUD_ACCENT, HUD_ACCENT_DIM, HUD_MILESTONE_INTERVAL, MedalDef, PHASE_DISPLAY_NAMES, TIME_BUTTON_BOTTOM, TIME_BUTTON_RADIUS, TIME_BUTTON_RIGHT, WEAPON_STAGES } from '../config';
+import { DARK_MATTER_MIN_ACTIVATION, HUD_ACCENT, HUD_ACCENT_BRIGHT, HUD_ACCENT_DIM, HUD_MILESTONE_INTERVAL, MedalDef, PHASE_DISPLAY_NAMES, TIME_BUTTON_BOTTOM, TIME_BUTTON_RADIUS, TIME_BUTTON_RIGHT, WEAPON_STAGES } from '../config';
 import { RunStats } from '../core/run-stats';
 import type { Camera } from '../core/camera';
 import type { TimeDilationSnapshot } from '../systems/time-dilation-system';
@@ -509,28 +509,48 @@ export class HUD {
 
   drawMenu(): void {
     this.clear();
+    const ctx = this.ctx;
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
 
-    // Title with strong glow
-    this.drawGlowText('DEATH BY', w / 2, h / 2 - 80, 'bold 56px monospace', '#20ff20', '#20ff20', 25);
-    this.drawGlowText('GEOMETRY', w / 2, h / 2 - 20, 'bold 56px monospace', '#20ff20', '#20ff20', 25);
+    // Title with strong glow (unified teal accent)
+    this.drawGlowText('DEATH BY', w / 2, h / 2 - 80, 'bold 56px monospace', HUD_ACCENT, HUD_ACCENT, 25);
+    this.drawGlowText('GEOMETRY', w / 2, h / 2 - 20, 'bold 56px monospace', HUD_ACCENT, HUD_ACCENT, 25);
 
-    // Subtitle
-    const playText = this.touchMode ? 'Tap to Play' : 'Click to Play';
-    this.drawGlowText(playText, w / 2, h / 2 + 50, '22px monospace', '#10dd10', '#10dd10', 15);
+    // Accent rule under the title
+    ctx.save();
+    ctx.strokeStyle = 'rgba(120,200,190,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(w / 2 - 120, h / 2 + 20);
+    ctx.lineTo(w / 2 + 120, h / 2 + 20);
+    ctx.stroke();
+    ctx.restore();
+
+    // "Play" prompt inside a chip pill (echoes the HUD chip language), gently pulsing
+    const playText = this.touchMode ? 'TAP TO PLAY' : 'CLICK TO PLAY';
+    const pulse = 0.7 + 0.3 * Math.sin(performance.now() / 500);
+    ctx.font = 'bold 20px monospace';
+    const tw = ctx.measureText(playText).width;
+    const pillW = tw + 44, pillH = 40, pillY = h / 2 + 50;
+    ctx.save();
+    ctx.globalAlpha = pulse;
+    this.chip(w / 2 - pillW / 2, pillY - pillH / 2, pillW, pillH, pillH / 2, HUD_ACCENT);
+    ctx.restore();
+    ctx.textBaseline = 'middle';
+    this.drawGlowText(playText, w / 2, pillY, 'bold 20px monospace', HUD_ACCENT, HUD_ACCENT, 12);
 
     // Controls hint
     const controlsText = this.touchMode
       ? 'Left stick: move  |  Right stick: aim & shoot'
       : 'WASD to move  |  Mouse to aim  |  Click to shoot  |  F auto-fire  |  M mute';
-    this.drawGlowText(controlsText, w / 2, h / 2 + 100, '13px monospace', '#0a770a', '#0a770a', 5);
+    this.drawGlowText(controlsText, w / 2, h / 2 + 108, '13px monospace', HUD_ACCENT_DIM, HUD_ACCENT_DIM, 4);
 
     // Credit
-    this.ctx.textBaseline = 'bottom';
-    this.drawGlowText('Geometry Wars-inspired arcade shooter', w / 2, h - 20, '11px monospace', '#064006', '#064006', 3);
+    ctx.textBaseline = 'bottom';
+    this.drawGlowText('Geometry Wars-inspired arcade shooter', w / 2, h - 20, '11px monospace', 'rgba(28,125,104,0.7)', 'rgba(28,125,104,0.7)', 3);
   }
 
   /** Draw miniboss HP bar at top of screen */
@@ -655,18 +675,27 @@ export class HUD {
     // Fade-in factor for initial appearance
     const fadeIn = Math.min(1, animTime * 2);
 
-    // "GAME OVER" header
+    // Summary card — a chip frame that ties the screen to the HUD language
+    const cardW = Math.min(600, w * 0.92);
+    const cardX = cx - cardW / 2;
+    const cardTop = h * 0.05, cardBot = h * 0.96;
+    this.ctx.save();
+    this.ctx.globalAlpha = fadeIn * 0.92;
+    this.chip(cardX, cardTop, cardW, cardBot - cardTop, 16, 'rgba(120,200,190,0.28)');
+    this.ctx.restore();
+
+    // "GAME OVER" header (red kept — semantic for death)
     this.ctx.save();
     this.ctx.globalAlpha = fadeIn;
-    this.drawGlowText('GAME OVER', cx, h * 0.12, `bold ${Math.round(48 * scale)}px monospace`, '#ff3030', '#ff0000', 25);
+    this.drawGlowText('GAME OVER', cx, h * 0.12, `bold ${Math.round(48 * scale)}px monospace`, '#ff4d5e', '#ff2740', 25);
     this.ctx.restore();
 
     // Score — big number
     const scoreAlpha = Math.min(1, Math.max(0, (animTime - 0.2) * 3));
     this.ctx.save();
     this.ctx.globalAlpha = scoreAlpha;
-    this.drawGlowText(`${stats.score}`, cx, h * 0.22, `bold ${Math.round(42 * scale)}px monospace`, '#20ff20', '#20ff20', 18);
-    this.drawGlowText('SCORE', cx, h * 0.22 + 28 * scale, `${Math.round(13 * scale)}px monospace`, '#0a770a', '#0a770a', 4);
+    this.drawGlowText(`${stats.score}`, cx, h * 0.22, `bold ${Math.round(42 * scale)}px monospace`, HUD_ACCENT, HUD_ACCENT, 18);
+    this.drawGlowText('SCORE', cx, h * 0.22 + 28 * scale, `${Math.round(13 * scale)}px monospace`, HUD_ACCENT_DIM, HUD_ACCENT_DIM, 4);
     this.ctx.restore();
 
     // Stats grid — staggered reveal
@@ -694,8 +723,8 @@ export class HUD {
     if (heatPct > 0) combatStats.push({ label: 'PEAK HEAT', value: `${heatPct}%` });
 
     const fontSize = `${Math.round(14 * scale)}px monospace`;
-    const labelColor = '#0a770a';
-    const valueColor = '#10cc10';
+    const labelColor = HUD_ACCENT_DIM;
+    const valueColor = HUD_ACCENT_BRIGHT;
 
     // Draw stats in two columns
     const colW = Math.min(160 * scale, w * 0.22);
@@ -732,8 +761,8 @@ export class HUD {
     const sepY = statsY + Math.max(statLines.length, combatStats.length) * lineH + lineH * 0.5;
     const sepAlpha = Math.min(1, Math.max(0, (animTime - 1.0) * 3));
     this.ctx.save();
-    this.ctx.globalAlpha = sepAlpha * 0.4;
-    this.ctx.strokeStyle = '#20ff20';
+    this.ctx.globalAlpha = sepAlpha * 0.5;
+    this.ctx.strokeStyle = 'rgba(120,200,190,0.6)';
     this.ctx.lineWidth = 1;
     this.ctx.beginPath();
     this.ctx.moveTo(cx - colW * 1.2, sepY);
@@ -783,7 +812,7 @@ export class HUD {
       this.ctx.save();
       this.ctx.globalAlpha = noMedalAlpha;
       this.ctx.textAlign = 'center';
-      this.drawGlowText('Keep playing to earn medals!', cx, sepY + lineH, `${Math.round(13 * scale)}px monospace`, '#0a770a', '#0a770a', 5);
+      this.drawGlowText('Keep playing to earn medals!', cx, sepY + lineH, `${Math.round(13 * scale)}px monospace`, HUD_ACCENT_DIM, HUD_ACCENT_DIM, 5);
       this.ctx.restore();
     }
 
@@ -796,7 +825,7 @@ export class HUD {
       this.ctx.globalAlpha = replayAlpha * pulse;
       this.ctx.textAlign = 'center';
       const replayText = this.touchMode ? 'Tap to Play Again' : 'Click to Play Again';
-      this.drawGlowText(replayText, cx, h * 0.92, `${Math.round(18 * scale)}px monospace`, '#10dd10', '#10dd10', 10);
+      this.drawGlowText(replayText, cx, h * 0.92, `${Math.round(18 * scale)}px monospace`, HUD_ACCENT, HUD_ACCENT, 10);
       this.ctx.restore();
     }
   }

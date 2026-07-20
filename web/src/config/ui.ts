@@ -3,8 +3,9 @@ export const HUD_FONT = '24px monospace';
 export const HUD_COLOR = '#20ff20';
 
 // Diegetic Ring HUD (picked in the HUD Lab) + juice tokens.
-export const HUD_ACCENT = '#38f2c8';      // unified primary accent for the in-game HUD
-export const HUD_ACCENT_DIM = '#1c7d68';  // dim label variant
+export const HUD_ACCENT = '#38f2c8';       // unified primary accent for the in-game HUD
+export const HUD_ACCENT_BRIGHT = '#7dffea'; // brighter value/highlight variant
+export const HUD_ACCENT_DIM = '#1c7d68';   // dim label variant
 export const HUD_MILESTONE_INTERVAL = 10000; // score interval for milestone celebrations
 
 // --- Offscreen indicator ---
