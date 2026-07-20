@@ -3,7 +3,9 @@ import { Vec2 } from '../../core/vector';
 import type { Renderer } from '../../renderer/sprite-batch';
 import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_MAX_ABSORB, BLACKHOLE_PALETTE, SUPERNOVA_DESTABILIZE_MS, SPAWN_DURATION_BLACKHOLE,
          BH_DIFFRACTION_DISPERSION_BASE, BH_DIFFRACTION_DISPERSION_PER_MASS, BH_DIFFRACTION_RING_ALPHA,
-         BH_DIFFRACTION_BAND_THICKNESS_BASE, BH_DIFFRACTION_BAND_THICKNESS_PER_MASS, BH_DIFFRACTION_SPECTRUM } from '../../config';
+         BH_DIFFRACTION_BAND_THICKNESS_BASE, BH_DIFFRACTION_BAND_THICKNESS_PER_MASS, BH_DIFFRACTION_SPECTRUM,
+         BH_HIT_SURGE_KICK, BH_HIT_SURGE_MAX, BH_HIT_SURGE_DECAY,
+         BH_HIT_SWIRL_SPEED_SURGE, BH_HIT_SWIRL_BRIGHT_SURGE, BH_HIT_ORBIT_SPEED_SURGE, BH_HIT_ORBIT_BRIGHT_SURGE } from '../../config';
 import { gameSettings } from '../../settings';
 
 export type BlackHoleVisualMode = 'dense' | 'haze' | 'corona' | 'molten';
@@ -76,6 +78,16 @@ export class BlackHole extends Enemy {
   private wobbleTime = 0;
   // Hit feedback: a ring pulse + a puff of emitted sparks (replaces the old white overlay)
   private hitPulse = 0;
+  // On-hit swirl surge: each bullet hit kicks this up (see registerHit); while > 0 the
+  // hole's own swirl arms + orbit dots run brighter and faster, decaying back to baseline.
+  // The knobs are per-instance (copied from config) so the BlackHole FX Lab can tune live.
+  private hitSurge = 0;
+  hitSurgeKick = BH_HIT_SURGE_KICK;
+  hitSurgeDecay = BH_HIT_SURGE_DECAY;
+  swirlSpeedSurge = BH_HIT_SWIRL_SPEED_SURGE;
+  swirlBrightSurge = BH_HIT_SWIRL_BRIGHT_SURGE;
+  orbitSpeedSurge = BH_HIT_ORBIT_SPEED_SURGE;
+  orbitBrightSurge = BH_HIT_ORBIT_BRIGHT_SURGE;
   private hitSparks: { x: number; y: number; vx: number; vy: number; life: number; maxLife: number }[] = [];
   /** Bullet angles of recent impacts awaiting a dust-ejecta burst. Drained every frame by
    *  Game.updateParticles, which owns the ambient dust field this entity can't reach. */
@@ -212,6 +224,7 @@ export class BlackHole extends Enemy {
 
     // Hit feedback: decay the pulse, advance + fade the emitted sparks
     if (this.hitPulse > 0) this.hitPulse = Math.max(0, this.hitPulse - dt * 0.005);
+    if (this.hitSurge > 0) this.hitSurge = Math.max(0, this.hitSurge - dt * this.hitSurgeDecay);
     if (this.hitSparks.length > 0) {
       const drag = Math.pow(0.95, dt / 16.6667);
       for (const s of this.hitSparks) {
@@ -224,19 +237,21 @@ export class BlackHole extends Enemy {
       this.hitSparks = this.hitSparks.filter(s => s.life > 0);
     }
 
-    // Swirl rotation — accelerates with mass
+    // Swirl rotation — accelerates with mass; infall speeds up during the on-hit surge
     this.swirlRotation += dt * (0.0008 + this.absorbedCount * 0.0005);
+    const swirlSurge = 1 + this.hitSurge * this.swirlSpeedSurge;
     for (const sp of this.swirlParticles) {
-      sp.t -= dt * sp.speed * (1 + (1 - sp.t) * 2.5);
+      sp.t -= dt * sp.speed * (1 + (1 - sp.t) * 2.5) * swirlSurge;
       if (sp.t <= 0) {
         sp.t = 1;
         sp.brightness = 0.4 + Math.random() * 0.6;
       }
     }
 
-    // Horizon particles orbit
+    // Horizon particles orbit — excited (faster) during the on-hit surge
+    const orbitSurge = 1 + this.hitSurge * this.orbitSpeedSurge;
     for (const hp of this.horizonParticles) {
-      hp.angle += dt * hp.speed * (1 + instability * 0.5);
+      hp.angle += dt * hp.speed * (1 + instability * 0.5) * orbitSurge;
     }
 
     // Corona flicker
@@ -408,18 +423,19 @@ export class BlackHole extends Enemy {
 
     // Orbit particles as larger filled dots
     const [odr, odg, odb] = P.orbitDot;
+    const ob = 1 + this.hitSurge * this.orbitBrightSurge;
     for (const hp of this.horizonParticles) {
       if (!this.showOrbitDots) break;
       const r = ringR * hp.orbitR;
       const hpx = px + Math.cos(hp.angle) * r;
       const hpy = py + Math.sin(hp.angle) * r;
-      renderer.drawFilledCircle(hpx, hpy, 2.5 + instability * 1.5, [odr, odg, odb], 8, hp.brightness * 0.8);
+      renderer.drawFilledCircle(hpx, hpy, 2.5 + instability * 1.5, [odr, odg, odb], 8, Math.min(1, hp.brightness * 0.8 * ob));
       // Short trail arc
       const ta = hp.angle + hp.trailLen * Math.sign(hp.speed);
       renderer.drawLine(
         hpx, hpy,
         px + Math.cos(ta) * r, py + Math.sin(ta) * r,
-        odr, odg, odb, hp.brightness * 0.4,
+        odr, odg, odb, Math.min(1, hp.brightness * 0.4 * ob),
       );
     }
 
@@ -487,12 +503,13 @@ export class BlackHole extends Enemy {
 
     // Small ember particles scattered in the cloud
     const [odr, odg, odb] = P.orbitDot;
+    const ob = 1 + this.hitSurge * this.orbitBrightSurge;
     for (const hp of this.horizonParticles) {
       if (!this.showOrbitDots) break;
       const r = ringR * (0.85 + hp.orbitR * 0.3);
       const hpx = px + Math.cos(hp.angle) * r;
       const hpy = py + Math.sin(hp.angle) * r;
-      renderer.drawFilledCircle(hpx, hpy, 1.5 + instability, [odr, odg, odb], 6, hp.brightness * 0.5);
+      renderer.drawFilledCircle(hpx, hpy, 1.5 + instability, [odr, odg, odb], 6, Math.min(1, hp.brightness * 0.5 * ob));
     }
 
     // Infall streaks (faint)
@@ -572,12 +589,13 @@ export class BlackHole extends Enemy {
 
     // Orbit particles
     const [odr, odg, odb] = P.orbitDot;
+    const ob = 1 + this.hitSurge * this.orbitBrightSurge;
     for (const hp of this.horizonParticles) {
       if (!this.showOrbitDots) break;
       const r = ringR * hp.orbitR;
       const hpx = px + Math.cos(hp.angle) * r;
       const hpy = py + Math.sin(hp.angle) * r;
-      renderer.drawFilledCircle(hpx, hpy, 2 + instability, [odr, odg, odb], 6, hp.brightness * 0.7);
+      renderer.drawFilledCircle(hpx, hpy, 2 + instability, [odr, odg, odb], 6, Math.min(1, hp.brightness * 0.7 * ob));
     }
 
     // Swirl arms feeding ring
@@ -658,12 +676,13 @@ export class BlackHole extends Enemy {
 
     // Orbit particles
     const [odr, odg, odb] = P.orbitDot;
+    const ob = 1 + this.hitSurge * this.orbitBrightSurge;
     for (const hp of this.horizonParticles) {
       if (!this.showOrbitDots) break;
       const r = (innerR + outerR) / 2 * hp.orbitR;
       const hpx = px + Math.cos(hp.angle) * r;
       const hpy = py + Math.sin(hp.angle) * r;
-      renderer.drawFilledCircle(hpx, hpy, 2 + instability, [odr, odg, odb], 6, hp.brightness * 0.7);
+      renderer.drawFilledCircle(hpx, hpy, 2 + instability, [odr, odg, odb], 6, Math.min(1, hp.brightness * 0.7 * ob));
     }
 
     // Swirl arms
@@ -716,6 +735,7 @@ export class BlackHole extends Enemy {
   ): void {
     if (!this.showSwirlArms) return;
     const [ar, ag, ab] = P.swirlArm;
+    const brightBoost = 1 + this.hitSurge * this.swirlBrightSurge;
     for (const sp of this.swirlParticles) {
       const armIdx = sp.arm % armCount;
       const armBase = (armIdx / armCount) * TWO_PI + this.swirlRotation;
@@ -729,7 +749,7 @@ export class BlackHole extends Enemy {
       const tx = Math.cos(tangentAngle) * streakLen;
       const ty = Math.sin(tangentAngle) * streakLen;
 
-      const alpha = sp.brightness * (1 - sp.t * 0.3) * alphaScale;
+      const alpha = sp.brightness * (1 - sp.t * 0.3) * alphaScale * brightBoost;
       renderer.drawLine(spx - tx, spy - ty, spx + tx, spy + ty, ar, ag, ab, alpha);
     }
   }
@@ -750,9 +770,10 @@ export class BlackHole extends Enemy {
     }
   }
 
-  /** Register a bullet hit: kick a ring pulse and emit a puff of sparks from the impact. */
+  /** Register a bullet hit: kick a ring pulse + the swirl/orbit surge, and emit a puff of sparks. */
   private registerHit(bulletAngle: number): void {
     this.hitPulse = 1;
+    this.hitSurge = Math.min(BH_HIT_SURGE_MAX, this.hitSurge + this.hitSurgeKick);
     // Queue dust ejecta — Game.updateParticles turns this into a dust-field burst.
     this.impactEjecta.push(bulletAngle);
     if (this.impactEjecta.length > 8) this.impactEjecta.shift();

@@ -51,6 +51,7 @@ import {
   BOSS_HIT_GRID_IMPULSE,
   BOSS_HIT_GRID_RADIUS,
   BOSS_HIT_SOUND_COOLDOWN_MS,
+  BH_HIT_SOUND_COOLDOWN_MS,
   BOSS_MILESTONE_FRACTIONS,
   BOSS_MILESTONE_SHAKE,
   BOSS_MILESTONE_HITSTOP,
@@ -115,6 +116,7 @@ export class CombatSystem {
   private heat = 0;
   private timeSinceLastKill = 0;
   private bossHitSoundCooldown = 0; // ms — rate-limits the per-hit "tick" so rapid fire doesn't spam it
+  private bhHitSoundCooldown = 0;   // ms — same rate-limit for the BlackHole per-hit thud
 
   constructor(mobile: boolean, deps: CombatSystemDeps) {
     this.mobile = mobile;
@@ -135,6 +137,13 @@ export class CombatSystem {
     // lingering "damage" tick, but survivors get the subtle bite + milestone chunks.
     if (result.bossHits && result.bossHits.length > 0) {
       maxHitstop = Math.max(maxHitstop, this.processBossHits(result.bossHits));
+    }
+
+    // BlackHole per-hit thud — one sound per frame at most, no matter how many bullets
+    // landed (rapid fire rate-limited exactly like the boss tick).
+    if (result.blackholeHits && result.blackholeHits.length > 0 && this.bhHitSoundCooldown <= 0) {
+      this.deps.audio.playBlackHoleHit();
+      this.bhHitSoundCooldown = BH_HIT_SOUND_COOLDOWN_MS;
     }
 
     for (const kill of result.killedEnemies) {
@@ -441,6 +450,7 @@ export class CombatSystem {
   /** Update timers: kill effects, heat decay/survival, and process ready staggered spawns. */
   update(dt: number, gameTime: number): void {
     if (this.bossHitSoundCooldown > 0) this.bossHitSoundCooldown -= dt;
+    if (this.bhHitSoundCooldown > 0) this.bhHitSoundCooldown -= dt;
     // Kill effects
     const dtSec = dt / 1000;
     for (const ke of this.killEffects) {

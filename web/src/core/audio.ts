@@ -3,6 +3,9 @@ import { SFX_NAMES, SFXName, GENERATED_SFX, MASTER_VOLUME, SFX_VOLUME, MUSIC_VOL
 /** Supernova detonation sound variants — A/B tested in the Threat Lab (`?threat=1`). */
 export type SupernovaSoundVariant = 'classic' | 'subdrop' | 'doom' | 'quake';
 
+/** Per-bullet-hit BlackHole sound variants — previewed in the BlackHole FX Lab (`?blackhole=1`). */
+export type BlackHoleHitVariant = 'thud' | 'gulp' | 'crack';
+
 // ============================================================
 // AudioManager — SFX + Procedural Music
 // ============================================================
@@ -1101,7 +1104,158 @@ export class AudioManager {
     noise.stop(now + 2.0);
   }
 
-  // --- BlackHole stress loop: two detuned subs beating + LFO tremolo, level-driven ---
+  /**
+   * Per-bullet-hit BlackHole sound — a short, deep "gut punch" so every shot that lands on
+   * the hole has weight (previously the hole was silent until spawn/stress/death). Three
+   * variants, same dispatcher pattern as the supernova sounds; previewed in the BlackHole
+   * FX Lab (`?blackhole=1`). Callers rate-limit (BH_HIT_SOUND_COOLDOWN_MS).
+   * - 'thud'  — saturated sub thump 130→32Hz + low band-passed noise crunch (production default)
+   * - 'gulp'  — darker "swallow": longer sub sweep 90→22Hz with a slow detuned beat
+   * - 'crack' — sharper: a hollow knock transient over a short sub tail + bright tick
+   */
+  playBlackHoleHit(variant: BlackHoleHitVariant = 'thud', volume: number = 1): void {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return;
+    const v = Math.min(1, Math.max(0, volume));
+    switch (variant) {
+      case 'thud': this.playBlackHoleHitThud(v); break;
+      case 'gulp': this.playBlackHoleHitGulp(v); break;
+      case 'crack': this.playBlackHoleHitCrack(v); break;
+    }
+  }
+
+  private playBlackHoleHitThud(v: number): void {
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    // Saturated sub thump — saturation adds harmonics so it reads on laptop speakers.
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(130, now);
+    sub.frequency.exponentialRampToValueAtTime(32, now + 0.22);
+    const sat = this.makeSaturator(3.0);
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0.55 * v, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    sub.connect(sat);
+    sat.connect(subGain);
+    subGain.connect(this.sfxGain!);
+    sub.start(now);
+    sub.stop(now + 0.35);
+
+    // Low crunch — band-passed noise dropping through the low mids.
+    const noise = this.makeNoiseSource(0.25);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(300, now);
+    bp.frequency.exponentialRampToValueAtTime(90, now + 0.22);
+    bp.Q.value = 1.2;
+    const nGain = ctx.createGain();
+    nGain.gain.setValueAtTime(0.22 * v, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+    noise.connect(bp);
+    bp.connect(nGain);
+    nGain.connect(this.sfxGain!);
+    noise.start(now);
+    noise.stop(now + 0.26);
+  }
+
+  private playBlackHoleHitGulp(v: number): void {
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    // Longer, darker sub sweep — matter being swallowed.
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(90, now);
+    sub.frequency.exponentialRampToValueAtTime(22, now + 0.5);
+    const sat = this.makeSaturator(3.0);
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0.5 * v, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    sub.connect(sat);
+    sat.connect(subGain);
+    subGain.connect(this.sfxGain!);
+    sub.start(now);
+    sub.stop(now + 0.62);
+
+    // Detuned second sub — a brief uneasy beat against the first (spawn-sound DNA).
+    const sub2 = ctx.createOscillator();
+    sub2.type = 'sine';
+    sub2.frequency.setValueAtTime(94, now);
+    sub2.frequency.exponentialRampToValueAtTime(24, now + 0.5);
+    const sub2Gain = ctx.createGain();
+    sub2Gain.gain.setValueAtTime(0.26 * v, now);
+    sub2Gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    sub2.connect(sub2Gain);
+    sub2Gain.connect(this.sfxGain!);
+    sub2.start(now);
+    sub2.stop(now + 0.62);
+
+    // Soft low rumble texture, well under the subs.
+    const noise = this.makeNoiseSource(0.4);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(240, now);
+    lp.frequency.exponentialRampToValueAtTime(80, now + 0.4);
+    const nGain = ctx.createGain();
+    nGain.gain.setValueAtTime(0.1 * v, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+    noise.connect(lp);
+    lp.connect(nGain);
+    nGain.connect(this.sfxGain!);
+    noise.start(now);
+    noise.stop(now + 0.44);
+  }
+
+  private playBlackHoleHitCrack(v: number): void {
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+
+    // Hollow knock transient — a mid triangle snap dropping fast.
+    const knock = ctx.createOscillator();
+    knock.type = 'triangle';
+    knock.frequency.setValueAtTime(260, now);
+    knock.frequency.exponentialRampToValueAtTime(90, now + 0.09);
+    const knockGain = ctx.createGain();
+    knockGain.gain.setValueAtTime(0.32 * v, now);
+    knockGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    knock.connect(knockGain);
+    knockGain.connect(this.sfxGain!);
+    knock.start(now);
+    knock.stop(now + 0.16);
+
+    // Short sub tail so the knock still lands low.
+    const sub = ctx.createOscillator();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(110, now);
+    sub.frequency.exponentialRampToValueAtTime(34, now + 0.18);
+    const sat = this.makeSaturator(3.0);
+    const subGain = ctx.createGain();
+    subGain.gain.setValueAtTime(0.4 * v, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+    sub.connect(sat);
+    sat.connect(subGain);
+    subGain.connect(this.sfxGain!);
+    sub.start(now);
+    sub.stop(now + 0.28);
+
+    // Bright tick — a short high noise snap for the impact surface.
+    const noise = this.makeNoiseSource(0.08);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2400;
+    bp.Q.value = 1.5;
+    const nGain = ctx.createGain();
+    nGain.gain.setValueAtTime(0.12 * v, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    noise.connect(bp);
+    bp.connect(nGain);
+    nGain.connect(this.sfxGain!);
+    noise.start(now);
+    noise.stop(now + 0.09);
+  }
+
+
   private stressOsc1: OscillatorNode | null = null;
   private stressOsc2: OscillatorNode | null = null;
   private stressLfo: OscillatorNode | null = null;

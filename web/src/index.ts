@@ -9,6 +9,7 @@ import type { LiquidGlassLab as LiquidGlassLabType } from './liquid-glass-lab';
 import type { PlayerDesignLab as PlayerDesignLabType } from './player-design-lab';
 import type { HudLab as HudLabType } from './hud-lab';
 import type { HudJuiceLab as HudJuiceLabType } from './hud-juice-lab';
+import type { BlackHoleLab as BlackHoleLabType } from './blackhole-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -170,6 +171,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(juiceLoop);
     }
     requestAnimationFrame(juiceLoop);
+  });
+} else if (bootParams.has('blackhole')) {
+  // BlackHole FX Lab — live-tune the bullet-hit ejecta/surge/sound + death FX (`?blackhole=1`)
+  import('./blackhole-lab').then(({ BlackHoleLab }) => {
+    const lab = new BlackHoleLab(gameCanvas);
+    (window as unknown as { blackHoleLab: BlackHoleLabType }).blackHoleLab = lab;
+    let last = performance.now();
+    function blackholeLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(blackholeLoop);
+    }
+    requestAnimationFrame(blackholeLoop);
   });
 } else {
   bootGame();

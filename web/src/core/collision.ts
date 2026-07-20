@@ -26,6 +26,15 @@ export interface CollisionResult {
     /** Boss HP fraction (hp/maxHp) BEFORE this hit — for milestone-crossing detection. */
     fracBefore: number;
   }[];
+  /** Every bullet impact on a blackhole-family unit (damage AND absorb) — drives the
+   *  per-hit thud. BlackHoles are not `bossFeedback` units, so they get their own list.
+   *  Optional so callers that build a result by hand (debug kill hooks) can omit it. */
+  blackholeHits?: {
+    /** Bullet contact point. */
+    position: Vec2;
+    /** Impact direction (rad): from the hole's center toward the bullet at contact. */
+    bulletAngle: number;
+  }[];
   playerHit: boolean;
 }
 
@@ -37,6 +46,7 @@ export function checkCollisions(
   const result: CollisionResult = {
     killedEnemies: [],
     bossHits: [],
+    blackholeHits: [],
     playerHit: false,
   };
 
@@ -48,6 +58,11 @@ export function checkCollisions(
       if (b.position.distanceToSq(e.position) < BULLET_COLLISION_RADIUS_ENEMY * BULLET_COLLISION_RADIUS_ENEMY) {
         const bulletAngle = Math.atan2(b.position.y - e.position.y, b.position.x - e.position.x);
         const reaction = e.onBulletHit(bulletAngle);
+
+        if (e.family === 'blackhole') {
+          // Per-hit thud (absorb + damage alike) — played (rate-limited) by CombatSystem.
+          result.blackholeHits!.push({ position: b.position.clone(), bulletAngle });
+        }
 
         if (reaction === 'reflect') {
           // Bounce bullet back — don't deactivate, don't damage

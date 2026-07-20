@@ -67,10 +67,26 @@ export const PARTICLE_FIELD_BH_EMIT_RATE = 1.4;        // per-frame emit chance 
 export const PARTICLE_FIELD_BH_EMIT_CRITICAL = 7;      // motes/frame streaming inward while destabilizing (desktop)
 export const PARTICLE_FIELD_BH_DETONATE_BURST = 160;   // motes erupted outward on supernova detonation (desktop)
 // Bullet-impact ejecta: every bullet that hits a hole kicks dust + matter out of the disk.
-export const PARTICLE_FIELD_BH_HIT_EJECTA = 22;        // fast hot dust motes per bullet impact (desktop)
-export const PARTICLE_FIELD_BH_HIT_EJECTA_MOBILE = 9;
-export const PARTICLE_FIELD_BH_HIT_MATTER = 12;        // slower colorful matter motes per bullet impact (desktop)
-export const PARTICLE_FIELD_BH_HIT_MATTER_MOBILE = 5;
+// (Strengthened after the "not enough dust on hit" feedback — counts roughly doubled vs.
+// the original 22/12; preview + retune live in the BlackHole FX Lab, `?blackhole=1`.)
+export const PARTICLE_FIELD_BH_HIT_EJECTA = 34;        // fast hot dust motes per bullet impact (desktop)
+export const PARTICLE_FIELD_BH_HIT_EJECTA_MOBILE = 14;
+export const PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD = 1.5; // fan half-angle (rad) of the hot jet
+export const PARTICLE_FIELD_BH_HIT_EJECTA_SPEED = 5.5;  // base speed of the hot jet motes
+export const PARTICLE_FIELD_BH_HIT_MATTER = 22;        // slower colorful matter motes per bullet impact (desktop)
+export const PARTICLE_FIELD_BH_HIT_MATTER_MOBILE = 9;
+export const PARTICLE_FIELD_BH_HIT_MATTER_SPREAD = 2.6; // fan half-angle (rad) of the matter fan
+export const PARTICLE_FIELD_BH_HIT_MATTER_SPEED = 2.0;  // base speed of the matter motes
+// On-hit swirl surge: a bullet hit also briefly excites the hole's OWN swirl arms + orbit
+// dots (brighter + faster), decaying back to baseline in a fraction of a second. The
+// BlackHole instance copies these into per-instance knobs so the lab can tune them live.
+export const BH_HIT_SURGE_KICK = 1;              // surge added per bullet hit (stacks up to the cap)
+export const BH_HIT_SURGE_MAX = 2;               // cap so rapid fire saturates instead of blowing out
+export const BH_HIT_SURGE_DECAY = 0.0022;        // surge lost per ms (~450ms for a single hit to fade)
+export const BH_HIT_SWIRL_SPEED_SURGE = 1.2;     // extra swirl-arm infall speed at full surge
+export const BH_HIT_SWIRL_BRIGHT_SURGE = 1.4;    // extra swirl-arm brightness at full surge
+export const BH_HIT_ORBIT_SPEED_SURGE = 2.0;     // extra orbit-dot angular speed at full surge
+export const BH_HIT_ORBIT_BRIGHT_SURGE = 1.0;    // extra orbit-dot brightness at full surge
 // Player-kill death: a loud multi-hue eruption plus a long-lived slow "fizz-out" cloud.
 export const PARTICLE_FIELD_BH_DEATH_BURST = 140;      // fast hot eruption motes (desktop)
 export const PARTICLE_FIELD_BH_DEATH_FIZZ = 110;       // lingering slow fizz-out motes (desktop)

@@ -45,6 +45,9 @@ export const BOSS_HIT_SPARK_COUNT = 5;              // contact-spark motes per n
 export const BOSS_HIT_GRID_IMPULSE = 130;           // grid dimple strength per hit
 export const BOSS_HIT_GRID_RADIUS = 90;             // grid dimple radius per hit
 export const BOSS_HIT_SOUND_COOLDOWN_MS = 45;       // min gap between per-hit ticks (rate-limit spam)
+// BlackHole per-bullet-hit sound (deep thud — the hole is not a `bossFeedback` unit, so it
+// has its own tick): same rate-limit treatment as the boss tick so rapid fire can't stack it.
+export const BH_HIT_SOUND_COOLDOWN_MS = 45;
 // Damage fractions (0 = pristine → 1 = dead) at which a milestone "chunk" fires.
 export const BOSS_MILESTONE_FRACTIONS = [0.25, 0.5, 0.75];
 export const BOSS_MILESTONE_SHAKE = 6;              // screen shake on a damage milestone

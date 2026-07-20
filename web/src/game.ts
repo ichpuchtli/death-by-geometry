@@ -80,8 +80,12 @@ import {
   PARTICLE_FIELD_BH_EMIT_CRITICAL,
   PARTICLE_FIELD_BH_HIT_EJECTA,
   PARTICLE_FIELD_BH_HIT_EJECTA_MOBILE,
+  PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD,
+  PARTICLE_FIELD_BH_HIT_EJECTA_SPEED,
   PARTICLE_FIELD_BH_HIT_MATTER,
   PARTICLE_FIELD_BH_HIT_MATTER_MOBILE,
+  PARTICLE_FIELD_BH_HIT_MATTER_SPREAD,
+  PARTICLE_FIELD_BH_HIT_MATTER_SPEED,
   BULLET_WAKE_LEAD,
   BULLET_WAKE_LEAD_RADIUS,
   BULLET_WAKE_BOW_WELL,
@@ -974,9 +978,9 @@ export class Game {
           const hx = e.position.x + Math.cos(hitAngle) * e.collisionRadius * 0.9;
           const hy = e.position.y + Math.sin(hitAngle) * e.collisionRadius * 0.9;
           // Hot fast jet (amber-white) shooting back out along the impact direction
-          this.field.spawnBurst(hx, hy, hitAngle, 1.5, ejectaCount, 5.5, 35, 0.55);
+          this.field.spawnBurst(hx, hy, hitAngle, PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD, ejectaCount, PARTICLE_FIELD_BH_HIT_EJECTA_SPEED, 35, 0.55);
           // Slower colorful matter flung wider — rides the disk's swirl afterwards
-          this.field.spawnBurst(hx, hy, hitAngle, 2.6, matterCount, 2.0, 190 + Math.random() * 130, 1.1);
+          this.field.spawnBurst(hx, hy, hitAngle, PARTICLE_FIELD_BH_HIT_MATTER_SPREAD, matterCount, PARTICLE_FIELD_BH_HIT_MATTER_SPEED, 190 + Math.random() * 130, 1.1);
         }
         e.impactEjecta.length = 0;
       }
