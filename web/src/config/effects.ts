@@ -66,6 +66,21 @@ export const PARTICLE_FIELD_BH_EMIT_BASE = 0.9;        // baseline per-frame emi
 export const PARTICLE_FIELD_BH_EMIT_RATE = 2.2;        // per-frame emit chance added at full mass (scales with fill fraction)
 export const PARTICLE_FIELD_BH_EMIT_CRITICAL = 10;     // motes/frame streaming inward while destabilizing (desktop)
 export const PARTICLE_FIELD_BH_DETONATE_BURST = 160;   // motes erupted outward on supernova detonation (desktop)
+// Accretion-disk ACCUMULATION: each hole carries a diskCharge (0..1) — how much dust it has
+// collected. It builds slowly over the hole's whole life and jumps when the hole feeds —
+// monotonic, the disk never depletes. The rim DUST trickle scales its mote count with
+// charge (MIN at empty → MAX at full); charged motes live longer and spawn with a
+// tangential (orbital) bias so they settle INTO orbit instead of just raining in and
+// dying — this is what makes the ring visibly collect.
+export const BH_DISK_CHARGE_RATE = 0.014;         // charge gained per second (fresh hole → thick disk in ~70s — builds across the whole life)
+export const BH_DISK_CHARGE_ABSORB_GAIN = 0.15;   // charge added per absorbed enemy — feeding fattens the disk
+export const BH_DISK_MOTES_MIN = 2;               // rim trickle motes at zero charge (desktop)
+export const BH_DISK_MOTES_MAX = 9;               // rim trickle motes at full charge (desktop)
+export const BH_DISK_MOTES_MIN_MOBILE = 1;
+export const BH_DISK_MOTES_MAX_MOBILE = 4;
+export const BH_DISK_MOTE_LIFE = 1.6;             // s — trickle life at full charge (vs 0.95 baseline) so collected dust lingers in orbit
+export const BH_DISK_MOTE_TANGENT = 0.65;         // orbital velocity bias at full charge: 0 = pure inward rain, 1 = pure orbit (sign follows the hole's dustSwirl)
+export const BH_DISK_HIT_SPRAY = 0.5;             // extra hit-DUST burst fraction at full charge — a fat disk sprays more when shot
 // Ambient EMBER emission (the "particles" element, mote kind 1): hot bright motes shed on
 // the rim that orbit + infall — always on, so the disk sparkles even between hits.
 export const PARTICLE_FIELD_BH_EMBER_BASE = 0.55;      // per-frame ember emission chance (desktop)
@@ -85,10 +100,10 @@ export const PARTICLE_FIELD_BH_HIT_PARTICLES_SPREAD = 1.5; // fan half-angle (ra
 export const PARTICLE_FIELD_BH_HIT_PARTICLES_SPEED = 5.5;  // fast, but still bound — it curves back
 // 3. MATTER (massless — the headline): sharp escaping lance projectiles. Gravity does NOT
 //    act on them; they spray outward and escape (renderer/matter-field.ts, no attractors).
-export const BH_HIT_MATTER_COUNT = 26;        // lances per bullet impact (desktop)
+export const BH_HIT_MATTER_COUNT = 30;        // lances per bullet impact (desktop)
 export const BH_HIT_MATTER_COUNT_MOBILE = 10;
-export const BH_HIT_MATTER_SPEED = 7.0;       // px/frame — fast enough to clearly escape the disk
-export const BH_HIT_MATTER_SPREAD = 1.6;      // fan half-angle (rad)
+export const BH_HIT_MATTER_SPEED = 11.0;      // px/frame — fast enough to clearly escape the disk
+export const BH_HIT_MATTER_SPREAD = 1.9;      // fan half-angle (rad)
 export const BH_HIT_MATTER_LIFE = 0.9;        // seconds
 export const MATTER_FIELD_MAX = 700;          // live lance cap (desktop perf guard)
 export const MATTER_FIELD_MAX_MOBILE = 260;

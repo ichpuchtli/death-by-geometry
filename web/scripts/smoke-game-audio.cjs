@@ -1,8 +1,8 @@
 // Headless smoke test for the shipped black-hole samples:
 // loads the real game off a running preview server, triggers audio init with a
-// pointer gesture, then verifies the three promoted ElevenLabs mp3s
-// (blackhole-hit / blackhole-absorb / blackhole-death, see GENERATED_SFX) are
-// fetched with HTTP 200 and the page produces zero console errors.
+// pointer gesture, then verifies the four promoted ElevenLabs mp3s
+// (blackhole-hit / blackhole-absorb / blackhole-death / blackhole-spawn,
+// see GENERATED_SFX) are fetched with HTTP 200 and the page produces zero console errors.
 // Audibility cannot be verified headlessly — this only proves the load path.
 const { chromium } = require('playwright');
 
@@ -19,7 +19,7 @@ const { chromium } = require('playwright');
   });
   page.on('pageerror', (err) => errors.push(String(err)));
 
-  const wanted = ['blackhole-hit', 'blackhole-absorb', 'blackhole-death'];
+  const wanted = ['blackhole-hit', 'blackhole-absorb', 'blackhole-death', 'blackhole-spawn'];
   const seen = {}; // name -> HTTP status
   page.on('response', (resp) => {
     for (const name of wanted) {

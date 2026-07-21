@@ -29,8 +29,9 @@ const { chromium } = require('playwright');
     lab.playProceduralHit('thud');
     lab.playDeathVariant('subdrop');
     lab.playCandidate(1);
+    lab.playSpawnCandidate(1);
     const buttons = document.querySelectorAll('#sfx-lab-page button');
-    const pendingBadges = [...document.querySelectorAll('#sfx-lab-page span')]
+    const pendingIn = (id) => [...document.querySelectorAll(`#${id} span`)]
       .filter((el) => el.textContent === 'pending generation').length;
     return {
       ok: true,
@@ -39,8 +40,14 @@ const { chromium } = require('playwright');
       candidates: lab.candidates.length,
       available: lab.candidates.filter((c) => c.available).length,
       entriesRendered: lab.entriesRendered,
+      spawnReady: lab.spawnReady,
+      spawnLoadError: lab.spawnLoadError,
+      spawnCandidates: lab.spawnCandidates.length,
+      spawnAvailable: lab.spawnCandidates.filter((c) => c.available).length,
+      spawnEntriesRendered: lab.spawnEntriesRendered,
       buttons: buttons.length,
-      pendingBadges,
+      pendingBadges: pendingIn('sfx-lab-candidates'),
+      spawnPendingBadges: pendingIn('sfx-lab-spawn-candidates'),
     };
   });
 
@@ -60,7 +67,12 @@ const { chromium } = require('playwright');
     info.entriesRendered === 12 &&
     // All 12 either playable (post-generation) or pending (pre-generation)
     info.available + info.pendingBadges === 12 &&
-    info.buttons >= 12 + 3 + 4 && // candidates + 3 procedural hits + 4 deaths
+    info.spawnReady &&
+    !info.spawnLoadError &&
+    info.spawnCandidates === 11 &&
+    info.spawnEntriesRendered === 11 &&
+    info.spawnAvailable + info.spawnPendingBadges === 11 &&
+    info.buttons >= 12 + 11 + 3 + 4 && // hit + spawn candidates + 3 procedural hits + 4 deaths
     errors.length === 0;
   if (!pass) {
     console.error('SMOKE FAIL');

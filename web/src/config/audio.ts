@@ -12,6 +12,8 @@ export const GENERATED_SFX: Record<string, string> = {
   'blackhole-hit': './sounds/generated/blackhole-hit.mp3',
   'blackhole-absorb': './sounds/generated/blackhole-absorb.mp3',
   'blackhole-death': './sounds/generated/blackhole-death.mp3',
+  // Black hole spawn (ElevenLabs pick from sounds/generated/blackhole-spawn/)
+  'blackhole-spawn': './sounds/generated/blackhole-spawn.mp3',
 };
 export const MASTER_VOLUME = 0.5;
 export const SFX_VOLUME = 0.6;

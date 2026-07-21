@@ -98,6 +98,13 @@ import {
   MATTER_FIELD_MAX_MOBILE,
   BH_MATTER_TRICKLE,
   BH_MATTER_TRICKLE_COUNT,
+  BH_DISK_MOTES_MIN,
+  BH_DISK_MOTES_MAX,
+  BH_DISK_MOTES_MIN_MOBILE,
+  BH_DISK_MOTES_MAX_MOBILE,
+  BH_DISK_MOTE_LIFE,
+  BH_DISK_MOTE_TANGENT,
+  BH_DISK_HIT_SPRAY,
   BULLET_WAKE_LEAD,
   BULLET_WAKE_LEAD_RADIUS,
   BULLET_WAKE_BOW_WELL,
@@ -990,7 +997,8 @@ export class Game {
       //   DUST (massy) fans out slow + cool and rides the swirl back in.
       if (e.impactEjecta.length > 0) {
         const emberCount = this.mobile ? PARTICLE_FIELD_BH_HIT_PARTICLES_MOBILE : PARTICLE_FIELD_BH_HIT_PARTICLES;
-        const dustCount = this.mobile ? PARTICLE_FIELD_BH_HIT_DUST_MOBILE : PARTICLE_FIELD_BH_HIT_DUST;
+        // A fat disk sprays more when shot — the extra dust is disk material knocked loose
+        const dustCount = Math.round((this.mobile ? PARTICLE_FIELD_BH_HIT_DUST_MOBILE : PARTICLE_FIELD_BH_HIT_DUST) * (1 + e.diskCharge * BH_DISK_HIT_SPRAY));
         const matterCount = this.mobile ? BH_HIT_MATTER_COUNT_MOBILE : BH_HIT_MATTER_COUNT;
         for (const hitAngle of e.impactEjecta) {
           const hx = e.position.x + Math.cos(hitAngle) * e.collisionRadius * 0.9;
@@ -1011,20 +1019,30 @@ export class Game {
       // as it fills.
       const rimBase = e.collisionRadius * 1.6;
       const emitHue = 210 - heat * 180;
-      const emit = (count: number, speed: number, life: number): void => {
+      // `tangent` rotates the spawn direction away from pure inward rain toward an orbital
+      // bias (sign follows the hole's dustSwirl), so collected dust settles INTO orbit.
+      const emit = (count: number, speed: number, life: number, tangent = 0): void => {
         for (let k = 0; k < count; k++) {
           const a = Math.random() * Math.PI * 2;
           const rr = rimBase + Math.random() * e.collisionRadius * 1.4;
           const rx = e.position.x + Math.cos(a) * rr;
           const ry = e.position.y + Math.sin(a) * rr;
           const inward = Math.atan2(e.position.y - ry, e.position.x - rx);
-          this.field.spawnBurst(rx, ry, inward, 1.1, 1, speed, emitHue, life);
+          this.field.spawnBurst(rx, ry, inward + tangent, 1.1, 1, speed, emitHue, life);
         }
       };
       if (e.destabilizing && !e.overloaded) {
         emit(this.mobile ? 4 : PARTICLE_FIELD_BH_EMIT_CRITICAL, 0.25 + Math.random() * 0.2, 0.8);
       } else if (Math.random() < PARTICLE_FIELD_BH_EMIT_BASE + inst * PARTICLE_FIELD_BH_EMIT_RATE) {
-        emit(this.mobile ? 2 : 5, 0.12 + Math.random() * 0.14, 0.95);
+        // Disk accumulation: the trickle thickens with diskCharge (MIN→MAX motes), and
+        // charged motes live longer + spawn with a growing tangential bias so they join
+        // the orbit instead of raining in and dying — the ring visibly collects.
+        const mMin = this.mobile ? BH_DISK_MOTES_MIN_MOBILE : BH_DISK_MOTES_MIN;
+        const mMax = this.mobile ? BH_DISK_MOTES_MAX_MOBILE : BH_DISK_MOTES_MAX;
+        const diskCount = Math.round(mMin + e.diskCharge * (mMax - mMin));
+        const diskLife = 0.95 + e.diskCharge * (BH_DISK_MOTE_LIFE - 0.95);
+        const diskTangent = e.diskCharge * BH_DISK_MOTE_TANGENT * (Math.PI / 2) * (Math.sign(e.dustSwirl) || 1);
+        emit(diskCount, 0.12 + Math.random() * 0.14, diskLife, diskTangent);
       }
       // Ambient EMBERS (the "particles" element) — hot bright motes shed on the rim that
       // orbit + infall, so the disk sparkles even between bullet hits.

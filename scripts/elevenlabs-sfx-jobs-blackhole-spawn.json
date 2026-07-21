@@ -1,0 +1,82 @@
+[
+  {
+    "text": "Black hole implosion swell: a deep reverse swell of air pressure rising slowly, then a single soft massive sub-bass thud as the void snaps open. Warm, dark, cinematic high-fidelity sound design, felt in the chest. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_implosion_swell_elevenlabs_v1.mp3",
+    "duration": 2.0,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Gravity tear: the slow deep rending of space itself, a vast fabric-of-reality rip with heavy sub-bass body and a smooth dark tail, ominous and enormous. Cinematic high-fidelity sound design. No distortion, no harsh highs, no metallic screech, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_gravity_tear_elevenlabs_v1.mp3",
+    "duration": 2.2,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Void bloom: a dark low bloom opening outward like a flower of pure shadow, warm sub-bass whoosh with a soft round attack and a long smooth decay into silence. Cinematic, high-fidelity, deep and velvety. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_void_bloom_elevenlabs_v1.mp3",
+    "duration": 2.0,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Deep cosmic inhale: a vast slow inward breath, all the air in the room being sucked into a single point of darkness, building pressure that resolves into a soft deep sub drop. Smooth, dark, cinematic high-fidelity sound design. No distortion, no harsh highs, no liquid sounds, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_deep_inhale_elevenlabs_v1.mp3",
+    "duration": 2.4,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Sub pressure wave: an enormous low-frequency pressure front rolling slowly past, felt more than heard, centered around 40 Hz, with a gentle dark rumble and a clean natural decay. Cinematic high-fidelity sound design, massive and smooth. No distortion, no harsh highs, no lo-fi artifacts.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_pressure_wave_elevenlabs_v1.mp3",
+    "duration": 2.2,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Dark portal hum: a deep ominous hum fading in from silence and swelling, like a doorway to a void powering open, warm analog low-end with a slow dark tremolo. Cinematic high-fidelity sound design, smooth and menacing. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_portal_hum_elevenlabs_v1.mp3",
+    "duration": 2.5,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Magnetic inward pull: a deep magnetic drone tightening and descending in pitch, like colossal forces converging on one point, resolving into a soft warm sub impact. Round, dark, cinematic high-fidelity sound design. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_magnetic_pull_elevenlabs_v1.mp3",
+    "duration": 2.0,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Velvet collapse: a smooth dark collapse inward, heavy air folding into itself with a warm sub-bass body and a soft hollow resonance, like thunder heard through thick velvet. Cinematic, high-fidelity, deep and smooth. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_velvet_collapse_elevenlabs_v1.mp3",
+    "duration": 1.8,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Leviathan arrival: the enormous deep groan of something impossibly massive arriving from far away, a slow organic sub-bass moan with dark weight and a clean decay, dry and huge. Cinematic high-fidelity sound design. No distortion, no harsh highs, no liquid or wet sounds, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_leviathan_arrival_elevenlabs_v1.mp3",
+    "duration": 2.4,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Event horizon toll: a single deep resonant toll like a colossal dark bell struck once inside a cavern, round warm fundamental with a slow blooming decay, ominous and sacred. Cinematic high-fidelity sound design. No distortion, no harsh highs, no bright metallic overtones, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-spawn/blackhole_spawn_horizon_toll_elevenlabs_v1.mp3",
+    "duration": 2.5,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  }
+]

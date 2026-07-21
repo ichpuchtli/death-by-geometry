@@ -29,6 +29,13 @@ import {
   MATTER_FIELD_MAX,
   BH_MATTER_TRICKLE,
   BH_MATTER_TRICKLE_COUNT,
+  BH_DISK_CHARGE_RATE,
+  BH_DISK_CHARGE_ABSORB_GAIN,
+  BH_DISK_MOTES_MIN,
+  BH_DISK_MOTES_MAX,
+  BH_DISK_MOTE_LIFE,
+  BH_DISK_MOTE_TANGENT,
+  BH_DISK_HIT_SPRAY,
   BH_HIT_SURGE_DECAY,
   BH_HIT_SWIRL_SPEED_SURGE,
   BH_HIT_ORBIT_SPEED_SURGE,
@@ -112,7 +119,9 @@ interface PendingHit {
  * `onBulletHit` path (hit pulse + sparks + the three-element burst + swirl/orbit surge +
  * the per-hit thud); Destroy runs the death path (eruption + supernova sound variants).
  * The sliders drive the same knobs the game reads from config, so a winning tuning can
- * be ported straight back into `config/effects.ts`.
+ * be ported straight back into `config/effects.ts`. The hole's `diskCharge` accumulates
+ * over lab time (Disk accumulation slider group) — monotonic, the dust ring visibly
+ * collects and never depletes.
  */
 export class BlackHoleLab {
   private renderer: Renderer;
@@ -144,6 +153,11 @@ export class BlackHoleLab {
   dustCount = PARTICLE_FIELD_BH_HIT_DUST;
   dustSpeed = PARTICLE_FIELD_BH_HIT_DUST_SPEED;
   dustSpread = PARTICLE_FIELD_BH_HIT_DUST_SPREAD;
+  // Disk accumulation (pushed onto the hole via applyDiskKnobs)
+  diskChargeRate = BH_DISK_CHARGE_RATE;
+  diskAbsorbGain = BH_DISK_CHARGE_ABSORB_GAIN;
+  diskMotesMin = BH_DISK_MOTES_MIN;
+  diskMotesMax = BH_DISK_MOTES_MAX;
   // Ambient
   emberRate = PARTICLE_FIELD_BH_EMBER_BASE;
   swirlSurge = BH_HIT_SWIRL_SPEED_SURGE;
@@ -229,6 +243,7 @@ export class BlackHoleLab {
     bh.spawnTimer = 0;
     bh.visualMode = this.visualMode;
     this.applySurgeKnobs(bh);
+    this.applyDiskKnobs(bh);
     this.bh = bh;
     this.grid.applyImpulse(0, 0, -800, 350);
   }
@@ -240,6 +255,12 @@ export class BlackHoleLab {
     bh.orbitSpeedSurge = this.orbitExcite;
     bh.orbitBrightSurge = this.orbitExcite * 0.5;
     bh.hitSurgeDecay = 1 / this.surgeMs;
+  }
+
+  /** Push the disk-accumulation sliders onto the hole (per-instance knobs on BlackHole). */
+  private applyDiskKnobs(bh: BlackHole): void {
+    bh.diskChargeRate = this.diskChargeRate;
+    bh.diskChargeAbsorbGain = this.diskAbsorbGain;
   }
 
   /** Queue a shot at the hole from `angle` (rad, direction from hole center to impact). */
@@ -408,22 +429,27 @@ export class BlackHoleLab {
           this.matter.spray(hx, hy, hitAngle, this.matterSpread, Math.round(this.matterCount), this.matterSpeed, BH_HIT_MATTER_LIFE);
           // PARTICLES — hot ember jet (massy: curves back into the well)
           this.field.spawnBurst(hx, hy, hitAngle, this.particleSpread, Math.round(this.particleCount), this.particleSpeed, 35, 0.7, 1);
-          // DUST — slow cool fan (massy: rides the swirl back in)
-          this.field.spawnBurst(hx, hy, hitAngle, this.dustSpread, Math.round(this.dustCount), this.dustSpeed, 190 + Math.random() * 130, 1.1);
+          // DUST — slow cool fan (massy: rides the swirl back in); a fat disk sprays more
+          this.field.spawnBurst(hx, hy, hitAngle, this.dustSpread, Math.round(this.dustCount * (1 + bh.diskCharge * BH_DISK_HIT_SPRAY)), this.dustSpeed, 190 + Math.random() * 130, 1.1);
         }
         bh.impactEjecta.length = 0;
       }
 
-      // Ambient rim DUST emission (the game's steady trickle) so the disk is always alive
+      // Ambient rim DUST emission (the game's steady trickle) so the disk is always alive —
+      // scaled by diskCharge like the game: more motes, longer-lived, with a growing
+      // tangential (orbital) bias so the lab hole visibly accumulates over lab time.
       if (Math.random() < PARTICLE_FIELD_BH_EMIT_BASE) {
         const heat = inst * 0.5;
-        for (let k = 0; k < 5; k++) {
+        const diskCount = Math.round(this.diskMotesMin + bh.diskCharge * (this.diskMotesMax - this.diskMotesMin));
+        const diskLife = 0.95 + bh.diskCharge * (BH_DISK_MOTE_LIFE - 0.95);
+        const diskTangent = bh.diskCharge * BH_DISK_MOTE_TANGENT * (Math.PI / 2) * (Math.sign(bh.dustSwirl) || 1);
+        for (let k = 0; k < diskCount; k++) {
           const a = Math.random() * TWO_PI;
           const rr = bh.collisionRadius * (1.6 + Math.random() * 1.4);
           const rx = bh.position.x + Math.cos(a) * rr;
           const ry = bh.position.y + Math.sin(a) * rr;
           const inward = Math.atan2(bh.position.y - ry, bh.position.x - rx);
-          this.field.spawnBurst(rx, ry, inward, 1.1, 1, 0.12 + Math.random() * 0.14, 210 - heat * 180, 0.95);
+          this.field.spawnBurst(rx, ry, inward + diskTangent, 1.1, 1, 0.12 + Math.random() * 0.14, 210 - heat * 180, diskLife);
         }
       }
 
@@ -569,6 +595,18 @@ export class BlackHoleLab {
     this.addSlider('Dust speed', 0.5, 5, 0.1, () => this.dustSpeed, (v) => { this.dustSpeed = v; });
     this.addSlider('Dust spread', 0.5, 3.1, 0.05, () => this.dustSpread, (v) => { this.dustSpread = v; });
 
+    this.panel.appendChild(this.panelLabel('Disk accumulation (collects over time)'));
+    this.addSlider('Charge rate /s', 0, 0.1, 0.005, () => this.diskChargeRate, (v) => {
+      this.diskChargeRate = v;
+      if (this.bh) this.applyDiskKnobs(this.bh);
+    });
+    this.addSlider('Absorb gain', 0, 0.5, 0.01, () => this.diskAbsorbGain, (v) => {
+      this.diskAbsorbGain = v;
+      if (this.bh) this.applyDiskKnobs(this.bh);
+    });
+    this.addSlider('Disk motes min', 0, 10, 1, () => this.diskMotesMin, (v) => { this.diskMotesMin = v; });
+    this.addSlider('Disk motes max', 0, 20, 1, () => this.diskMotesMax, (v) => { this.diskMotesMax = v; });
+
     this.panel.appendChild(this.panelLabel('Swirl / orbit surge (on hit)'));
     this.addSlider('Swirl surge', 0, 3, 0.05, () => this.swirlSurge, (v) => {
       this.swirlSurge = v;
@@ -703,7 +741,7 @@ export class BlackHoleLab {
       return;
     }
     this.statusLine.textContent =
-      `mode ${bh.visualMode} · mass ${bh.absorbedCount}/${BlackHole.MAX_ABSORB} · ` +
+      `mode ${bh.visualMode} · mass ${bh.absorbedCount}/${BlackHole.MAX_ABSORB} · disk ${(bh.diskCharge * 100).toFixed(0)}% · ` +
       `motes ${this.field.count} · lances ${this.matter.count} · hits ${this.hitCount} · sound ${this.hitVariant}@${this.hitVolume.toFixed(2)}`;
   }
 }

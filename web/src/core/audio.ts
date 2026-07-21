@@ -1044,12 +1044,26 @@ export class AudioManager {
   }
 
   /**
-   * BlackHole spawn: a deep, ominous bass swell as the gravity well tears open in space.
-   * Low & weighty — a saturated sub sweeping DOWN (matter collapsing inward), a slow detuned
-   * beat for unease, and a low-passed noise rumble for the "tearing" texture. Roughly matches
-   * the 3s spawn telegraph so the sound and the growing warning ring land together.
+   * BlackHole spawn: the ElevenLabs 'implosion_swell' sample (picked in the SFX Lab) at
+   * 0.85 × the caller's volume — the spawn is a big moment, so it sits a bit louder than
+   * the absorb. Falls back to the procedural swell while the async sample load is still
+   * in flight. Called by SpawnSystem at spawn start (full volume) and for formation
+   * leakthrough (reduced volume).
    */
   playBlackHoleSpawn(volume: number = 1): void {
+    if (!this.playGeneratedBuffer('blackhole-spawn', volume * 0.85)) {
+      this.playBlackHoleSpawnProcedural(volume);
+    }
+  }
+
+  /**
+   * Procedural BlackHole spawn fallback: a deep, ominous bass swell as the gravity well
+   * tears open in space. Low & weighty — a saturated sub sweeping DOWN (matter collapsing
+   * inward), a slow detuned beat for unease, and a low-passed noise rumble for the
+   * "tearing" texture. Roughly matches the 3s spawn telegraph so the sound and the
+   * growing warning ring land together.
+   */
+  private playBlackHoleSpawnProcedural(volume: number): void {
     if (!this._initialized || !this.ctx || !this.sfxGain) return;
     const ctx = this.ctx;
     const now = ctx.currentTime;

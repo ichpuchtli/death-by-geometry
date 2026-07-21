@@ -18,11 +18,13 @@ const DEATH_VARIANTS: SupernovaSoundVariant[] = ['classic', 'subdrop', 'doom', '
 const CANDIDATE_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
 const CANDIDATE_KEY_LABELS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
 const AUDITION_BASE = './sfx-audition/blackhole-hit';
+const AUDITION_SPAWN_BASE = './sfx-audition/blackhole-spawn';
 // Candidates promoted into the game (copied to web/public/sounds/generated/, see GENERATED_SFX)
 const IN_GAME_BADGES: Record<string, string> = {
   'blackhole_hit_magnetic_thump_a_elevenlabs_v3.mp3': 'IN GAME — hit',
   'blackhole_hit_heartbeat_hollow_elevenlabs_v3.mp3': 'IN GAME — absorb',
   'blackhole_hit_sub_drop_thump_elevenlabs_v3.mp3': 'IN GAME — death',
+  'blackhole_spawn_implosion_swell_elevenlabs_v1.mp3': 'IN GAME — spawn',
 };
 
 interface SpamState {
@@ -33,13 +35,18 @@ interface SpamState {
 
 /**
  * SFX Audition Lab (`?sfx=1`) — a DOM page (no canvas scene) for auditioning black-hole
- * hit sounds and picking a winner. Three sections:
+ * sounds and picking winners. Four sections:
  *   1. Procedural hits (playable now) — the shipped `playBlackHoleHit` variants.
- *   2. ElevenLabs candidates — the 12-job manifest `scripts/elevenlabs-sfx-jobs-blackhole-hit.json`,
+ *   2. ElevenLabs hit candidates — the 12-job manifest `scripts/elevenlabs-sfx-jobs-blackhole-hit.json`,
  *      served via `web/public/sfx-audition/blackhole-hit/index.json` (see
  *      `web/scripts/sync-sfx-audition.mjs`). Ungenerated entries render as
  *      "pending generation" (disabled) — never an error.
  *   3. Procedural deaths — the `playSupernovaVariant` set, for A/B contrast.
+ *   4. ElevenLabs spawn candidates — the 10-job manifest
+ *      `scripts/elevenlabs-sfx-jobs-blackhole-spawn.json` + the copy-only legacy
+ *      `blackhole_form_elevenlabs_v1.mp3` (11 rows), served via
+ *      `web/public/sfx-audition/blackhole-spawn/index.json`. Click-only (the
+ *      1-9,0,-,= keys belong to the hit section).
  * Every playable row has a rapid-fire spam toggle (rate slider 6–10 hits/s) so layering
  * under sustained fire can be judged; procedural spam keeps the game's 45ms min-gap.
  * Candidates promoted into the game (IN_GAME_BADGES) get a green "IN GAME — …" tag.
@@ -51,6 +58,10 @@ export class SfxLab {
   /** true once index.json has been fetched (or failed — check loadError). */
   ready = false;
   loadError: string | null = null;
+  spawnCandidates: SfxCandidate[] = [];
+  spawnReady = false;
+  spawnLoadError: string | null = null;
+  spawnEntriesRendered = 0;
   volume = 0.8;
   spamRate = 8; // hits/sec for the rapid-fire toggles
   entriesRendered = 0;
@@ -79,6 +90,7 @@ export class SfxLab {
 
     this.buildShell();
     this.loadCandidates();
+    this.loadSpawnCandidates();
   }
 
   // ============================================================
@@ -95,6 +107,19 @@ export class SfxLab {
     }
     this.ready = true;
     this.renderCandidates();
+  }
+
+  private async loadSpawnCandidates(): Promise<void> {
+    try {
+      const resp = await fetch(`${AUDITION_SPAWN_BASE}/index.json`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      this.spawnCandidates = (await resp.json()) as SfxCandidate[];
+    } catch {
+      this.spawnLoadError = 'index.json not found — run `npm run sfx:sync` (in web/) to (re)build the audition index.';
+      this.spawnCandidates = [];
+    }
+    this.spawnReady = true;
+    this.renderSpawnCandidates();
   }
 
   // ============================================================
@@ -117,6 +142,15 @@ export class SfxLab {
     const c = this.candidates[id - 1];
     if (!c || !c.available) return;
     const el = new Audio(`${AUDITION_BASE}/${c.file}`);
+    el.volume = this.volume;
+    el.play().catch(() => {});
+  }
+
+  /** ElevenLabs spawn candidate by 1-based id. No-op (never an error) while pending generation. */
+  playSpawnCandidate(id: number): void {
+    const c = this.spawnCandidates[id - 1];
+    if (!c || !c.available) return;
+    const el = new Audio(`${AUDITION_SPAWN_BASE}/${c.file}`);
     el.volume = this.volume;
     el.play().catch(() => {});
   }
@@ -151,12 +185,12 @@ export class SfxLab {
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:17px;font-weight:bold;color:#ffc9a0;text-shadow:0 0 8px rgba(255,150,60,0.5);';
-    title.textContent = 'SFX AUDITION LAB — black hole hit candidates';
+    title.textContent = 'SFX AUDITION LAB — black hole hit + spawn candidates';
     const sub = document.createElement('div');
     sub.style.cssText = 'color:#c88a5a;margin-bottom:10px;';
     sub.textContent =
       'Audition lab — rows tagged IN GAME are promoted into gameplay (web/public/sounds/generated/). ' +
-      'Generate: npm run sfx:elevenlabs -- --manifest scripts/elevenlabs-sfx-jobs-blackhole-hit.json (repo root) · then: npm run sfx:sync (web/). Keys 1-9,0,-,= play candidates 1-12.';
+      'Generate: npm run sfx:elevenlabs -- --manifest <manifest> (repo root) · then: npm run sfx:sync (web/). Keys 1-9,0,-,= play hit candidates 1-12; spawn rows are click-only.';
     this.page.append(title, sub);
 
     // Global controls: volume + spam rate
@@ -206,6 +240,14 @@ export class SfxLab {
       }));
     }
     this.page.appendChild(deathRow);
+
+    // Section 4 — ElevenLabs spawn candidates (filled in by loadSpawnCandidates)
+    this.page.appendChild(this.sectionTitle('4 · Black hole spawn — ElevenLabs candidates (11)'));
+    const spawnList = document.createElement('div');
+    spawnList.id = 'sfx-lab-spawn-candidates';
+    spawnList.textContent = 'loading index.json…';
+    spawnList.style.color = '#6f8aa8';
+    this.page.appendChild(spawnList);
   }
 
   private renderCandidates(): void {
@@ -231,6 +273,31 @@ export class SfxLab {
       list.appendChild(row);
       this.entriesRendered++;
     });
+  }
+
+  private renderSpawnCandidates(): void {
+    const list = document.getElementById('sfx-lab-spawn-candidates') as HTMLDivElement | null;
+    if (!list) return;
+    list.innerHTML = '';
+    list.style.color = '';
+    if (this.spawnLoadError) {
+      list.textContent = this.spawnLoadError;
+      list.style.color = '#c88a5a';
+      return;
+    }
+    this.spawnEntriesRendered = 0;
+    for (const c of this.spawnCandidates) {
+      const row = this.entryRow({
+        label: c.name,
+        keyHint: null, // spawn rows are click-only (keys 1-9,0,-,= belong to the hit section)
+        available: c.available,
+        prompt: c.prompt,
+        badge: IN_GAME_BADGES[c.file] ?? null,
+        play: () => this.playSpawnCandidate(c.id),
+      });
+      list.appendChild(row);
+      this.spawnEntriesRendered++;
+    }
   }
 
   private sectionTitle(text: string): HTMLDivElement {

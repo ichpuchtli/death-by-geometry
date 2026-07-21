@@ -5,7 +5,8 @@ import { COLORS, ENEMY_SPEED, ENEMY_SCORES, BLACKHOLE_HP, BLACKHOLE_MAX_ABSORB, 
          BH_DIFFRACTION_DISPERSION_BASE, BH_DIFFRACTION_DISPERSION_PER_MASS, BH_DIFFRACTION_RING_ALPHA,
          BH_DIFFRACTION_BAND_THICKNESS_BASE, BH_DIFFRACTION_BAND_THICKNESS_PER_MASS, BH_DIFFRACTION_SPECTRUM,
          BH_HIT_SURGE_KICK, BH_HIT_SURGE_MAX, BH_HIT_SURGE_DECAY,
-         BH_HIT_SWIRL_SPEED_SURGE, BH_HIT_SWIRL_BRIGHT_SURGE, BH_HIT_ORBIT_SPEED_SURGE, BH_HIT_ORBIT_BRIGHT_SURGE } from '../../config';
+         BH_HIT_SWIRL_SPEED_SURGE, BH_HIT_SWIRL_BRIGHT_SURGE, BH_HIT_ORBIT_SPEED_SURGE, BH_HIT_ORBIT_BRIGHT_SURGE,
+         BH_DISK_CHARGE_RATE, BH_DISK_CHARGE_ABSORB_GAIN } from '../../config';
 import { gameSettings } from '../../settings';
 
 export type BlackHoleVisualMode = 'dense' | 'haze' | 'corona' | 'molten';
@@ -88,6 +89,14 @@ export class BlackHole extends Enemy {
   swirlBrightSurge = BH_HIT_SWIRL_BRIGHT_SURGE;
   orbitSpeedSurge = BH_HIT_ORBIT_SPEED_SURGE;
   orbitBrightSurge = BH_HIT_ORBIT_BRIGHT_SURGE;
+  // Accretion-disk accumulation: how much dust this hole has collected (0 = bare rim,
+  // 1 = thick disk). Builds slowly over the hole's whole life and jumps when it feeds
+  // (absorbEnemy) — monotonic, it never depletes. Game.updateParticles scales the rim
+  // dust trickle with it, so the ring visibly collects. The rate/gain knobs are
+  // per-instance (copied from config) so the lab tunes live.
+  diskCharge = 0;
+  diskChargeRate = BH_DISK_CHARGE_RATE;
+  diskChargeAbsorbGain = BH_DISK_CHARGE_ABSORB_GAIN;
   private hitSparks: { x: number; y: number; vx: number; vy: number; life: number; maxLife: number }[] = [];
   /** Bullet angles of recent impacts awaiting a dust-ejecta burst. Drained every frame by
    *  Game.updateParticles, which owns the ambient dust field this entity can't reach. */
@@ -182,6 +191,8 @@ export class BlackHole extends Enemy {
   absorbEnemy(): void {
     this.absorbedCount++;
     this.collisionRadius = 30 + this.absorbedCount * 2.5;
+    // Feeding fattens the disk
+    this.diskCharge = Math.min(1, this.diskCharge + this.diskChargeAbsorbGain);
     for (let i = 0; i < 4; i++) this.pushSwirlParticle(i % 4);
     for (let i = 0; i < 2; i++) this.pushHorizonParticle();
     if (this.absorbedCount >= BlackHole.MAX_ABSORB && !this.destabilizing) {
@@ -221,6 +232,9 @@ export class BlackHole extends Enemy {
     this.rotation += dt * (0.003 + this.absorbedCount * 0.0008);
     this.wobbleTime += dt;
     this.breathPhase += dt * (0.002 + instability * 0.003);
+
+    // The disk slowly collects dust over time
+    this.diskCharge = Math.min(1, this.diskCharge + this.diskChargeRate * dt / 1000);
 
     // Hit feedback: decay the pulse, advance + fade the emitted sparks
     if (this.hitPulse > 0) this.hitPulse = Math.max(0, this.hitPulse - dt * 0.005);

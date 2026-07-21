@@ -39,6 +39,12 @@ Use the smallest matching manifest:
   Use for active enemy family formation/destruction pairs:
   `rhombus`, `square`, `pinwheel`, `sierpinski`, `blackhole`.
 
+- `scripts/elevenlabs-sfx-jobs-blackhole-hit.json`
+  Use for black-hole bullet-hit candidates (auditioned in the SFX Lab, `?sfx=1`).
+
+- `scripts/elevenlabs-sfx-jobs-blackhole-spawn.json`
+  Use for black-hole spawn-sound candidates (auditioned in the SFX Lab spawn section).
+
 - `scripts/elevenlabs-procedural-sfx.json`
   Use for discrete procedural cues from `web/src/core/audio.ts`.
   This covers kill signatures, phase transition, elite arrive/kill, telegraph warning, recovery start/expire, and black-hole death.
