@@ -1,6 +1,8 @@
 // Headless smoke test for the BlackHole FX Lab (?blackhole=1):
 // loads the lab off a running preview server, fires hits + destroy via the
-// window hook, and fails on any console error. Not part of the YAML flows.
+// window hook, verifies the three-element emission (matter lances + embers +
+// dust motes all live after hits), and fails on any console error.
+// Not part of the YAML flows.
 const { chromium } = require('playwright');
 
 (async () => {
@@ -22,8 +24,8 @@ const { chromium } = require('playwright');
   const info = await page.evaluate(() => {
     const lab = window.blackHoleLab;
     if (!lab) return { ok: false, reason: 'window.blackHoleLab missing' };
-    // Fire a few shots (tracer → real onBulletHit path) and let them land
-    for (let i = 0; i < 5; i++) lab.fire(i * 1.25);
+    // Fire a volley (tracer → real onBulletHit path) and let it land
+    for (let i = 0; i < 6; i++) lab.fire(i * 1.05);
     lab.applyPreset(2); // Violent
     lab.fire(0.5);
     lab.applyPreset(1); // back to Current+
@@ -31,24 +33,42 @@ const { chromium } = require('playwright');
       ok: true,
       mode: lab.bh && lab.bh.visualMode,
       presets: lab.presets.map((p) => p.name),
-      ejecta: lab.ejectaCount,
+      matterKnob: lab.matterCount,
+      particleKnob: lab.particleCount,
+      dustKnob: lab.dustCount,
     };
   });
-  await page.waitForTimeout(1200); // let tracers land + ejecta spawn
+  await page.waitForTimeout(700); // let tracers land + bursts spawn
+
+  const mid = await page.evaluate(() => {
+    const lab = window.blackHoleLab;
+    return {
+      hits: lab.hitCount,
+      lances: lab.matter.count,   // MATTER — massless escaping projectiles
+      motes: lab.field.count,     // DUST + PARTICLES (massy field)
+    };
+  });
+  await page.waitForTimeout(600);
 
   const after = await page.evaluate(() => {
     const lab = window.blackHoleLab;
-    const hits = lab.hitCount;
     lab.destroy();
-    return { hits, bhActive: lab.bh && lab.bh.active };
+    return { destroyLances: lab.matter.count, bhActive: lab.bh && lab.bh.active };
   });
   await page.waitForTimeout(800);
 
   await page.screenshot({ path: 'test-results/blackhole-lab-smoke.png' });
   await browser.close();
 
-  console.log(JSON.stringify({ info, after, errors }, null, 2));
-  if (!info.ok || errors.length > 0 || after.hits < 4) {
+  console.log(JSON.stringify({ info, mid, after, errors }, null, 2));
+  const pass =
+    info.ok &&
+    errors.length === 0 &&
+    mid.hits >= 5 &&
+    mid.lances > 0 &&        // matter emission on hits
+    mid.motes > 200 &&       // ambient dust sea + embers alive
+    after.destroyLances > 0; // matter blows out on destroy
+  if (!pass) {
     console.error('SMOKE FAIL');
     process.exit(1);
   }

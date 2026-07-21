@@ -48,6 +48,9 @@ export const BOSS_HIT_SOUND_COOLDOWN_MS = 45;       // min gap between per-hit t
 // BlackHole per-bullet-hit sound (deep thud — the hole is not a `bossFeedback` unit, so it
 // has its own tick): same rate-limit treatment as the boss tick so rapid fire can't stack it.
 export const BH_HIT_SOUND_COOLDOWN_MS = 45;
+// BlackHole absorb sound (an enemy is swallowed): looser rate-limit than the bullet tick —
+// absorbs can burst when a wave crosses the well, but each gulp should still read.
+export const BH_ABSORB_SOUND_COOLDOWN_MS = 90;
 // Damage fractions (0 = pristine → 1 = dead) at which a milestone "chunk" fires.
 export const BOSS_MILESTONE_FRACTIONS = [0.25, 0.5, 0.75];
 export const BOSS_MILESTONE_SHAKE = 6;              // screen shake on a damage milestone

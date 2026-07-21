@@ -10,6 +10,7 @@ import { Enemy } from './entities/enemies/enemy';
 import { ExplosionPool } from './entities/explosion';
 import { AimIndicator } from './entities/crosshair';
 import { ParticleField, FieldAttractor } from './renderer/particle-field';
+import { MatterField } from './renderer/matter-field';
 import { DebrisField } from './renderer/debris-field';
 import { HUD } from './ui/hud';
 import { VirtualJoystickRenderer } from './ui/virtual-joystick';
@@ -78,14 +79,25 @@ import {
   PARTICLE_FIELD_BH_EMIT_BASE,
   PARTICLE_FIELD_BH_EMIT_RATE,
   PARTICLE_FIELD_BH_EMIT_CRITICAL,
-  PARTICLE_FIELD_BH_HIT_EJECTA,
-  PARTICLE_FIELD_BH_HIT_EJECTA_MOBILE,
-  PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD,
-  PARTICLE_FIELD_BH_HIT_EJECTA_SPEED,
-  PARTICLE_FIELD_BH_HIT_MATTER,
-  PARTICLE_FIELD_BH_HIT_MATTER_MOBILE,
-  PARTICLE_FIELD_BH_HIT_MATTER_SPREAD,
-  PARTICLE_FIELD_BH_HIT_MATTER_SPEED,
+  PARTICLE_FIELD_BH_EMBER_BASE,
+  PARTICLE_FIELD_BH_EMBER_COUNT,
+  PARTICLE_FIELD_BH_HIT_DUST,
+  PARTICLE_FIELD_BH_HIT_DUST_MOBILE,
+  PARTICLE_FIELD_BH_HIT_DUST_SPREAD,
+  PARTICLE_FIELD_BH_HIT_DUST_SPEED,
+  PARTICLE_FIELD_BH_HIT_PARTICLES,
+  PARTICLE_FIELD_BH_HIT_PARTICLES_MOBILE,
+  PARTICLE_FIELD_BH_HIT_PARTICLES_SPREAD,
+  PARTICLE_FIELD_BH_HIT_PARTICLES_SPEED,
+  BH_HIT_MATTER_COUNT,
+  BH_HIT_MATTER_COUNT_MOBILE,
+  BH_HIT_MATTER_SPEED,
+  BH_HIT_MATTER_SPREAD,
+  BH_HIT_MATTER_LIFE,
+  MATTER_FIELD_MAX,
+  MATTER_FIELD_MAX_MOBILE,
+  BH_MATTER_TRICKLE,
+  BH_MATTER_TRICKLE_COUNT,
   BULLET_WAKE_LEAD,
   BULLET_WAKE_LEAD_RADIUS,
   BULLET_WAKE_BOW_WELL,
@@ -118,7 +130,8 @@ export class Game {
   private bullets: BulletPool;
   private enemies: Enemy[] = [];
   private explosions: ExplosionPool;
-  private field: ParticleField;       // ambient cosmic dust + thruster wake / impact sparklets
+  private field: ParticleField;       // ambient cosmic dust + thruster wake / impact sparklets (massy: dust + embers)
+  private matter: MatterField;        // massless escaping matter lances (bullet-hit spray — no gravity)
   private debris: DebrisField;        // geometry shatter — killed units break into their own edges
   private prevPlayerX = 0;            // for the thruster wake delta
   private prevPlayerY = 0;
@@ -230,6 +243,7 @@ export class Game {
     this.explosions = new ExplosionPool();
     this.field = new ParticleField();
     this.field.density = this.mobile ? PARTICLE_FIELD_GAME_DENSITY_MOBILE : PARTICLE_FIELD_GAME_DENSITY;
+    this.matter = new MatterField(this.mobile ? MATTER_FIELD_MAX_MOBILE : MATTER_FIELD_MAX);
     this.debris = new DebrisField();
     this.combat = new CombatSystem(this.mobile, {
       player: this.player,
@@ -501,6 +515,7 @@ export class Game {
     this.timeDilation.reset();
     this.explosions.clear();
     this.debris.clear();
+    this.matter.clear();
     this.field.reseed();
     this.prevPlayerX = this.player.position.x;
     this.prevPlayerY = this.player.position.y;
@@ -968,19 +983,24 @@ export class Game {
         heat,
         swirl: e.dustSwirl,
       });
-      // Bullet-impact ejecta — every bullet that hit the hole this frame kicks dust and
-      // matter out of the disk: a fast hot jet along the impact direction plus a slower
-      // fan of colorful matter motes.
+      // Bullet-impact response — every bullet that hit the hole this frame emits all
+      // THREE elements of the hole's vocabulary from the impact point:
+      //   MATTER (massless) lances spray outward and ESCAPE — no gravity, the headline.
+      //   PARTICLES (massy embers) jet out hot, then visibly curve as the well recaptures them.
+      //   DUST (massy) fans out slow + cool and rides the swirl back in.
       if (e.impactEjecta.length > 0) {
-        const ejectaCount = this.mobile ? PARTICLE_FIELD_BH_HIT_EJECTA_MOBILE : PARTICLE_FIELD_BH_HIT_EJECTA;
-        const matterCount = this.mobile ? PARTICLE_FIELD_BH_HIT_MATTER_MOBILE : PARTICLE_FIELD_BH_HIT_MATTER;
+        const emberCount = this.mobile ? PARTICLE_FIELD_BH_HIT_PARTICLES_MOBILE : PARTICLE_FIELD_BH_HIT_PARTICLES;
+        const dustCount = this.mobile ? PARTICLE_FIELD_BH_HIT_DUST_MOBILE : PARTICLE_FIELD_BH_HIT_DUST;
+        const matterCount = this.mobile ? BH_HIT_MATTER_COUNT_MOBILE : BH_HIT_MATTER_COUNT;
         for (const hitAngle of e.impactEjecta) {
           const hx = e.position.x + Math.cos(hitAngle) * e.collisionRadius * 0.9;
           const hy = e.position.y + Math.sin(hitAngle) * e.collisionRadius * 0.9;
-          // Hot fast jet (amber-white) shooting back out along the impact direction
-          this.field.spawnBurst(hx, hy, hitAngle, PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD, ejectaCount, PARTICLE_FIELD_BH_HIT_EJECTA_SPEED, 35, 0.55);
-          // Slower colorful matter flung wider — rides the disk's swirl afterwards
-          this.field.spawnBurst(hx, hy, hitAngle, PARTICLE_FIELD_BH_HIT_MATTER_SPREAD, matterCount, PARTICLE_FIELD_BH_HIT_MATTER_SPEED, 190 + Math.random() * 130, 1.1);
+          // MATTER — massless escaping lances (amber-white, sharp, straight)
+          this.matter.spray(hx, hy, hitAngle, BH_HIT_MATTER_SPREAD, matterCount, BH_HIT_MATTER_SPEED, BH_HIT_MATTER_LIFE);
+          // PARTICLES — hot ember jet along the impact direction (massy: curves back in)
+          this.field.spawnBurst(hx, hy, hitAngle, PARTICLE_FIELD_BH_HIT_PARTICLES_SPREAD, emberCount, PARTICLE_FIELD_BH_HIT_PARTICLES_SPEED, 35, 0.7, 1);
+          // DUST — slow cool fan flung wider, rides the disk's swirl afterwards
+          this.field.spawnBurst(hx, hy, hitAngle, PARTICLE_FIELD_BH_HIT_DUST_SPREAD, dustCount, PARTICLE_FIELD_BH_HIT_DUST_SPEED, 190 + Math.random() * 130, 1.1);
         }
         e.impactEjecta.length = 0;
       }
@@ -1002,9 +1022,29 @@ export class Game {
         }
       };
       if (e.destabilizing && !e.overloaded) {
-        emit(this.mobile ? 3 : PARTICLE_FIELD_BH_EMIT_CRITICAL, 0.25 + Math.random() * 0.2, 0.8);
+        emit(this.mobile ? 4 : PARTICLE_FIELD_BH_EMIT_CRITICAL, 0.25 + Math.random() * 0.2, 0.8);
       } else if (Math.random() < PARTICLE_FIELD_BH_EMIT_BASE + inst * PARTICLE_FIELD_BH_EMIT_RATE) {
-        emit(this.mobile ? 1 : 3, 0.12 + Math.random() * 0.14, 0.95);
+        emit(this.mobile ? 2 : 5, 0.12 + Math.random() * 0.14, 0.95);
+      }
+      // Ambient EMBERS (the "particles" element) — hot bright motes shed on the rim that
+      // orbit + infall, so the disk sparkles even between bullet hits.
+      if (!this.mobile && Math.random() < PARTICLE_FIELD_BH_EMBER_BASE) {
+        for (let k = 0; k < PARTICLE_FIELD_BH_EMBER_COUNT; k++) {
+          const a = Math.random() * Math.PI * 2;
+          const rr = rimBase + Math.random() * e.collisionRadius * 1.2;
+          const rx = e.position.x + Math.cos(a) * rr;
+          const ry = e.position.y + Math.sin(a) * rr;
+          const inward = Math.atan2(e.position.y - ry, e.position.x - rx);
+          this.field.spawnBurst(rx, ry, inward, 1.4, 1, 0.2 + Math.random() * 0.2, 40, 1.1, 1);
+        }
+      }
+      // Ambient MATTER trickle — a stressed hole spits the occasional escaping lance even
+      // without being shot (hit-driven spray above remains the main show).
+      if ((inst > 0.6 || (e.destabilizing && !e.overloaded)) && Math.random() < BH_MATTER_TRICKLE) {
+        const a = Math.random() * Math.PI * 2;
+        const rx = e.position.x + Math.cos(a) * e.collisionRadius * 0.9;
+        const ry = e.position.y + Math.sin(a) * e.collisionRadius * 0.9;
+        this.matter.spray(rx, ry, a, 0.6, BH_MATTER_TRICKLE_COUNT, BH_HIT_MATTER_SPEED * 0.8, BH_HIT_MATTER_LIFE);
       }
     }
     this.field.brightness = destabilizing ? 1.4 : 1;
@@ -1014,6 +1054,7 @@ export class Game {
       halfW: this.renderer.width / 2,
       halfH: this.renderer.height / 2,
     });
+    this.matter.update(dt);
     this.debris.update(dt);
   }
 
@@ -1362,6 +1403,7 @@ export class Game {
     // 4. Switch to additive blend for dust, trails, debris, explosions, glow, kill signatures
     this.renderer.setBlendMode('additive');
     this.field.render(this.renderer);
+    this.matter.render(this.renderer);
     this.renderDarkMatterHarvest();
     this.lifecycle.trailSystem.render(this.renderer);
     this.debris.render(this.renderer);

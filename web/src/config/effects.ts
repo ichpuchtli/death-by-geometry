@@ -25,7 +25,7 @@ export const PARTICLE_FIELD_MAX_SPEED = 9.5;     // px/frame speed cap
 export const PARTICLE_FIELD_SWIRL = 0.55;        // tangential force as a fraction of radial pull (the "orbit" knob)
 export const PARTICLE_FIELD_STREAK = 2.4;        // velocity-stretch multiplier for the streak tail
 export const PARTICLE_FIELD_SOFTENING = 850;     // distance² softening so the core pull stays finite
-export const PARTICLE_FIELD_MAX_TRANSIENT = 1000; // cap on live burst motes (thruster wake + impact sparks + BH life-stage emission); raised so supernova/death bursts aren't starved
+export const PARTICLE_FIELD_MAX_TRANSIENT = 1400; // cap on live burst motes (thruster wake + impact bursts + BH life-stage emission); raised so supernova/death bursts and the cranked ambient emission aren't starved
 
 // --- Geometry shatter (solid-object death) ---
 // When a unit is destroyed by a bullet/contact (not absorbed, not a boss), it breaks
@@ -49,8 +49,8 @@ export const DEATH_WARP_REACH_MIN = 150;     // px — minimum influence radius 
 export const DEATH_WARP_REACH_MULT = 3.5;    // influence radius = max(min, hole.collisionRadius * this)
 
 // --- Live-game particle wiring (ported from the Particle Lab) ---
-export const PARTICLE_FIELD_GAME_DENSITY = 520;        // ambient dust motes (desktop)
-export const PARTICLE_FIELD_GAME_DENSITY_MOBILE = 160; // fewer on mobile for perf
+export const PARTICLE_FIELD_GAME_DENSITY = 820;        // ambient dust motes (desktop) — cranked so every hole sits in a visible dust sea
+export const PARTICLE_FIELD_GAME_DENSITY_MOBILE = 260; // fewer on mobile for perf
 export const PARTICLE_FIELD_DUST_PULL = 2000;          // BlackHole strength as seen by the dust field
 // Blue circles carry the BlackHole's dust DNA: each is a small attractor so ambient dust
 // swirls into a tight accretion halo around it (instead of decorative satellite dots).
@@ -62,21 +62,38 @@ export const PARTICLE_FIELD_CIRCLE_SHED = 0.5;         // per-frame chance a mov
 // a steady trickle (always on, thickening with swallowed mass), a hot inrushing storm as it
 // nears supernova, then a radial eruption on detonation. (Separate from the passive pull/heat
 // coupling.)
-export const PARTICLE_FIELD_BH_EMIT_BASE = 0.45;       // baseline per-frame emit chance, even at zero mass
-export const PARTICLE_FIELD_BH_EMIT_RATE = 1.4;        // per-frame emit chance added at full mass (scales with fill fraction)
-export const PARTICLE_FIELD_BH_EMIT_CRITICAL = 7;      // motes/frame streaming inward while destabilizing (desktop)
+export const PARTICLE_FIELD_BH_EMIT_BASE = 0.9;        // baseline per-frame emit chance, even at zero mass (cranked — the hole always breathes dust)
+export const PARTICLE_FIELD_BH_EMIT_RATE = 2.2;        // per-frame emit chance added at full mass (scales with fill fraction)
+export const PARTICLE_FIELD_BH_EMIT_CRITICAL = 10;     // motes/frame streaming inward while destabilizing (desktop)
 export const PARTICLE_FIELD_BH_DETONATE_BURST = 160;   // motes erupted outward on supernova detonation (desktop)
-// Bullet-impact ejecta: every bullet that hits a hole kicks dust + matter out of the disk.
-// (Strengthened after the "not enough dust on hit" feedback — counts roughly doubled vs.
-// the original 22/12; preview + retune live in the BlackHole FX Lab, `?blackhole=1`.)
-export const PARTICLE_FIELD_BH_HIT_EJECTA = 34;        // fast hot dust motes per bullet impact (desktop)
-export const PARTICLE_FIELD_BH_HIT_EJECTA_MOBILE = 14;
-export const PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD = 1.5; // fan half-angle (rad) of the hot jet
-export const PARTICLE_FIELD_BH_HIT_EJECTA_SPEED = 5.5;  // base speed of the hot jet motes
-export const PARTICLE_FIELD_BH_HIT_MATTER = 22;        // slower colorful matter motes per bullet impact (desktop)
-export const PARTICLE_FIELD_BH_HIT_MATTER_MOBILE = 9;
-export const PARTICLE_FIELD_BH_HIT_MATTER_SPREAD = 2.6; // fan half-angle (rad) of the matter fan
-export const PARTICLE_FIELD_BH_HIT_MATTER_SPEED = 2.0;  // base speed of the matter motes
+// Ambient EMBER emission (the "particles" element, mote kind 1): hot bright motes shed on
+// the rim that orbit + infall — always on, so the disk sparkles even between hits.
+export const PARTICLE_FIELD_BH_EMBER_BASE = 0.55;      // per-frame ember emission chance (desktop)
+export const PARTICLE_FIELD_BH_EMBER_COUNT = 2;        // embers per emission
+
+// --- BlackHole bullet-hit response: the three-element emission vocabulary ---
+// 1. DUST (massy): a slow cool fan kicked out of the disk — rides the swirl, orbits, falls back in.
+export const PARTICLE_FIELD_BH_HIT_DUST = 26;          // kicked-up dust motes per bullet impact (desktop)
+export const PARTICLE_FIELD_BH_HIT_DUST_MOBILE = 10;
+export const PARTICLE_FIELD_BH_HIT_DUST_SPREAD = 2.6;  // fan half-angle (rad)
+export const PARTICLE_FIELD_BH_HIT_DUST_SPEED = 2.0;   // slow — the well recaptures it fast
+// 2. PARTICLES / embers (massy): a hot bright jet — bigger + brighter than dust, visibly
+//    curves back as gravity recaptures it (same ParticleField gravity integration, mote kind 1).
+export const PARTICLE_FIELD_BH_HIT_PARTICLES = 30;     // hot ember jet motes per bullet impact (desktop)
+export const PARTICLE_FIELD_BH_HIT_PARTICLES_MOBILE = 12;
+export const PARTICLE_FIELD_BH_HIT_PARTICLES_SPREAD = 1.5; // fan half-angle (rad)
+export const PARTICLE_FIELD_BH_HIT_PARTICLES_SPEED = 5.5;  // fast, but still bound — it curves back
+// 3. MATTER (massless — the headline): sharp escaping lance projectiles. Gravity does NOT
+//    act on them; they spray outward and escape (renderer/matter-field.ts, no attractors).
+export const BH_HIT_MATTER_COUNT = 26;        // lances per bullet impact (desktop)
+export const BH_HIT_MATTER_COUNT_MOBILE = 10;
+export const BH_HIT_MATTER_SPEED = 7.0;       // px/frame — fast enough to clearly escape the disk
+export const BH_HIT_MATTER_SPREAD = 1.6;      // fan half-angle (rad)
+export const BH_HIT_MATTER_LIFE = 0.9;        // seconds
+export const MATTER_FIELD_MAX = 700;          // live lance cap (desktop perf guard)
+export const MATTER_FIELD_MAX_MOBILE = 260;
+export const BH_MATTER_TRICKLE = 0.3;         // per-frame chance of a small ambient matter spit while instability > 60% or destabilizing
+export const BH_MATTER_TRICKLE_COUNT = 2;     // lances per ambient spit
 // On-hit swirl surge: a bullet hit also briefly excites the hole's OWN swirl arms + orbit
 // dots (brighter + faster), decaying back to baseline in a fraction of a second. The
 // BlackHole instance copies these into per-instance knobs so the lab can tune them live.

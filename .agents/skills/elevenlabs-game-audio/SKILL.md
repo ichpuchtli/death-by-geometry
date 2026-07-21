@@ -76,6 +76,16 @@ Outputs:
 - Only convert or swap them into shipped `/sounds` assets after explicit user approval.
 - If you change the workflow, manifests, or helper scripts, update [CLAUDE.md](../../../../CLAUDE.md) in the same task.
 
+## Promotion Workflow (after explicit approval)
+
+Precedent: the black-hole hit/absorb/death v3 picks (see CLAUDE.md changelog).
+
+1. Copy the approved mp3 from `sounds/generated/<pack>/` to `web/public/sounds/generated/<role>.mp3` (flat, role-named).
+2. Register it in `GENERATED_SFX` (`web/src/config/audio.ts`) — the existing `loadGeneratedSFX()` path fetches/decodes it at audio init; missing buffers warn, never error.
+3. Add an `AudioManager` playback method that tries `playGeneratedBuffer(name, volume)` first and falls back to the procedural sound while the async load is in flight.
+4. Rate-limit chatty cues in the calling system (see `BH_HIT_SOUND_COOLDOWN_MS` / `BH_ABSORB_SOUND_COOLDOWN_MS` in `web/src/config/combat.ts`).
+5. Tag the promoted row(s) in `web/src/sfx-lab.ts` `IN_GAME_BADGES` so the lab shows "IN GAME — <role>".
+
 ## When You Need New Prompts
 
 Base them on these repo truths:

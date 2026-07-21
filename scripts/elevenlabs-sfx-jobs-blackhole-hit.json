@@ -1,0 +1,98 @@
+[
+  {
+    "text": "Black hole heartbeat: a single deep organic pulse, like the chest-deep throb of something impossibly massive, warm sub-bass thud with a soft hollow resonance and natural decay. High-fidelity, cinematic, smooth, intimate and huge. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_heartbeat_a_elevenlabs_v3.mp3",
+    "duration": 1.0,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Black hole heartbeat, shorter and tighter: one deep warm chest-thump, immediate soft attack, quick natural decay, like a giant slow heartbeat sped up into a single compact pulse. High-fidelity cinematic sound design, round and smooth. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_heartbeat_tight_elevenlabs_v3.mp3",
+    "duration": 0.8,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Black hole heartbeat, deeper: a single enormous sub-bass pulse centered around 35 Hz, felt in the chest more than heard, warm and slow-blooming with a soft hollow tail. Cinematic high-fidelity sound design, smooth, dark, massive. No distortion, no harshness, no lo-fi artifacts.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_heartbeat_deep_elevenlabs_v3.mp3",
+    "duration": 1.3,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Black hole heartbeat with a dark hollow chamber: one deep organic thump inside a vast smooth cavern of low resonance, warm sub body, gentle echoing depth without any reverb wash. High-fidelity, cinematic, ominous and smooth. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_heartbeat_hollow_elevenlabs_v3.mp3",
+    "duration": 1.2,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Black hole double heartbeat: two quick deep organic pulses in succession, lub-dub, warm and heavy like the heart of a dying star, smooth round sub-bass with natural decay. High-fidelity cinematic sound design. No distortion, no harsh highs, no lo-fi texture.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_heartbeat_double_elevenlabs_v3.mp3",
+    "duration": 1.1,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Black hole heartbeat, soft and ominous: a single muffled deep throb, like a heartbeat heard through thick walls, very warm, very round, quiet menace, smooth slow decay. High-fidelity cinematic sound design. No distortion, no harshness, no lo-fi artifacts.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_heartbeat_muffled_elevenlabs_v3.mp3",
+    "duration": 1.2,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Clean cinematic sub drop: a smooth deep 808-style sub-bass drop sliding downward into a soft landing, warm analog low end, round and musical, professional trailer sound design. High fidelity, no grit, no distortion, no harshness, not lo-fi.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_sub_drop_a_elevenlabs_v3.mp3",
+    "duration": 1.1,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Short cinematic sub drop: a quick smooth sub-bass fall from low to very low, landing softly, warm round analog body, tight and compact for repeated use, professional trailer sound. High fidelity, no distortion, no harsh highs, not lo-fi.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_sub_drop_tight_elevenlabs_v3.mp3",
+    "duration": 0.8,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Deep cinematic sub drop with a soft impact: a smooth downward sub-bass glide ending in one warm heavy thump, round analog low end, dark and satisfying, professional film trailer sound design. High fidelity, no grit, no distortion, not lo-fi.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_sub_drop_thump_elevenlabs_v3.mp3",
+    "duration": 1.2,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Magnetic field thump: a smooth round electromagnetic pulse, like a giant analog synth striking one low warm note with a gentle wobble in the tail, deep and clean. High-fidelity, cinematic, warm vintage low end. No harsh highs, no distortion, no lo-fi artifacts.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_magnetic_thump_a_elevenlabs_v3.mp3",
+    "duration": 1.0,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Velvet thunder: soft distant thunder felt more than heard, a warm rolling sub-bass bloom with a smooth rounded top, heavy and calm at once. High-fidelity cinematic sound design, deep and silky. No crackle, no harshness, no distortion, not lo-fi.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_velvet_thunder_a_elevenlabs_v3.mp3",
+    "duration": 1.4,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  },
+  {
+    "text": "Velvet thunder, closer and shorter: a single warm sub-bass rumble bloom, like soft thunder rolling once overhead, smooth round low end, compact decay, deep and silky. High-fidelity cinematic sound design. No crackle, no harshness, no distortion, not lo-fi.",
+    "out": "sounds/generated/blackhole-hit/blackhole_hit_velvet_thunder_tight_elevenlabs_v3.mp3",
+    "duration": 1.0,
+    "promptInfluence": 0.5,
+    "loop": false,
+    "format": "mp3_44100_192"
+  }
+]

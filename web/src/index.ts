@@ -10,6 +10,7 @@ import type { PlayerDesignLab as PlayerDesignLabType } from './player-design-lab
 import type { HudLab as HudLabType } from './hud-lab';
 import type { HudJuiceLab as HudJuiceLabType } from './hud-juice-lab';
 import type { BlackHoleLab as BlackHoleLabType } from './blackhole-lab';
+import type { SfxLab as SfxLabType } from './sfx-lab';
 import { loadSettings } from './settings';
 import { initSettingsPanel } from './ui/settings-panel';
 
@@ -186,6 +187,21 @@ if (bootParams.has('gallery')) {
       requestAnimationFrame(blackholeLoop);
     }
     requestAnimationFrame(blackholeLoop);
+  });
+} else if (bootParams.has('sfx')) {
+  // SFX Audition Lab — audition black-hole hit sound candidates (DOM page) (`?sfx=1`)
+  import('./sfx-lab').then(({ SfxLab }) => {
+    const lab = new SfxLab(gameCanvas);
+    (window as unknown as { sfxLab: SfxLabType }).sfxLab = lab;
+    let last = performance.now();
+    function sfxLoop(time: number): void {
+      const dt = Math.min(time - last, 50);
+      last = time;
+      lab.update(dt);
+      lab.render();
+      requestAnimationFrame(sfxLoop);
+    }
+    requestAnimationFrame(sfxLoop);
   });
 } else {
   bootGame();

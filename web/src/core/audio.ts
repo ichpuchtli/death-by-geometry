@@ -1123,6 +1123,48 @@ export class AudioManager {
     }
   }
 
+  /** Play a generated (sampled) SFX buffer; returns false if not loaded yet so callers can fall back */
+  private playGeneratedBuffer(name: string, volume: number): boolean {
+    if (!this._initialized || !this.ctx || !this.sfxGain) return false;
+    const buf = this.buffers.get(name);
+    if (!buf) return false;
+    const source = this.ctx.createBufferSource();
+    source.buffer = buf;
+    source.playbackRate.value = this.timeScale;
+    const gain = this.ctx.createGain();
+    gain.gain.value = Math.min(1, Math.max(0, volume));
+    source.connect(gain);
+    gain.connect(this.sfxGain);
+    source.start(0);
+    return true;
+  }
+
+  /**
+   * Production black-hole sounds — ElevenLabs v3 samples (picked in the SFX Lab from
+   * sounds/generated/blackhole-hit/), each with a procedural fallback while the async
+   * sample load is still in flight. Samples play at full playbackRate (timeScale).
+   */
+  /** Bullet hit on the hole — 'magnetic_thump_a' sample, fallback to procedural 'thud' */
+  playBlackHoleHitDefault(volume: number = 1): void {
+    if (!this.playGeneratedBuffer('blackhole-hit', volume)) {
+      this.playBlackHoleHit('thud', volume);
+    }
+  }
+
+  /** Hole absorbs an enemy — 'heartbeat_hollow' sample at 0.7 (under the hit sound), fallback 'gulp' */
+  playBlackHoleAbsorb(volume: number = 0.7): void {
+    if (!this.playGeneratedBuffer('blackhole-absorb', volume)) {
+      this.playBlackHoleHit('gulp', volume);
+    }
+  }
+
+  /** Hole death — 'sub_drop_thump' sample, fallback to the procedural death explosion */
+  playBlackHoleDeathSample(absorbed: number): void {
+    if (!this.playGeneratedBuffer('blackhole-death', 1)) {
+      this.playBlackHoleDeath(absorbed);
+    }
+  }
+
   private playBlackHoleHitThud(v: number): void {
     const ctx = this.ctx!;
     const now = ctx.currentTime;

@@ -3,6 +3,7 @@ import { BloomPass } from './renderer/bloom';
 import { SpringMassGrid } from './renderer/grid';
 import { Starfield } from './renderer/starfield';
 import { ParticleField, FieldAttractor, FieldView } from './renderer/particle-field';
+import { MatterField } from './renderer/matter-field';
 import { Camera } from './core/camera';
 import { Input } from './core/input';
 import { AudioManager, BlackHoleHitVariant, SupernovaSoundVariant } from './core/audio';
@@ -10,15 +11,24 @@ import { ExplosionPool } from './entities/explosion';
 import { BlackHole, BlackHoleVisualMode } from './entities/enemies/blackhole';
 import { gameSettings } from './settings';
 import {
-  PARTICLE_FIELD_DENSITY,
+  PARTICLE_FIELD_GAME_DENSITY,
   PARTICLE_FIELD_DUST_PULL,
   PARTICLE_FIELD_BH_EMIT_BASE,
-  PARTICLE_FIELD_BH_HIT_EJECTA,
-  PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD,
-  PARTICLE_FIELD_BH_HIT_EJECTA_SPEED,
-  PARTICLE_FIELD_BH_HIT_MATTER,
-  PARTICLE_FIELD_BH_HIT_MATTER_SPREAD,
-  PARTICLE_FIELD_BH_HIT_MATTER_SPEED,
+  PARTICLE_FIELD_BH_EMBER_BASE,
+  PARTICLE_FIELD_BH_EMBER_COUNT,
+  PARTICLE_FIELD_BH_HIT_DUST,
+  PARTICLE_FIELD_BH_HIT_DUST_SPREAD,
+  PARTICLE_FIELD_BH_HIT_DUST_SPEED,
+  PARTICLE_FIELD_BH_HIT_PARTICLES,
+  PARTICLE_FIELD_BH_HIT_PARTICLES_SPREAD,
+  PARTICLE_FIELD_BH_HIT_PARTICLES_SPEED,
+  BH_HIT_MATTER_COUNT,
+  BH_HIT_MATTER_SPEED,
+  BH_HIT_MATTER_SPREAD,
+  BH_HIT_MATTER_LIFE,
+  MATTER_FIELD_MAX,
+  BH_MATTER_TRICKLE,
+  BH_MATTER_TRICKLE_COUNT,
   BH_HIT_SURGE_DECAY,
   BH_HIT_SWIRL_SPEED_SURGE,
   BH_HIT_ORBIT_SPEED_SURGE,
@@ -38,12 +48,20 @@ const VISUAL_MODES: BlackHoleVisualMode[] = ['dense', 'haze', 'corona', 'molten'
 /** A named bundle of every knob the lab exposes — the presets row applies these. */
 interface FxPreset {
   name: string;
-  ejectaCount: number;
-  ejectaSpeed: number;
-  ejectaSpread: number;
+  // MATTER — massless escaping lances (the headline)
   matterCount: number;
   matterSpeed: number;
   matterSpread: number;
+  // PARTICLES — massy hot ember jet (recaptured by the well)
+  particleCount: number;
+  particleSpeed: number;
+  particleSpread: number;
+  // DUST — massy slow cool fan (rides the swirl back in)
+  dustCount: number;
+  dustSpeed: number;
+  dustSpread: number;
+  // Ambient ember emission (particles element, always-on)
+  emberRate: number;
   swirlSurge: number;
   surgeMs: number;
   orbitExcite: number;
@@ -53,21 +71,27 @@ interface FxPreset {
 export const FX_PRESETS: FxPreset[] = [
   {
     name: 'Subtle',
-    ejectaCount: 14, ejectaSpeed: 4.0, ejectaSpread: 1.2,
-    matterCount: 8, matterSpeed: 1.4, matterSpread: 2.0,
+    matterCount: 10, matterSpeed: 5.5, matterSpread: 1.2,
+    particleCount: 12, particleSpeed: 4.5, particleSpread: 1.2,
+    dustCount: 10, dustSpeed: 1.5, dustSpread: 2.0,
+    emberRate: 0.2,
     swirlSurge: 0.5, surgeMs: 320, orbitExcite: 0.8, hitVolume: 0.6,
   },
   {
-    // Matches the shipped config defaults (the strengthened production tuning).
+    // Matches the shipped config defaults (production tuning).
     name: 'Current+',
-    ejectaCount: PARTICLE_FIELD_BH_HIT_EJECTA, ejectaSpeed: PARTICLE_FIELD_BH_HIT_EJECTA_SPEED, ejectaSpread: PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD,
-    matterCount: PARTICLE_FIELD_BH_HIT_MATTER, matterSpeed: PARTICLE_FIELD_BH_HIT_MATTER_SPEED, matterSpread: PARTICLE_FIELD_BH_HIT_MATTER_SPREAD,
+    matterCount: BH_HIT_MATTER_COUNT, matterSpeed: BH_HIT_MATTER_SPEED, matterSpread: BH_HIT_MATTER_SPREAD,
+    particleCount: PARTICLE_FIELD_BH_HIT_PARTICLES, particleSpeed: PARTICLE_FIELD_BH_HIT_PARTICLES_SPEED, particleSpread: PARTICLE_FIELD_BH_HIT_PARTICLES_SPREAD,
+    dustCount: PARTICLE_FIELD_BH_HIT_DUST, dustSpeed: PARTICLE_FIELD_BH_HIT_DUST_SPEED, dustSpread: PARTICLE_FIELD_BH_HIT_DUST_SPREAD,
+    emberRate: PARTICLE_FIELD_BH_EMBER_BASE,
     swirlSurge: BH_HIT_SWIRL_SPEED_SURGE, surgeMs: Math.round(1 / BH_HIT_SURGE_DECAY), orbitExcite: BH_HIT_ORBIT_SPEED_SURGE, hitVolume: 1,
   },
   {
     name: 'Violent',
-    ejectaCount: 72, ejectaSpeed: 7.5, ejectaSpread: 2.1,
-    matterCount: 52, matterSpeed: 3.2, matterSpread: 3.1,
+    matterCount: 64, matterSpeed: 9.0, matterSpread: 2.2,
+    particleCount: 70, particleSpeed: 7.5, particleSpread: 2.1,
+    dustCount: 60, dustSpeed: 3.2, dustSpread: 3.1,
+    emberRate: 1.0,
     swirlSurge: 2.4, surgeMs: 950, orbitExcite: 3.5, hitVolume: 1,
   },
 ];
@@ -80,8 +104,12 @@ interface PendingHit {
 
 /**
  * BlackHole FX Lab (`?blackhole=1`) — preview + tune the black hole's bullet-hit and
- * death effects live. Click the canvas (or Space / auto-fire) to "shoot" the hole through
- * the real `onBulletHit` path (hit pulse + sparks + dust ejecta + swirl/orbit surge +
+ * death effects live, across the hole's THREE emission elements:
+ *   MATTER    — massless escaping lance projectiles (no gravity; spray outward + escape)
+ *   PARTICLES — massy hot embers (bigger/brighter than dust; curve back into the well)
+ *   DUST      — massy cool motes (the ambient fog; rides the swirl, orbits, infalls)
+ * Click the canvas (or Space / auto-fire) to "shoot" the hole through the real
+ * `onBulletHit` path (hit pulse + sparks + the three-element burst + swirl/orbit surge +
  * the per-hit thud); Destroy runs the death path (eruption + supernova sound variants).
  * The sliders drive the same knobs the game reads from config, so a winning tuning can
  * be ported straight back into `config/effects.ts`.
@@ -99,19 +127,29 @@ export class BlackHoleLab {
 
   bh: BlackHole | null = null;
   presets = FX_PRESETS;
+  /** Massless matter lances (public for test hooks). */
+  readonly matter = new MatterField(MATTER_FIELD_MAX);
 
   // --- Live knobs (sliders write these; exposed for test hooks) ---
   visualMode: BlackHoleVisualMode = 'dense';
-  ejectaCount = PARTICLE_FIELD_BH_HIT_EJECTA;
-  ejectaSpeed = PARTICLE_FIELD_BH_HIT_EJECTA_SPEED;
-  ejectaSpread = PARTICLE_FIELD_BH_HIT_EJECTA_SPREAD;
-  matterCount = PARTICLE_FIELD_BH_HIT_MATTER;
-  matterSpeed = PARTICLE_FIELD_BH_HIT_MATTER_SPEED;
-  matterSpread = PARTICLE_FIELD_BH_HIT_MATTER_SPREAD;
+  // MATTER — massless escaping lances
+  matterCount = BH_HIT_MATTER_COUNT;
+  matterSpeed = BH_HIT_MATTER_SPEED;
+  matterSpread = BH_HIT_MATTER_SPREAD;
+  // PARTICLES — massy hot ember jet
+  particleCount = PARTICLE_FIELD_BH_HIT_PARTICLES;
+  particleSpeed = PARTICLE_FIELD_BH_HIT_PARTICLES_SPEED;
+  particleSpread = PARTICLE_FIELD_BH_HIT_PARTICLES_SPREAD;
+  // DUST — massy slow cool fan
+  dustCount = PARTICLE_FIELD_BH_HIT_DUST;
+  dustSpeed = PARTICLE_FIELD_BH_HIT_DUST_SPEED;
+  dustSpread = PARTICLE_FIELD_BH_HIT_DUST_SPREAD;
+  // Ambient
+  emberRate = PARTICLE_FIELD_BH_EMBER_BASE;
   swirlSurge = BH_HIT_SWIRL_SPEED_SURGE;
   surgeMs = Math.round(1 / BH_HIT_SURGE_DECAY);
   orbitExcite = BH_HIT_ORBIT_SPEED_SURGE;
-  dustDensity = PARTICLE_FIELD_DENSITY;
+  dustDensity = PARTICLE_FIELD_GAME_DENSITY;
   dustSwirl = 1.0;
   dustPull = PARTICLE_FIELD_DUST_PULL;
   hitVariant: BlackHoleHitVariant = 'thud';
@@ -236,6 +274,11 @@ export class BlackHoleLab {
       const a = (i / 48) * TWO_PI;
       this.field.spawnBurst(x + Math.cos(a) * 24, y + Math.sin(a) * 24, a, 0.5, 6, 9, 35, 1.2);
     }
+    // Matter blows out too — a full radial ring of escaping lances
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * TWO_PI;
+      this.matter.spray(x + Math.cos(a) * 24, y + Math.sin(a) * 24, a, 0.4, 3, 9, 1.1);
+    }
     this.explosions.spawn(x, y, bh.color, 120, EXPLOSION_DURATION_LARGE);
     this.explosions.spawn(x, y, [1, 1, 1], 50, EXPLOSION_DURATION_LARGE * 0.6);
     this.explosions.spawn(x, y, [1, 0.5, 0.1], 40, EXPLOSION_DURATION_LARGE * 1.5, 0.3);
@@ -250,12 +293,16 @@ export class BlackHoleLab {
 
   applyPreset(idx: number): void {
     const p = this.presets[idx];
-    this.ejectaCount = p.ejectaCount;
-    this.ejectaSpeed = p.ejectaSpeed;
-    this.ejectaSpread = p.ejectaSpread;
     this.matterCount = p.matterCount;
     this.matterSpeed = p.matterSpeed;
     this.matterSpread = p.matterSpread;
+    this.particleCount = p.particleCount;
+    this.particleSpeed = p.particleSpeed;
+    this.particleSpread = p.particleSpread;
+    this.dustCount = p.dustCount;
+    this.dustSpeed = p.dustSpeed;
+    this.dustSpread = p.dustSpread;
+    this.emberRate = p.emberRate;
     this.swirlSurge = p.swirlSurge;
     this.surgeMs = p.surgeMs;
     this.orbitExcite = p.orbitExcite;
@@ -281,6 +328,7 @@ export class BlackHoleLab {
     this.pendingHits = [];
     this.explosions.clear();
     this.field.clear();
+    this.matter.clear();
     this.respawnTimer = 0;
     this.hitCount = 0;
     this.spawnBlackHole();
@@ -350,22 +398,26 @@ export class BlackHoleLab {
         swirl: this.dustSwirl,
       });
 
-      // Bullet-impact ejecta — same two-burst recipe as Game.updateParticles, but driven
-      // by the lab sliders so the full range can be previewed.
+      // Bullet-impact response — the full three-element vocabulary, driven by the lab
+      // sliders so the whole range can be previewed (same recipe as Game.updateParticles).
       if (bh.impactEjecta.length > 0) {
         for (const hitAngle of bh.impactEjecta) {
           const hx = bh.position.x + Math.cos(hitAngle) * bh.collisionRadius * 0.9;
           const hy = bh.position.y + Math.sin(hitAngle) * bh.collisionRadius * 0.9;
-          this.field.spawnBurst(hx, hy, hitAngle, this.ejectaSpread, Math.round(this.ejectaCount), this.ejectaSpeed, 35, 0.55);
-          this.field.spawnBurst(hx, hy, hitAngle, this.matterSpread, Math.round(this.matterCount), this.matterSpeed, 190 + Math.random() * 130, 1.1);
+          // MATTER — massless escaping lances (no gravity)
+          this.matter.spray(hx, hy, hitAngle, this.matterSpread, Math.round(this.matterCount), this.matterSpeed, BH_HIT_MATTER_LIFE);
+          // PARTICLES — hot ember jet (massy: curves back into the well)
+          this.field.spawnBurst(hx, hy, hitAngle, this.particleSpread, Math.round(this.particleCount), this.particleSpeed, 35, 0.7, 1);
+          // DUST — slow cool fan (massy: rides the swirl back in)
+          this.field.spawnBurst(hx, hy, hitAngle, this.dustSpread, Math.round(this.dustCount), this.dustSpeed, 190 + Math.random() * 130, 1.1);
         }
         bh.impactEjecta.length = 0;
       }
 
-      // Ambient rim emission (the game's steady trickle) so the disk is always alive
+      // Ambient rim DUST emission (the game's steady trickle) so the disk is always alive
       if (Math.random() < PARTICLE_FIELD_BH_EMIT_BASE) {
         const heat = inst * 0.5;
-        for (let k = 0; k < 3; k++) {
+        for (let k = 0; k < 5; k++) {
           const a = Math.random() * TWO_PI;
           const rr = bh.collisionRadius * (1.6 + Math.random() * 1.4);
           const rx = bh.position.x + Math.cos(a) * rr;
@@ -373,6 +425,26 @@ export class BlackHoleLab {
           const inward = Math.atan2(bh.position.y - ry, bh.position.x - rx);
           this.field.spawnBurst(rx, ry, inward, 1.1, 1, 0.12 + Math.random() * 0.14, 210 - heat * 180, 0.95);
         }
+      }
+
+      // Ambient EMBERS (particles element) — hot motes shed on the rim that orbit + infall
+      if (Math.random() < this.emberRate) {
+        for (let k = 0; k < PARTICLE_FIELD_BH_EMBER_COUNT; k++) {
+          const a = Math.random() * TWO_PI;
+          const rr = bh.collisionRadius * (1.6 + Math.random() * 1.2);
+          const rx = bh.position.x + Math.cos(a) * rr;
+          const ry = bh.position.y + Math.sin(a) * rr;
+          const inward = Math.atan2(bh.position.y - ry, bh.position.x - rx);
+          this.field.spawnBurst(rx, ry, inward, 1.4, 1, 0.2 + Math.random() * 0.2, 40, 1.1, 1);
+        }
+      }
+
+      // Ambient MATTER trickle while stressed (mirrors the game; a no-op at zero mass)
+      if ((inst > 0.6 || (bh.destabilizing && !bh.overloaded)) && Math.random() < BH_MATTER_TRICKLE) {
+        const a = Math.random() * TWO_PI;
+        const rx = bh.position.x + Math.cos(a) * bh.collisionRadius * 0.9;
+        const ry = bh.position.y + Math.sin(a) * bh.collisionRadius * 0.9;
+        this.matter.spray(rx, ry, a, 0.6, BH_MATTER_TRICKLE_COUNT, this.matterSpeed * 0.8, BH_HIT_MATTER_LIFE);
       }
 
       // Grid gravity well (keeps the spacetime dent visible under the hole)
@@ -384,6 +456,7 @@ export class BlackHoleLab {
     }
 
     this.field.update(dt, attractors, this.view());
+    this.matter.update(dt);
     this.explosions.update(dt);
     this.grid.update(dt);
     this.camera.updateShake(dt);
@@ -436,10 +509,11 @@ export class BlackHoleLab {
     }
     this.renderer.end();
 
-    // Additive glow pass: dust field + explosions
+    // Additive glow pass: dust field, matter lances, explosions
     this.renderer.begin(false);
     this.renderer.setBlendMode('additive');
     this.field.render(this.renderer);
+    this.matter.render(this.renderer);
     this.explosions.render(this.renderer);
     this.renderer.setBlendMode('normal');
     this.renderer.end();
@@ -479,14 +553,21 @@ export class BlackHoleLab {
       if (this.bh) this.bh.visualMode = this.visualMode;
     });
 
-    // Hit FX sliders
-    this.panel.appendChild(this.panelLabel('Hit ejecta (dust burst)'));
-    this.addSlider('Ejecta count', 0, 80, 1, () => this.ejectaCount, (v) => { this.ejectaCount = v; });
-    this.addSlider('Ejecta speed', 1, 10, 0.1, () => this.ejectaSpeed, (v) => { this.ejectaSpeed = v; });
-    this.addSlider('Ejecta spread', 0.2, 3.1, 0.05, () => this.ejectaSpread, (v) => { this.ejectaSpread = v; });
-    this.addSlider('Matter count', 0, 60, 1, () => this.matterCount, (v) => { this.matterCount = v; });
-    this.addSlider('Matter speed', 0.5, 5, 0.1, () => this.matterSpeed, (v) => { this.matterSpeed = v; });
-    this.addSlider('Matter spread', 0.5, 3.1, 0.05, () => this.matterSpread, (v) => { this.matterSpread = v; });
+    // Hit FX sliders — the three-element emission vocabulary
+    this.panel.appendChild(this.panelLabel('Hit: MATTER (massless — escapes)'));
+    this.addSlider('Lance count', 0, 80, 1, () => this.matterCount, (v) => { this.matterCount = v; });
+    this.addSlider('Lance speed', 2, 12, 0.1, () => this.matterSpeed, (v) => { this.matterSpeed = v; });
+    this.addSlider('Lance spread', 0.2, 3.1, 0.05, () => this.matterSpread, (v) => { this.matterSpread = v; });
+
+    this.panel.appendChild(this.panelLabel('Hit: PARTICLES (massy — recaptured)'));
+    this.addSlider('Ember count', 0, 80, 1, () => this.particleCount, (v) => { this.particleCount = v; });
+    this.addSlider('Ember speed', 1, 10, 0.1, () => this.particleSpeed, (v) => { this.particleSpeed = v; });
+    this.addSlider('Ember spread', 0.2, 3.1, 0.05, () => this.particleSpread, (v) => { this.particleSpread = v; });
+
+    this.panel.appendChild(this.panelLabel('Hit: DUST (massy — recaptured)'));
+    this.addSlider('Dust count', 0, 60, 1, () => this.dustCount, (v) => { this.dustCount = v; });
+    this.addSlider('Dust speed', 0.5, 5, 0.1, () => this.dustSpeed, (v) => { this.dustSpeed = v; });
+    this.addSlider('Dust spread', 0.5, 3.1, 0.05, () => this.dustSpread, (v) => { this.dustSpread = v; });
 
     this.panel.appendChild(this.panelLabel('Swirl / orbit surge (on hit)'));
     this.addSlider('Swirl surge', 0, 3, 0.05, () => this.swirlSurge, (v) => {
@@ -503,13 +584,14 @@ export class BlackHoleLab {
     });
 
     this.panel.appendChild(this.panelLabel('Ambient dust field'));
-    this.addSlider('Dust density', 60, 1200, 20, () => this.dustDensity, (v) => {
+    this.addSlider('Dust density', 60, 1400, 20, () => this.dustDensity, (v) => {
       this.dustDensity = v;
       this.field.density = Math.round(v);
       this.field.reseed();
     });
     this.addSlider('Dust swirl', 0, 2.5, 0.05, () => this.dustSwirl, (v) => { this.dustSwirl = v; });
     this.addSlider('Dust pull', 0, 6000, 50, () => this.dustPull, (v) => { this.dustPull = v; });
+    this.addSlider('Ember rate', 0, 1, 0.05, () => this.emberRate, (v) => { this.emberRate = v; });
 
     this.panel.appendChild(this.panelLabel('Sound'));
     this.addSelect('Hit variant', HIT_VARIANTS, this.hitVariant, (v) => { this.hitVariant = v as BlackHoleHitVariant; });
@@ -622,6 +704,6 @@ export class BlackHoleLab {
     }
     this.statusLine.textContent =
       `mode ${bh.visualMode} · mass ${bh.absorbedCount}/${BlackHole.MAX_ABSORB} · ` +
-      `motes ${this.field.count} · hits ${this.hitCount} · sound ${this.hitVariant}@${this.hitVolume.toFixed(2)}`;
+      `motes ${this.field.count} · lances ${this.matter.count} · hits ${this.hitCount} · sound ${this.hitVariant}@${this.hitVolume.toFixed(2)}`;
   }
 }

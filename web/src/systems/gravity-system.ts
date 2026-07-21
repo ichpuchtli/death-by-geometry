@@ -22,6 +22,7 @@ import {
   SUPERNOVA_SHOCKWAVE_RINGS,
   SUPERNOVA_DESTABILIZE_MS,
   SUPERNOVA_SOUND_VARIANT,
+  BH_ABSORB_SOUND_COOLDOWN_MS,
   BH_CORE_RADIUS_FRACTION,
   BH_CORE_PULL_MULT,
   CIRCLE_EJECT_SPEED_MIN,
@@ -74,6 +75,9 @@ export class GravitySystem {
   // Tracks BlackHoles whose destabilize warning has already played
   private supernovaWarningPlayed = new Set<BlackHole>();
 
+  // ms — rate-limits the absorb gulp so a wave crossing the well can't stack it
+  private absorbSoundCooldown = 0;
+
   // Expanding supernova shockwave rings (visual only, rendered in the additive pass)
   private shockRings: ShockRing[] = [];
 
@@ -103,6 +107,7 @@ export class GravitySystem {
   /** Apply BlackHole gravitational attraction to nearby enemies + absorb on contact */
   applyAttraction(dt: number): void {
     const { enemies, explosions, grid, audio, bullets } = this.deps;
+    if (this.absorbSoundCooldown > 0) this.absorbSoundCooldown -= dt;
 
     const blackholes: BlackHole[] = [];
     for (const e of enemies) {
@@ -144,6 +149,10 @@ export class GravitySystem {
         if (dist2 < absorbR2 && bh.absorbedCount < BlackHole.MAX_ABSORB) {
           e.active = false;
           bh.absorbEnemy();
+          if (this.absorbSoundCooldown <= 0) {
+            audio.playBlackHoleAbsorb();
+            this.absorbSoundCooldown = BH_ABSORB_SOUND_COOLDOWN_MS;
+          }
           explosions.spawn(e.position.x, e.position.y, e.color, 15, 0.6);
           grid.applyImpulse(e.position.x, e.position.y, -20, 120);
           continue;

@@ -142,7 +142,7 @@ export class CombatSystem {
     // BlackHole per-hit thud — one sound per frame at most, no matter how many bullets
     // landed (rapid fire rate-limited exactly like the boss tick).
     if (result.blackholeHits && result.blackholeHits.length > 0 && this.bhHitSoundCooldown <= 0) {
-      this.deps.audio.playBlackHoleHit();
+      this.deps.audio.playBlackHoleHitDefault();
       this.bhHitSoundCooldown = BH_HIT_SOUND_COOLDOWN_MS;
     }
 
@@ -223,7 +223,7 @@ export class CombatSystem {
         }
         case 'blackhole': {
           const absorbed = kill.enemy instanceof BlackHole ? kill.enemy.absorbedCount : 0;
-          this.deps.audio.playBlackHoleDeath(absorbed);
+          this.deps.audio.playBlackHoleDeathSample(absorbed);
           // Noisy, multi-color explosion stack — the stored accretion disk blows out in
           // every hue it was made of, not just the hole's base color.
           this.deps.explosions.spawn(

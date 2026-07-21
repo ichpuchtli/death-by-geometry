@@ -35,6 +35,7 @@ export interface FieldView {
 }
 
 type MoteMode = 0 | 1 | 2; // 0 = ambient (persistent), 1 = transient, 2 = dead slot
+type MoteKind = 0 | 1; // 0 = dust (tiny, dim, cool) · 1 = particle/ember (bigger, hotter, brighter)
 
 class Mote {
   x = 0;
@@ -47,6 +48,7 @@ class Mote {
   size = 1;
   spark = 0;
   mode: MoteMode = 0;
+  kind: MoteKind = 0;
   life = 0;    // seconds remaining (transient only)
   maxLife = 1;
 }
@@ -74,6 +76,14 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
  * velocity-stretched streaks whose brightness/hue rise with speed. Also accepts
  * transient injected bursts (thruster wake, impact sparklets) that share the same
  * streak look and fade out over a short lifetime.
+ *
+ * Two mote KINDS (both massy — both feel the gravity integration):
+ *   0 = dust    — tiny, dim, cool-hued points; the ambient fog + kicked-up slow fans.
+ *   1 = ember   — the "particles" element: bigger, brighter, hot-hued streaks with a
+ *                 white-hot core, jetted out of a BlackHole's disk on bullet hits and
+ *                 shed from its rim; they visibly curve/orbit as the well recaptures them.
+ * (The third BlackHole element — massless escaping "matter" lances — deliberately does
+ *  NOT live here; see renderer/matter-field.ts.)
  *
  * Reusable by both the Particle Lab and the live game. Render during the additive
  * blend pass; bloom does the glow.
@@ -114,6 +124,7 @@ export class ParticleField {
     for (let i = ambient.length; i < this.density; i++) {
       const m = this.acquire();
       m.mode = 0;
+      m.kind = 0; // ambient fog is always dust, never embers
       m.x = minX + Math.random() * spanX;
       m.y = minY + Math.random() * spanY;
       m.px = m.x;
@@ -140,11 +151,13 @@ export class ParticleField {
   /**
    * Inject a short-lived burst of motes fanning out along `angle` — used for the
    * player thruster wake and bullet-impact sparklets. Reuses dead slots so it
-   * never unbounds the pool.
+   * never unbounds the pool. `kind` 1 marks embers (the BlackHole "particles"
+   * element): bigger, brighter, hotter — still gravity-integrated.
    */
   spawnBurst(
     x: number, y: number, angle: number, spread: number,
     count: number, speed: number, hue: number, life: number,
+    kind: MoteKind = 0,
   ): void {
     let transient = 0;
     for (const m of this.motes) if (m.mode === 1) transient++;
@@ -154,6 +167,7 @@ export class ParticleField {
       const m = this.acquire();
       if (m.mode !== 1) transient++;
       m.mode = 1;
+      m.kind = kind;
       const a = angle + (Math.random() - 0.5) * spread;
       const sp = speed * (0.4 + Math.random() * 0.6);
       m.x = x;
@@ -163,7 +177,7 @@ export class ParticleField {
       m.vx = Math.cos(a) * sp;
       m.vy = Math.sin(a) * sp;
       m.hue = (hue + (Math.random() - 0.5) * 40 + 360) % 360;
-      m.size = 0.7 + Math.random() * 1.1;
+      m.size = (0.7 + Math.random() * 1.1) * (kind === 1 ? 1.9 : 1);
       m.spark = Math.random();
       m.maxLife = life * (0.7 + Math.random() * 0.6);
       m.life = m.maxLife;
@@ -271,14 +285,21 @@ export class ParticleField {
       let lifeAlpha = 1;
       if (m.mode === 1) lifeAlpha = Math.max(0, m.life / m.maxLife);
 
-      const alpha = Math.min(0.9, 0.2 + sp * 0.085 + m.spark * 0.16) * lifeAlpha * bright;
-      const lightness = Math.min(0.82, 0.54 + sp * 0.035);
+      const ember = m.kind === 1;
+      // Embers read as their own element: brighter floor, hotter lightness, longer streak,
+      // plus a white-hot core line on top of the hue streak.
+      const alpha = (ember
+        ? Math.min(1, 0.38 + sp * 0.1 + m.spark * 0.2)
+        : Math.min(0.9, 0.2 + sp * 0.085 + m.spark * 0.16)) * lifeAlpha * bright;
+      const lightness = ember
+        ? Math.min(0.9, 0.64 + sp * 0.04)
+        : Math.min(0.82, 0.54 + sp * 0.035);
       const [r, g, b] = hslToRgb((m.hue % 360) / 360, 0.95, lightness);
 
       // Streak tail trails behind along the velocity; near-still motes get a tiny
       // nub so they still read as a point of light.
-      let tx = m.vx * streak;
-      let ty = m.vy * streak;
+      let tx = m.vx * streak * (ember ? 1.9 : 1);
+      let ty = m.vy * streak * (ember ? 1.9 : 1);
       const segLen = Math.hypot(tx, ty);
       if (segLen < 1.2) {
         const a = m.hue * 0.017453;
@@ -286,6 +307,9 @@ export class ParticleField {
         ty = Math.sin(a) * 1.3;
       }
       renderer.drawLine(m.x - tx, m.y - ty, m.x, m.y, r, g, b, alpha);
+      if (ember) {
+        renderer.drawLine(m.x - tx * 0.45, m.y - ty * 0.45, m.x, m.y, 1, 0.96, 0.85, alpha * 0.9);
+      }
     }
   }
 
