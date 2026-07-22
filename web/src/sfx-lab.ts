@@ -6,11 +6,30 @@ interface SfxCandidate {
   id: number;
   name: string;
   file: string;
-  prompt: string;
-  duration: number;
+  prompt: string | null;
+  duration: number | null;
   /** false until the generator has produced the mp3 and `npm run sfx:sync` has copied it. */
   available: boolean;
 }
+
+/** One Artlist-candidate category — auto-discovered files, no manifest/prompt. */
+interface ArtlistCategory {
+  dir: string;
+  label: string;
+  base: string;
+  candidates: SfxCandidate[];
+  ready: boolean;
+  loadError: string | null;
+}
+
+const ARTLIST_CATEGORIES: { dir: string; label: string }[] = [
+  { dir: 'player-hit', label: 'Player hit / damage taken (currently silent)' },
+  { dir: 'player-death', label: 'Player death (replaces die/die1.wav)' },
+  { dir: 'weapon-upgrade', label: 'Weapon stage upgrade (currently silent)' },
+  { dir: 'legacy-kills', label: 'Legacy kill/UI replacements (rhombus/pinwheel/octagon/crash/deathstar/triangle2.wav)' },
+  { dir: 'ui-click', label: 'Menu click / pause / mute toggle (currently silent)' },
+  { dir: 'game-start', label: 'Game start / power-on (replaces start.wav)' },
+];
 
 const HIT_VARIANTS: BlackHoleHitVariant[] = ['thud', 'gulp', 'crack'];
 const DEATH_VARIANTS: SupernovaSoundVariant[] = ['classic', 'subdrop', 'doom', 'quake'];
@@ -62,6 +81,13 @@ export class SfxLab {
   spawnReady = false;
   spawnLoadError: string | null = null;
   spawnEntriesRendered = 0;
+  artlist: ArtlistCategory[] = ARTLIST_CATEGORIES.map((c) => ({
+    ...c,
+    base: `./sfx-audition/artlist-${c.dir}`,
+    candidates: [],
+    ready: false,
+    loadError: null,
+  }));
   volume = 0.8;
   spamRate = 8; // hits/sec for the rapid-fire toggles
   entriesRendered = 0;
@@ -91,6 +117,7 @@ export class SfxLab {
     this.buildShell();
     this.loadCandidates();
     this.loadSpawnCandidates();
+    for (const cat of this.artlist) this.loadArtlistCategory(cat);
   }
 
   // ============================================================
@@ -122,6 +149,19 @@ export class SfxLab {
     this.renderSpawnCandidates();
   }
 
+  private async loadArtlistCategory(cat: ArtlistCategory): Promise<void> {
+    try {
+      const resp = await fetch(`${cat.base}/index.json`);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      cat.candidates = (await resp.json()) as SfxCandidate[];
+    } catch {
+      cat.loadError = 'index.json not found — run `npm run sfx:sync` (in web/) to build the audition index.';
+      cat.candidates = [];
+    }
+    cat.ready = true;
+    this.renderArtlistCategory(cat);
+  }
+
   // ============================================================
   // Playback
   // ============================================================
@@ -151,6 +191,16 @@ export class SfxLab {
     const c = this.spawnCandidates[id - 1];
     if (!c || !c.available) return;
     const el = new Audio(`${AUDITION_SPAWN_BASE}/${c.file}`);
+    el.volume = this.volume;
+    el.play().catch(() => {});
+  }
+
+  /** Artlist candidate by category dir + 1-based id. No-op if missing (never an error). */
+  playArtlistCandidate(dir: string, id: number): void {
+    const cat = this.artlist.find((c) => c.dir === dir);
+    const c = cat?.candidates[id - 1];
+    if (!c || !c.available) return;
+    const el = new Audio(`${cat!.base}/${c.file}`);
     el.volume = this.volume;
     el.play().catch(() => {});
   }
@@ -248,6 +298,29 @@ export class SfxLab {
     spawnList.textContent = 'loading index.json…';
     spawnList.style.color = '#6f8aa8';
     this.page.appendChild(spawnList);
+
+    // Section 5 — Artlist candidates (one subsection per category, auto-discovered)
+    this.page.appendChild(this.sectionTitle('5 · Artlist candidates — manually downloaded, auto-discovered'));
+    const artlistNote = document.createElement('div');
+    artlistNote.style.cssText = 'color:#6f8aa8;font-size:10px;margin-bottom:6px;';
+    artlistNote.textContent =
+      'Download mp3/wav files from Artlist into sounds/artlist-candidates/<category>/ (repo root, git-ignored), ' +
+      'then run npm run sfx:sync (web/) to pick them up here — no manifest needed, whatever\'s in the folder shows up.';
+    this.page.appendChild(artlistNote);
+    for (const cat of this.artlist) {
+      const details = document.createElement('details');
+      details.style.cssText = 'margin:4px 0;';
+      details.open = true;
+      const summary = document.createElement('summary');
+      summary.style.cssText = 'cursor:pointer;color:#ffc9a0;font-size:11px;';
+      summary.textContent = cat.label;
+      const list = document.createElement('div');
+      list.id = `sfx-lab-artlist-${cat.dir}`;
+      list.style.cssText = 'padding:4px 0 4px 12px;color:#6f8aa8;';
+      list.textContent = 'loading index.json…';
+      details.append(summary, list);
+      this.page.appendChild(details);
+    }
   }
 
   private renderCandidates(): void {
@@ -297,6 +370,33 @@ export class SfxLab {
       });
       list.appendChild(row);
       this.spawnEntriesRendered++;
+    }
+  }
+
+  private renderArtlistCategory(cat: ArtlistCategory): void {
+    const list = document.getElementById(`sfx-lab-artlist-${cat.dir}`) as HTMLDivElement | null;
+    if (!list) return;
+    list.innerHTML = '';
+    list.style.color = '';
+    if (cat.loadError) {
+      list.textContent = cat.loadError;
+      list.style.color = '#c88a5a';
+      return;
+    }
+    if (cat.candidates.length === 0) {
+      list.textContent = `no candidates yet — drop mp3/wav files into sounds/artlist-candidates/${cat.dir}/`;
+      list.style.color = '#5a6a7a';
+      return;
+    }
+    for (const c of cat.candidates) {
+      const row = this.entryRow({
+        label: c.name,
+        keyHint: null,
+        available: c.available,
+        prompt: null,
+        play: () => this.playArtlistCandidate(cat.dir, c.id),
+      });
+      list.appendChild(row);
     }
   }
 

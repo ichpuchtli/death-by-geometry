@@ -30,6 +30,7 @@ const { chromium } = require('playwright');
     lab.playDeathVariant('subdrop');
     lab.playCandidate(1);
     lab.playSpawnCandidate(1);
+    lab.playArtlistCandidate('player-hit', 1); // empty category — no-op, must not throw
     const buttons = document.querySelectorAll('#sfx-lab-page button');
     const pendingIn = (id) => [...document.querySelectorAll(`#${id} span`)]
       .filter((el) => el.textContent === 'pending generation').length;
@@ -48,6 +49,11 @@ const { chromium } = require('playwright');
       buttons: buttons.length,
       pendingBadges: pendingIn('sfx-lab-candidates'),
       spawnPendingBadges: pendingIn('sfx-lab-spawn-candidates'),
+      artlistCategories: lab.artlist.length,
+      artlistAllReady: lab.artlist.every((c) => c.ready),
+      artlistAllNoError: lab.artlist.every((c) => !c.loadError),
+      artlistEmptyMessages: [...document.querySelectorAll('[id^="sfx-lab-artlist-"]')]
+        .filter((el) => el.textContent.startsWith('no candidates yet')).length,
     };
   });
 
@@ -73,6 +79,10 @@ const { chromium } = require('playwright');
     info.spawnEntriesRendered === 11 &&
     info.spawnAvailable + info.spawnPendingBadges === 11 &&
     info.buttons >= 12 + 11 + 3 + 4 && // hit + spawn candidates + 3 procedural hits + 4 deaths
+    info.artlistCategories === 6 &&
+    info.artlistAllReady &&
+    info.artlistAllNoError &&
+    info.artlistEmptyMessages === 6 && // no downloads yet — all 6 categories show the empty-state hint
     errors.length === 0;
   if (!pass) {
     console.error('SMOKE FAIL');

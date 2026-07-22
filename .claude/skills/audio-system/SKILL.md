@@ -96,3 +96,13 @@ Wired in `game.ts`: `formationSpawnCounts` map tracks per-formation spawn counts
 - **Menu stitching:** `npm run sfx:stitch-menus` wraps `scripts/stitch-elevenlabs-menu-themes.sh`
 - **Kill signature previews:** `sounds/kill-signature-previews/` — FFmpeg-synthesized WAVs from `scripts/generate-kill-signature-previews.sh` (not wired into gameplay)
 - **Project skill doc:** `.agents/skills/elevenlabs-game-audio/SKILL.md`
+
+## Artlist Candidates (manual download, no API/MCP generation)
+
+The connected Artlist MCP server only exposes image/video/voiceover generation + asset uploads — **no SFX search or download tool** — so unlike ElevenLabs there's no scripted generation path. The workflow is manual: the user shops Artlist's own library/app and downloads mp3/wav candidates into `sounds/artlist-candidates/<category>/` (repo root, **git-ignored** — Artlist licensing is per-subscription, unlike ElevenLabs' `sounds/generated/` which is tracked in git).
+
+- `npm run sfx:sync` (in `web/`) auto-discovers whatever files exist per category — no manifest, so it lists whatever's actually there rather than "pending" placeholders — and writes `web/public/sfx-audition/artlist-<dir>/index.json`.
+- Categories (`AUTO_CATEGORIES` in `web/scripts/sync-sfx-audition.mjs`, `ARTLIST_CATEGORIES` in `web/src/sfx-lab.ts` — keep both lists in sync): `player-hit` (currently silent — the biggest gap, see below), `player-death`, `weapon-upgrade` (currently silent), `legacy-kills` (replacements for the 2013 WAVs), `ui-click` (currently silent), `game-start`.
+- Section 5 of the `?sfx=1` lab renders one collapsible subsection per category, click-only, empty-state hint instead of an error when nothing's downloaded yet.
+- **Known silent events** (zero sound, not just weak/inconsistent): player taking damage / losing a life (`game.ts` `result.playerHit` branch — decrements `player.lives`, calls `hud.onPlayerHit()`, no audio call at all), weapon stage upgrade, and all menu/pause/mute UI interactions.
+- **Established sound language** to match when picking candidates: deep, saturated/gritty sub-bass, dry (no long reverb tails — they smear at rapid-fire rates), short and punchy, cinematic rather than cartoonish. Set by the ElevenLabs v3 black-hole picks (magnetic thump / heartbeat hollow / sub drop) and the "Deep Thump" weapon fire.

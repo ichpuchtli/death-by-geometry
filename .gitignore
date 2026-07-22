@@ -2,3 +2,6 @@ node_modules/
 
 # Local secrets
 .env
+
+# Artlist SFX candidates — manually downloaded, per-subscription licensing, not for the repo
+sounds/artlist-candidates/
