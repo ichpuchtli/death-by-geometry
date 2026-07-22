@@ -325,8 +325,12 @@ export class Game {
 
     // Click/touch to start + init audio
     // Use touchend for iOS Safari reliability (touchstart preventDefault in Input
-    // suppresses synthetic click, and passive/non-passive conflicts cause issues)
+    // suppresses synthetic click, and passive/non-passive conflicts cause issues).
+    // Also kick audio on touchstart: iOS unlocks WebAudio most reliably on the
+    // earliest gesture, and this resumes a context parked by lock/call/Siri without
+    // waiting for the finger to lift.
     gameCanvas.addEventListener('click', () => this.onInteract());
+    gameCanvas.addEventListener('touchstart', () => this.ensureAudio(), { passive: true });
     gameCanvas.addEventListener('touchend', (e) => {
       e.preventDefault();
       this.onInteract();
@@ -483,7 +487,7 @@ export class Game {
     if (this.state === 'menu') this.hud.drawMenu();
   }
 
-  private onInteract(): void {
+  private ensureAudio(): void {
     // Init audio on first user gesture (non-blocking so game start isn't
     // prevented by audio failures on iOS Safari)
     if (!this.audio.initialized) {
@@ -491,6 +495,10 @@ export class Game {
     } else {
       this.audio.resume().catch(() => {});
     }
+  }
+
+  private onInteract(): void {
+    this.ensureAudio();
 
     if (this.state === 'design_lab') {
       this.designLab?.onClick();

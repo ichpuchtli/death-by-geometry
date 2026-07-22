@@ -47,7 +47,18 @@ export class AudioManager {
 
       this.sfxGain = this.ctx.createGain();
       this.sfxGain.gain.value = SFX_VOLUME;
-      this.sfxGain.connect(this.masterGain);
+      // Safety limiter on the SFX bus: stacked sub-heavy samples (rapid black-hole
+      // hits, supernovae) can sum past full scale and hard-clip, which reads as a
+      // harsh "bitcrushed" glitch. Only engages on loud stacks; the normal mix is
+      // untouched.
+      const sfxLimiter = this.ctx.createDynamicsCompressor();
+      sfxLimiter.threshold.value = -6;
+      sfxLimiter.knee.value = 3;
+      sfxLimiter.ratio.value = 12;
+      sfxLimiter.attack.value = 0.003;
+      sfxLimiter.release.value = 0.12;
+      this.sfxGain.connect(sfxLimiter);
+      sfxLimiter.connect(this.masterGain);
 
       this.musicGain = this.ctx.createGain();
       this.musicGain.gain.value = MUSIC_VOLUME;
@@ -57,9 +68,12 @@ export class AudioManager {
       this.musicGain.connect(this.musicFilter);
       this.musicFilter.connect(this.masterGain);
 
-      // Load all SFX (WAV + generated MP3)
-      await this.loadAllSFX();
-      await this.loadGeneratedSFX();
+      // Load all SFX (WAV + generated MP3). On mobile these fetches can be slow or
+      // hang (flaky network, service worker), so the graph goes live FIRST and
+      // samples stream in afterwards — procedural fallbacks cover anything not yet
+      // loaded, and a hung fetch can never silence the whole game.
+      void this.loadAllSFX();
+      void this.loadGeneratedSFX();
 
       // Create procedural music
       this.music = new ProceduralMusic(this.ctx, this.musicGain);
@@ -1138,18 +1152,47 @@ export class AudioManager {
   }
 
   /** Play a generated (sampled) SFX buffer; returns false if not loaded yet so callers can fall back */
+  // Voice management for generated samples: rapid triggers (black-hole bullet hits
+  // every 45ms) would otherwise stack ~1s-long sub-heavy samples (peak 0.97 FS each)
+  // until the bus clips — which reads as a glitchy tail that "never fades". Cap
+  // concurrent voices per sample and steal the oldest with a fast fade (click-free).
+  private static GENERATED_VOICE_CAP = 4;
+  private generatedVoices = new Map<string, { gain: GainNode; source: AudioBufferSourceNode }[]>();
+
   private playGeneratedBuffer(name: string, volume: number): boolean {
     if (!this._initialized || !this.ctx || !this.sfxGain) return false;
     const buf = this.buffers.get(name);
     if (!buf) return false;
-    const source = this.ctx.createBufferSource();
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+
+    let voices = this.generatedVoices.get(name);
+    if (!voices) { voices = []; this.generatedVoices.set(name, voices); }
+    while (voices.length >= AudioManager.GENERATED_VOICE_CAP) {
+      const old = voices.shift()!;
+      old.gain.gain.cancelScheduledValues(now);
+      old.gain.gain.setValueAtTime(old.gain.gain.value, now);
+      old.gain.gain.linearRampToValueAtTime(0, now + 0.03);
+      old.source.stop(now + 0.05);
+    }
+
+    const source = ctx.createBufferSource();
     source.buffer = buf;
     source.playbackRate.value = this.timeScale;
-    const gain = this.ctx.createGain();
-    gain.gain.value = Math.min(1, Math.max(0, volume));
+    const gain = ctx.createGain();
+    // 4ms attack ramp — the samples start hard (non-zero first sample) and click
+    // without one. Volume cap is 3 (not 1) so quiet-picked samples can be hot.
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(Math.min(3, Math.max(0, volume)), now + 0.004);
     source.connect(gain);
     gain.connect(this.sfxGain);
     source.start(0);
+    const entry = { gain, source };
+    voices.push(entry);
+    source.onended = () => {
+      const i = voices.indexOf(entry);
+      if (i >= 0) voices.splice(i, 1);
+    };
     return true;
   }
 
@@ -1165,8 +1208,9 @@ export class AudioManager {
     }
   }
 
-  /** Hole absorbs an enemy — 'heartbeat_hollow' sample at 0.7 (under the hit sound), fallback 'gulp' */
-  playBlackHoleAbsorb(volume: number = 0.7): void {
+  /** Hole absorbs an enemy — 'heartbeat_hollow' sample (intrinsically quiet, ~0.17 FS
+   * peak, so it needs >1 gain to read under the hit thump), fallback 'gulp' */
+  playBlackHoleAbsorb(volume: number = 2.0): void {
     if (!this.playGeneratedBuffer('blackhole-absorb', volume)) {
       this.playBlackHoleHit('gulp', volume);
     }
@@ -1898,10 +1942,12 @@ export class AudioManager {
     shimmer.stop(now + 2.2);
   }
 
-  /** Resume AudioContext if suspended (call on user gesture) */
+  /** Resume AudioContext if suspended/interrupted (call on user gesture) */
   async resume(): Promise<void> {
-    if (this.ctx && this.ctx.state === 'suspended') {
-      await this.ctx.resume();
+    // iOS Safari also parks the context in 'interrupted' (phone call, Siri, screen
+    // lock); only a user gesture can bring it back.
+    if (this.ctx && this.ctx.state !== 'running') {
+      try { await this.ctx.resume(); } catch { /* gesture window may have passed */ }
     }
   }
 }

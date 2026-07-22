@@ -100,10 +100,16 @@ export class Input implements InputSource {
     this.mode = 'touch';
     const half = this.canvasWidth / 2;
 
+    // Hygiene: iOS system gestures can swallow a touchend/touchcancel, leaving a
+    // tracked touch id wedged forever — which permanently kills the TIME button
+    // (every later press fails the timeTouchId<0 check and becomes a joystick) or
+    // a stick. Drop any tracked id that is no longer among the active touches.
+    this.pruneStaleTouches(e);
+
     for (let i = 0; i < e.changedTouches.length; i++) {
       const t = e.changedTouches[i];
       const tc = this.timeButtonCenter;
-      if (this.timeTouchId < 0 && Math.hypot(t.clientX - tc.x, t.clientY - tc.y) <= TIME_BUTTON_RADIUS * 1.25) {
+      if (this.timeTouchId < 0 && Math.hypot(t.clientX - tc.x, t.clientY - tc.y) <= TIME_BUTTON_RADIUS * 1.6) {
         this.timeTouchId = t.identifier;
         continue;
       }
@@ -113,6 +119,19 @@ export class Input implements InputSource {
         stick.touchId = t.identifier;
         stick.origin.set(t.clientX, t.clientY);
         stick.current.set(t.clientX, t.clientY);
+      }
+    }
+  }
+
+  /** Release tracked touch ids (TIME button + sticks) that are no longer active. */
+  private pruneStaleTouches(e: TouchEvent): void {
+    const active = new Set<number>();
+    for (let i = 0; i < e.touches.length; i++) active.add(e.touches[i].identifier);
+    if (this.timeTouchId >= 0 && !active.has(this.timeTouchId)) this.timeTouchId = -1;
+    for (const stick of [this.leftStick, this.rightStick]) {
+      if (stick.active && !active.has(stick.touchId)) {
+        stick.active = false;
+        stick.touchId = -1;
       }
     }
   }
