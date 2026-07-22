@@ -6,18 +6,7 @@ import { gameSettings } from '../../settings';
 import { EnemyType } from '../../spawner/spawn-patterns';
 
 export type EnemyDeathResult = {
-  spawnEnemies?: {
-    type: EnemyType;
-    position: Vec2;
-    tier?: number;
-    /** Initial rotation (radians). Used so cracked fragments inherit the parent's orientation. */
-    rotation?: number;
-    /** Skip the warp-in spawn animation — the child appears instantly (cracks into place). */
-    instant?: boolean;
-    /** Outward "crack" momentum (px/ms) so children visibly split apart before resuming AI. */
-    crackVx?: number;
-    crackVy?: number;
-  }[];
+  spawnEnemies?: { type: EnemyType; position: Vec2; tier?: number }[];
   /** If true, children spawn with a staggered theatrical delay */
   staggeredSpawn?: boolean;
 };

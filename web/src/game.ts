@@ -1692,7 +1692,7 @@ export class Game {
     return s;
   }
 
-  /** Deterministic test hook: run a single enemy through the real kill/crack pipeline. */
+  /** Deterministic test hook: run a single enemy through the real kill pipeline. */
   debugKillEnemy(enemy: Enemy, impactAngle = 0): void {
     enemy.active = false;
     this.combat.processKills({

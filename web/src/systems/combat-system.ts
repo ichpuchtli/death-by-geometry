@@ -273,28 +273,37 @@ export class CombatSystem {
         case 'sierpinski': {
           const sTier = (kill.enemy instanceof Sierpinski) ? kill.enemy.tier : 2;
           if (sTier === 0) {
-            // Boss cracks apart into 3 tier-1 fragments (spawned instantly in onDeath).
-            // Keep the impact weight (shake/hitstop/grid punch) but replace the big
-            // particle poof with a crisp fracture flash so it reads as a split, not a puff.
             this.deps.explosions.spawn(
-              kill.position.x, kill.position.y, [1, 0.95, 0.5],
-              this.mobile ? 18 : 34, EXPLOSION_DURATION_DEFAULT * 0.7,
+              kill.position.x, kill.position.y, kill.color,
+              this.mobile ? 80 : 160, EXPLOSION_DURATION_LARGE,
             );
-            this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 700, 320);
+            this.deps.explosions.spawn(
+              kill.position.x, kill.position.y, [1, 0.9, 0.3],
+              this.mobile ? 40 : 80, EXPLOSION_DURATION_DEFAULT,
+            );
+            this.deps.explosions.spawn(
+              kill.position.x, kill.position.y, [1, 0.7, 0.1],
+              this.mobile ? 30 : 60, EXPLOSION_DURATION_LARGE * 0.8, 0.3,
+            );
+            this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 800, 350);
             this.deps.camera.shake(SCREEN_SHAKE_DEATH);
             maxHitstop = Math.max(maxHitstop, HITSTOP_SIERPINSKI * 2);
             this.deps.onSierpinskiBossDefeated();
           } else if (sTier === 1) {
-            // Cracks into 3 tier-2 fragments — light fracture flash, no debris shatter.
+            const shattered = this.emitShatter(kill.enemy, kill.position.x, kill.position.y, kill.color, dir);
             this.deps.explosions.spawn(
-              kill.position.x, kill.position.y, [1, 0.95, 0.5],
-              this.mobile ? 10 : 18, EXPLOSION_DURATION_DEFAULT * 0.6, 1, dir,
+              kill.position.x, kill.position.y, kill.color,
+              shattered ? (this.mobile ? 8 : 16) : (this.mobile ? 40 : 80),
+              EXPLOSION_DURATION_DEFAULT, 1, dir,
             );
-            this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 400, 200);
+            this.deps.explosions.spawn(
+              kill.position.x, kill.position.y, [1, 0.9, 0.3],
+              this.mobile ? 20 : 40, EXPLOSION_DURATION_DEFAULT * 0.7, 1, dir,
+            );
+            this.deps.grid.applyImpulse(kill.position.x, kill.position.y, 500, 220);
             this.deps.camera.shake(SCREEN_SHAKE_LARGE);
             maxHitstop = Math.max(maxHitstop, HITSTOP_SIERPINSKI);
           } else {
-            // Last layer: shatter completely into tumbling geometry debris.
             const shattered = this.emitShatter(kill.enemy, kill.position.x, kill.position.y, kill.color, dir);
             this.deps.explosions.spawn(
               kill.position.x, kill.position.y, kill.color,
@@ -366,13 +375,6 @@ export class CombatSystem {
         } else {
           for (const child of deathResult.spawnEnemies) {
             const ce = createEnemy(child.type, child.position, false, child.tier);
-            if (child.rotation !== undefined) ce.rotation = child.rotation;
-            // Instant "crack into place": skip the warp-in animation so the fragment
-            // appears immediately where it split off, instead of re-materialising.
-            if (child.instant) ce.spawnTimer = 0;
-            if (child.crackVx !== undefined && ce instanceof Sierpinski) {
-              ce.applyCrack(child.crackVx, child.crackVy ?? 0);
-            }
             this.deps.lifecycle.spawnEnemy(ce);
             this.deps.enemies.push(ce);
           }
